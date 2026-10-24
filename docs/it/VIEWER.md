@@ -1253,9 +1253,9 @@ I tipi TypeScript del client sono generati da questo schema in `client/src/app/c
 
 | Endpoint | Descrizione |
 |----------|-------------|
-| `GET /api/persons` | Elenca tutte le persone |
+| `GET /api/persons` | Elenca tutte le persone; `named_only=true` esclude quelle senza nome (la pagina persone lo fa mentre è mostrato «Da nominare») |
 | `POST /api/persons` | Crea una nuova persona, allegando facoltativamente dei volti (riservato alla modalità di modifica). Corpo: `{name, face_ids}` |
-| `GET /api/persons/needs_naming?min_faces=N` | Elenca le persone raggruppate automaticamente senza nome con `face_count >= N` (predefinito da `viewer.persons.needs_naming_min_faces`) |
+| `GET /api/persons/needs_naming?min_faces=N` | Elenca le persone senza nome (assente o vuoto), non nascoste, con `face_count >= N`, dal raggruppamento o da una divisione (predefinito da `viewer.persons.needs_naming_min_faces`) |
 | `POST /api/persons/{id}/rename` | Rinomina una persona |
 | `POST /api/persons/{id}/assign_faces` | Allega in blocco volti a una persona; le vecchie persone vuote vengono eliminate automaticamente (riservato alla modalità di modifica). Corpo: `{face_ids, tolerant?, only_unassigned?}`. Con `tolerant: true` la chiamata assegna ciò che può e segnala il resto invece di fallire: `missing`, `already`, `skipped_model`, `skipped_hidden`, `skipped_assigned` (più `assigned_count`); `only_unassigned: true` lascia stare i volti che appartengono già a un'altra persona e richiede `tolerant: true` (altrimenti `422`) |
 | `POST /api/persons/{id}/split` | Dividi un sottoinsieme dei volti di una persona in una nuova persona (riservato alla modalità di modifica). Corpo: `{face_ids, name}` |

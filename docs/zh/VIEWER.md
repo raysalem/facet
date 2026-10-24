@@ -1312,9 +1312,9 @@ python database.py --stats-info
 
 | 端点 | 说明 |
 |----------|-------------|
-| `GET /api/persons` | 列出所有人物 |
+| `GET /api/persons` | 列出所有人物；`named_only=true` 会排除未命名的人物（显示“待命名”区域时人物页面会这样做） |
 | `POST /api/persons` | 创建一个新人物，可同时附加人脸（受编辑模式限制）。请求体：`{name, face_ids}` |
-| `GET /api/persons/needs_naming?min_faces=N` | 列出 `face_count >= N` 的未命名自动聚类人物（默认值来自 `viewer.persons.needs_naming_min_faces`） |
+| `GET /api/persons/needs_naming?min_faces=N` | 列出 `face_count >= N`、未隐藏的未命名人物（无名称或名称为空），无论来自聚类还是拆分（默认值来自 `viewer.persons.needs_naming_min_faces`） |
 | `POST /api/persons/{id}/rename` | 重命名人物 |
 | `POST /api/persons/{id}/assign_faces` | 批量把人脸附加到某个人物；变空的旧人物会被自动删除（受编辑模式限制）。请求体：`{face_ids, tolerant?, only_unassigned?}`。`tolerant: true` 时，调用会分配可分配的人脸并报告其余部分，而不是整体失败：`missing`、`already`、`skipped_model`、`skipped_hidden`、`skipped_assigned`（另有 `assigned_count`）；`only_unassigned: true` 不会动已属于其他人物的人脸，并且要求 `tolerant: true`（否则返回 `422`） |
 | `POST /api/persons/{id}/split` | 把某个人物的部分人脸拆分为新人物（受编辑模式限制）。请求体：`{face_ids, name}` |

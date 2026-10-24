@@ -424,11 +424,10 @@ python facet.py --refill-face-thumbnails-force
 ### 待命名
 
 管理人物页面会在**待命名**区域中列出值得命名的自动聚类人物：
-未命名的聚类（`name IS NULL`、
-`auto_clustered = 1`）且人脸数至少为 `viewer.persons.needs_naming_min_faces`
+未命名的聚类（无名称或名称为空、未隐藏，来自聚类或拆分）且人脸数至少为 `viewer.persons.needs_naming_min_faces`
 （默认 `5`），每一项都带有就地命名输入框，无需四处寻找即可为大聚类
 命名。数据由
-`GET /api/persons/needs_naming?min_faces=N` 提供。
+`GET /api/persons/needs_naming?min_faces=N` 提供。显示该区域时（编辑模式），下方的人物网格只列出已命名的人物，因此每个人只出现一次。
 
 ### 人物合并建议页面
 

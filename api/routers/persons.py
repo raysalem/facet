@@ -36,6 +36,11 @@ _SORT_CLAUSES = {
 }
 
 
+# A person still waiting for a name: none, or only spaces. Shared by the
+# needs-naming list and the persons list's ``named_only`` filter so the two
+# partition the persons exactly.
+_UNNAMED_SQL = "(p.name IS NULL OR TRIM(p.name) = '')"
+
 # --- Pydantic request bodies ---
 
 class RenamePersonRequest(BaseModel):
@@ -139,12 +144,14 @@ async def list_persons(
     search: str = Query(""),
     sort: str = Query("count_desc", pattern="^(count_asc|count_desc|quality_asc|quality_desc|name_asc|name_desc)$"),
     include_hidden: bool = Query(False),
+    named_only: bool = Query(False),
     user: CurrentUser = Depends(require_authenticated),
 ):
     """List all persons with pagination and search.
 
     Hidden persons (``is_hidden = 1``) are excluded by default; pass
-    ``include_hidden=true`` to surface them.
+    ``include_hidden=true`` to surface them. ``named_only=true`` leaves out persons
+    without a name, which the needs-naming list already shows.
     """
     order_clause = _SORT_CLAUSES.get(sort, _SORT_CLAUSES["count_desc"])
 
@@ -152,6 +159,8 @@ async def list_persons(
     params: list = []
     if not include_hidden:
         where_parts.append(person_not_hidden_clause('p'))
+    if named_only:
+        where_parts.append(f"NOT {_UNNAMED_SQL}")
     if search.strip():
         term = search.strip()
         if term.isdigit():
@@ -496,7 +505,11 @@ async def api_persons_needs_naming(
     min_faces: Optional[int] = Query(None, ge=0),
     user: CurrentUser = Depends(require_authenticated),
 ):
-    """List unnamed auto-clustered persons with face_count >= min_faces (default from config)."""
+    """List unnamed, non-hidden persons with face_count >= min_faces (default from config).
+
+    Unnamed means no name or a blank one, whether the person came from clustering or
+    from a split, so every person still waiting for a name is listed here once.
+    """
     if min_faces is None:
         try:
             min_faces = int(VIEWER_CONFIG.get('persons', {}).get('needs_naming_min_faces', 5))
@@ -510,7 +523,7 @@ async def api_persons_needs_naming(
             SELECT p.id, p.name, p.representative_face_id, p.face_count,
                    CASE WHEN p.face_thumbnail IS NOT NULL THEN 1 ELSE 0 END as face_thumbnail
             FROM persons p
-            WHERE p.name IS NULL AND p.auto_clustered = 1 AND p.face_count >= ?{extra}
+            WHERE {_UNNAMED_SQL} AND {person_not_hidden_clause('p')} AND p.face_count >= ?{extra}
             ORDER BY p.face_count DESC, p.id
         """, [min_faces, *vis_params])
         rows = await cur.fetchall()

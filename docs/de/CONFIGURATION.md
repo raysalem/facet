@@ -1741,7 +1741,7 @@ Anzeige und Verhalten der Web-Galerie.
 | `max_tags` | `20` | Maximale Anzahl Tags |
 | `min_photos_for_person` | `10` | Personen mit weniger Fotos im Dropdown ausblenden |
 | **persons** | | |
-| `needs_naming_min_faces` | `5` | Minimale face_count, damit ein automatisch geclustertes Cluster im Abschnitt „Needs naming“ von `/persons` erscheint |
+| `needs_naming_min_faces` | `5` | Minimale face_count, damit eine unbenannte Person im Abschnitt „Zu benennen“ von `/persons` erscheint; `1` listet alle |
 | **raw_processor** | | |
 | `darktable.executable` | `"darktable-cli"` | Name oder absoluter Pfad der darktable-cli-Binärdatei |
 | `darktable.profiles` | `[]` | Array benannter darktable-Exportprofile (siehe unten) |

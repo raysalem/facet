@@ -1737,7 +1737,7 @@ Visualización y comportamiento de la galería web.
 | `max_tags` | `20` | Máximo de etiquetas |
 | `min_photos_for_person` | `10` | Ocultar del desplegable a las personas con menos fotos |
 | **persons** | | |
-| `needs_naming_min_faces` | `5` | face_count mínimo para que un grupo autoagrupado aparezca en la sección "Necesita nombre" de `/persons` |
+| `needs_naming_min_faces` | `5` | face_count mínimo para que una persona sin nombre aparezca en la sección "Por nombrar" de `/persons`; `1` las lista todas |
 | **raw_processor** | | |
 | `darktable.executable` | `"darktable-cli"` | Nombre del binario darktable-cli o ruta absoluta |
 | `darktable.profiles` | `[]` | Array de perfiles de exportación darktable con nombre (ver abajo) |

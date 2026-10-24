@@ -430,10 +430,10 @@ nicht gefunden abgelehnt.
 ### Zu benennen
 
 Die Seite „Personen verwalten“ zeigt automatisch geclusterte Personen, die sich zu benennen lohnen,
-in einem Abschnitt **Zu benennen**: unbenannte Cluster (`name IS NULL`, `auto_clustered = 1`) mit
+in einem Abschnitt **Zu benennen**: unbenannte Cluster (ohne oder mit leerem Namen, nicht ausgeblendet, aus Clustering oder Aufteilung) mit
 mindestens `viewer.persons.needs_naming_min_faces` Gesichtern (Standard `5`), jeweils mit einem
 Inline-Namensfeld, damit große Cluster benannt werden können, ohne sie erst suchen zu müssen.
-Bereitgestellt über `GET /api/persons/needs_naming?min_faces=N`.
+Bereitgestellt über `GET /api/persons/needs_naming?min_faces=N`. Solange er angezeigt wird (Bearbeitungsmodus), listet das Personenraster darunter nur benannte Personen, sodass jede nur einmal erscheint.
 
 ### Seite mit Zusammenführungsvorschlägen
 

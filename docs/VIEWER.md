@@ -1324,9 +1324,9 @@ The client's TypeScript types are generated from that schema into `client/src/ap
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /api/persons` | List all persons |
+| `GET /api/persons` | List all persons; `named_only=true` leaves out unnamed ones (the persons page does this while Needs naming is shown) |
 | `POST /api/persons` | Create a new person, optionally attaching faces (edition-gated). Body: `{name, face_ids}` |
-| `GET /api/persons/needs_naming?min_faces=N` | List unnamed auto-clustered persons with `face_count >= N` (default from `viewer.persons.needs_naming_min_faces`) |
+| `GET /api/persons/needs_naming?min_faces=N` | List unnamed (no or blank name), non-hidden persons with `face_count >= N`, from clustering or a split (default from `viewer.persons.needs_naming_min_faces`) |
 | `POST /api/persons/{id}/rename` | Rename a person |
 | `POST /api/persons/{id}/assign_faces` | Bulk-attach faces to a person; empty old-persons are auto-deleted (edition-gated). Body: `{face_ids, tolerant?, only_unassigned?}`. With `tolerant: true` the call assigns what it may and reports the rest instead of failing: `missing`, `already`, `skipped_model`, `skipped_hidden`, `skipped_assigned` (plus `assigned_count`); `only_unassigned: true` leaves faces another person owns alone and requires `tolerant: true` (`422` otherwise) |
 | `POST /api/persons/{id}/split` | Split a subset of a person's faces into a new person (edition-gated). Body: `{face_ids, name}` |

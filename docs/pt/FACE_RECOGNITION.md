@@ -424,10 +424,10 @@ fora desse escopo é rejeitado como não encontrado.
 ### Precisa de nome
 
 A página Gerenciar pessoas mostra as pessoas agrupadas automaticamente que valem a pena nomear em
-uma seção **Precisa de nome**: clusters sem nome (`name IS NULL`, `auto_clustered = 1`) com pelo
+uma seção **Precisa de nome**: clusters sem nome (nome ausente ou em branco, não ocultos, do agrupamento ou de uma divisão) com pelo
 menos `viewer.persons.needs_naming_min_faces` rostos (padrão `5`), cada um com um campo de nome em
 linha para que clusters grandes possam ser nomeados sem precisar procurá-los. Servido por
-`GET /api/persons/needs_naming?min_faces=N`.
+`GET /api/persons/needs_naming?min_faces=N`. Enquanto ela é mostrada (modo de edição), a grade de pessoas abaixo lista só pessoas com nome, para que cada uma apareça uma vez.
 
 ### Página Sugestões de mesclagem
 

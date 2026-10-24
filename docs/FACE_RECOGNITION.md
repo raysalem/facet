@@ -427,11 +427,10 @@ as not found.
 ### Needs Naming
 
 The Manage Persons page surfaces auto-clustered persons that are worth naming in
-a **Needs naming** section: unnamed clusters (`name IS NULL`,
-`auto_clustered = 1`) with at least `viewer.persons.needs_naming_min_faces`
+a **Needs naming** section: unnamed clusters (no or blank name, not hidden, from clustering or a split) with at least `viewer.persons.needs_naming_min_faces`
 faces (default `5`), each with an inline name field so large clusters can be
 named without hunting for them. Served by
-`GET /api/persons/needs_naming?min_faces=N`.
+`GET /api/persons/needs_naming?min_faces=N`. While it is shown (edition mode), the person grid below lists named persons only, so each person appears once.
 
 ### Merge Suggestions Page
 
