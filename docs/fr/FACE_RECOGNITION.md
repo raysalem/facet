@@ -426,10 +426,9 @@ propres répertoires (ou partagés) ; un visage hors de ce périmètre est reje
 ### À nommer
 
 La page Gérer les personnes affiche les personnes regroupées automatiquement qui méritent d'être
-nommées dans une section **À nommer** : les clusters non nommés (`name IS NULL`,
-`auto_clustered = 1`) comportant au moins `viewer.persons.needs_naming_min_faces` visages (défaut
+nommées dans une section **À nommer** : les clusters non nommés (nom absent ou vide, non masqués, issus du regroupement ou d'une scission) comportant au moins `viewer.persons.needs_naming_min_faces` visages (défaut
 `5`), chacun avec un champ de nom en ligne afin que les grands clusters puissent être nommés sans
-avoir à les chercher. Servi par `GET /api/persons/needs_naming?min_faces=N`.
+avoir à les chercher. Servi par `GET /api/persons/needs_naming?min_faces=N`. Tant qu'elle est affichée (mode édition), la grille des personnes en dessous ne liste que les personnes nommées, pour que chacune n'apparaisse qu'une fois.
 
 ### Page Suggestions de fusion
 

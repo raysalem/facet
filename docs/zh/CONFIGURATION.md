@@ -1700,7 +1700,7 @@ python facet.py --recompute-tags-vlm   # 用 VLM 标签模型重新打标签
 | `max_tags` | `20` | 最多的标签数 |
 | `min_photos_for_person` | `10` | 照片数少于此值的人物不在下拉菜单中显示 |
 | **persons** | | |
-| `needs_naming_min_faces` | `5` | 自动聚类出的簇要出现在 `/persons` 的“待命名”区域所需的最少 face_count |
+| `needs_naming_min_faces` | `5` | 未命名人物要出现在 `/persons` 的“待命名”区域所需的最少 face_count；设为 `1` 则列出全部 |
 | **raw_processor** | | |
 | `darktable.executable` | `"darktable-cli"` | darktable-cli 的可执行文件名或绝对路径 |
 | `darktable.profiles` | `[]` | 具名的 darktable 导出配置数组（见下文） |

@@ -1713,7 +1713,7 @@ Web gallery display and behavior.
 | `max_tags` | `20` | Max tags |
 | `min_photos_for_person` | `10` | Hide persons with fewer photos from dropdown |
 | **persons** | | |
-| `needs_naming_min_faces` | `5` | Minimum face_count for an auto-clustered cluster to appear in the "Needs naming" section of `/persons` |
+| `needs_naming_min_faces` | `5` | Minimum face_count for an unnamed person to appear in the "Needs naming" section of `/persons`; `1` lists every unnamed person |
 | **raw_processor** | | |
 | `darktable.executable` | `"darktable-cli"` | darktable-cli binary name or absolute path |
 | `darktable.profiles` | `[]` | Array of named darktable export profiles (see below) |

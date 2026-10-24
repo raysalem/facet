@@ -425,10 +425,10 @@ compartidos); un rostro fuera de ese ámbito se rechaza como no encontrado.
 ### Por nombrar
 
 La página de gestión de personas muestra las personas agrupadas automáticamente que merece la pena
-nombrar en una sección **Por nombrar**: clústeres sin nombre (`name IS NULL`, `auto_clustered = 1`)
+nombrar en una sección **Por nombrar**: clústeres sin nombre (sin nombre o en blanco, no ocultos, del agrupamiento o de una división)
 con al menos `viewer.persons.needs_naming_min_faces` rostros (predeterminado `5`), cada uno con un
 campo de nombre en línea para que los clústeres grandes puedan nombrarse sin tener que buscarlos.
-Servido por `GET /api/persons/needs_naming?min_faces=N`.
+Servido por `GET /api/persons/needs_naming?min_faces=N`. Mientras se muestra (modo edición), la cuadrícula de personas de abajo solo lista personas con nombre, para que cada una aparezca una sola vez.
 
 ### Página de sugerencias de fusión
 

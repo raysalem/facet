@@ -1259,9 +1259,9 @@ Die TypeScript-Typen des Clients werden mit `cd client && npm run gen:api` aus d
 
 | Endpunkt | Beschreibung |
 |----------|-------------|
-| `GET /api/persons` | Alle Personen auflisten |
+| `GET /api/persons` | Alle Personen auflisten; `named_only=true` lässt unbenannte weg (die Personenseite tut das, solange „Zu benennen“ angezeigt wird) |
 | `POST /api/persons` | Eine neue Person erstellen, optional mit Gesichtern (Bearbeitungsmodus erforderlich). Body: `{name, face_ids}` |
-| `GET /api/persons/needs_naming?min_faces=N` | Unbenannte, automatisch geclusterte Personen mit `face_count >= N` auflisten (Standard aus `viewer.persons.needs_naming_min_faces`) |
+| `GET /api/persons/needs_naming?min_faces=N` | Unbenannte (ohne oder mit leerem Namen), nicht ausgeblendete Personen mit `face_count >= N` auflisten, aus Clustering oder Aufteilung (Standard aus `viewer.persons.needs_naming_min_faces`) |
 | `POST /api/persons/{id}/rename` | Eine Person umbenennen |
 | `POST /api/persons/{id}/assign_faces` | Gesichter per Sammelaktion einer Person zuweisen; leere Alt-Personen werden automatisch gelöscht (Bearbeitungsmodus erforderlich). Body: `{face_ids, tolerant?, only_unassigned?}`. Mit `tolerant: true` weist der Aufruf zu, was möglich ist, und meldet den Rest, statt zu scheitern: `missing`, `already`, `skipped_model`, `skipped_hidden`, `skipped_assigned` (plus `assigned_count`); `only_unassigned: true` lässt Gesichter, die bereits einer anderen Person gehören, unangetastet und verlangt `tolerant: true` (sonst `422`) |
 | `POST /api/persons/{id}/split` | Eine Teilmenge der Gesichter einer Person in eine neue Person aufteilen (Bearbeitungsmodus erforderlich). Body: `{face_ids, name}` |

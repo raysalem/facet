@@ -426,10 +426,10 @@ non trovato.
 ### Da nominare
 
 La pagina Gestisci persone mostra le persone raggruppate automaticamente che meritano di essere
-nominate in una sezione **Da nominare**: cluster senza nome (`name IS NULL`, `auto_clustered = 1`)
+nominate in una sezione **Da nominare**: cluster senza nome (nome assente o vuoto, non nascosti, dal raggruppamento o da una divisione)
 con almeno `viewer.persons.needs_naming_min_faces` volti (predefinito `5`), ciascuno con un campo
 nome in linea in modo che i cluster numerosi possano essere nominati senza doverli cercare. Servito
-da `GET /api/persons/needs_naming?min_faces=N`.
+da `GET /api/persons/needs_naming?min_faces=N`. Finché è mostrata (modalità modifica), la griglia delle persone sotto elenca solo le persone con nome, così ognuna compare una volta sola.
 
 ### Pagina Suggerimenti di unione
 
