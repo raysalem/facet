@@ -291,6 +291,10 @@ describe('ManagePersonsComponent', () => {
 
       await component.saveName(peter, 'Zed');
 
+      expect(mockDialog.open).not.toHaveBeenCalled();
+    });
+  });
+
   describe('find more faces', () => {
     it('opens for a person that is only in the needs-naming section', async () => {
       component.persons.set([]);
