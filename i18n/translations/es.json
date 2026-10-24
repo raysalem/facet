@@ -1705,6 +1705,13 @@
     "find_more_add_error": "No se pudieron añadir las caras",
     "find_more_no_centroid": "Esta persona aún no tiene una cara de referencia: asigne o fusione primero algunas caras y vuelva a intentarlo"
   },
+  "photo_faces": {
+    "unknown": "Desconocido",
+    "change_person": "Cambiar de persona…",
+    "name_face": "Nombrar esta cara…",
+    "find_more": "Buscar más caras de {name}",
+    "not_person": "No es {name}"
+  },
   "person_selector": {
     "create_new": "Crear nueva persona"
   },

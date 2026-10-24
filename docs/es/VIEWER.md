@@ -368,6 +368,10 @@ Accede mediante el botón de la cabecera o `/persons`:
 | **Buscar más caras** | El botón de búsqueda de la tarjeta de una persona lista las caras que se le parecen, las más parecidas primero (comparadas con el centroide de la persona mediante `GET /api/person/{id}/possible_faces`). Marca las correctas y añádelas. Añadir recalcula el centroide, así que la siguiente ronda se ordena según lo que acabas de confirmar; las caras que dejas sin marcar no se vuelven a ofrecer mientras el diálogo siga abierto. **Todas las caras** busca también en otros grupos, **Solo sin asignar** solo entre las caras sin agrupar. Una cara que pertenece a una persona con otro nombre muestra ese nombre y nunca aparece marcada de antemano; una que pertenece a una persona con el mismo nombre, un grupo separado, aparece marcada como una cara sin asignar |
 | **Ocultar** | Oculta un grupo de la lista de personas, los filtros y las sugerencias de fusión (reversible) |
 
+### Caras en la foto
+
+En la vista de foto aparece un recuadro alrededor de cada cara detectada mientras el puntero está sobre la foto, y al pasar por una cara se muestra su nombre (recuadro ámbar: aún sin nombre). Los recuadros siguen el zoom y el desplazamiento. En modo edición, hacer clic en una cara abre un menú: **Cambiar de persona…** (o **Nombrar esta cara…**) para elegir una persona existente o escribir un nombre nuevo, **Buscar más caras de …** para esa persona y **No es …** para quitar a esa persona de la foto. No se dibujan las caras cuyas dimensiones guardadas no son fiables. Los recuadros vienen de `GET /api/photo/faces`, que devuelve el `box` de cada cara normalizado al encuadre.
+
 ### Marcar una cara no detectada
 
 En modo edición, abre una foto y elige **Marcar una cara no detectada**, aunque no se haya detectado ninguna. Dibuja un rectángulo o ajusta sus coordenadas en los campos etiquetados. Elige una persona existente o escribe un nombre nuevo y pulsa **Guardar**. Dibujar y elegir el nombre solo muestran una vista previa; Cancelar no guarda nada.
