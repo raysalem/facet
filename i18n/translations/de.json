@@ -1708,6 +1708,13 @@
     "same_name_message": "{count} andere Gruppe(n) heißen bereits „{name}“. Zu einer Person zusammenführen? Die größte Gruppe behält ihre Schreibweise des Namens.",
     "same_name_merge": "Zusammenführen"
   },
+  "photo_faces": {
+    "unknown": "Unbekannt",
+    "change_person": "Person ändern…",
+    "name_face": "Dieses Gesicht benennen…",
+    "find_more": "Weitere Gesichter von {name} finden",
+    "not_person": "Nicht {name}"
+  },
   "person_selector": {
     "create_new": "Neue Person erstellen"
   },

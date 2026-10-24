@@ -1708,6 +1708,13 @@
     "same_name_message": "{count} outro(s) grupo(s) já se chamam “{name}”. Mesclá-los em uma só pessoa? O maior grupo mantém sua grafia do nome.",
     "same_name_merge": "Mesclar"
   },
+  "photo_faces": {
+    "unknown": "Desconhecido",
+    "change_person": "Trocar pessoa…",
+    "name_face": "Nomear este rosto…",
+    "find_more": "Encontrar mais rostos de {name}",
+    "not_person": "Não é {name}"
+  },
   "person_selector": {
     "create_new": "Criar nova pessoa"
   },

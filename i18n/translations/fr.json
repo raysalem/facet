@@ -1708,6 +1708,13 @@
     "same_name_message": "{count} autre(s) groupe(s) s'appellent déjà « {name} ». Les fusionner en une seule personne ? Le plus grand groupe garde son orthographe du nom.",
     "same_name_merge": "Fusionner"
   },
+  "photo_faces": {
+    "unknown": "Inconnu",
+    "change_person": "Changer de personne…",
+    "name_face": "Nommer ce visage…",
+    "find_more": "Trouver d'autres visages de {name}",
+    "not_person": "Pas {name}"
+  },
   "person_selector": {
     "create_new": "Créer une nouvelle personne"
   },

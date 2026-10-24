@@ -1722,6 +1722,13 @@ export const I18N = {
     same_name_message: "persons.same_name_message",
     same_name_merge: "persons.same_name_merge",
   },
+  photo_faces: {
+    unknown: "photo_faces.unknown",
+    change_person: "photo_faces.change_person",
+    name_face: "photo_faces.name_face",
+    find_more: "photo_faces.find_more",
+    not_person: "photo_faces.not_person",
+  },
   person_selector: {
     create_new: "person_selector.create_new",
   },

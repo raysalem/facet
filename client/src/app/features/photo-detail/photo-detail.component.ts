@@ -44,6 +44,7 @@ import { createLeafletMap } from '../../shared/leaflet';
 import { I18N, i18nKeys } from '../../core/i18n/keys';
 import { isTypingContext } from '../../shared/utils/keyboard';
 import type { CategoryOverrideResult } from './category-override-dialog.component';
+import { PhotoFaceLayerComponent } from './photo-face-layer.component';
 
 const SOCIAL_SOURCE_KEYS: Record<string, string> = {
   saliency: I18N.social_export.source.saliency,
@@ -55,6 +56,7 @@ const SOCIAL_SOURCE_KEYS: Record<string, string> = {
   selector: 'app-photo-detail',
   imports: [
     ExtendedQualityComponent,
+    PhotoFaceLayerComponent,
     MatIconModule,
     MatButtonModule,
     MatTooltipModule,
@@ -192,7 +194,7 @@ const SOCIAL_SOURCE_KEYS: Record<string, string> = {
       <!-- Main content: image + info -->
       <div class="flex flex-col lg:flex-row lg:h-[calc(100%-49px)] lg:overflow-hidden">
         <!-- Image panel -->
-        <div #imagePanel class="shrink-0 lg:h-auto lg:flex-1 flex items-center justify-center bg-black lg:min-h-0 relative overflow-hidden cursor-grab"
+        <div #imagePanel class="group/photo shrink-0 lg:h-auto lg:flex-1 flex items-center justify-center bg-black lg:min-h-0 relative overflow-hidden cursor-grab"
           [class.cursor-grabbing]="isPanning()"
           (dblclick)="resetZoom()"
           (pointerdown)="onPanStart($event)"
@@ -216,6 +218,13 @@ const SOCIAL_SOURCE_KEYS: Record<string, string> = {
             (load)="onFullImageLoad()"
             [style.transform]="zoomTransform()"
           />
+          <app-photo-face-layer
+            [path]="p.path"
+            [imageWidth]="p.image_width"
+            [imageHeight]="p.image_height"
+            [transform]="zoomTransform()"
+            [canEdit]="auth.isEdition()"
+            (changed)="refreshPeople(p.path)" />
         </div>
 
         <!-- Info panel -->
@@ -1039,17 +1048,24 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
     if (this.destroyRef.destroyed || this.photo()?.path !== path) return;
     this.dialog.open(ManualFaceDialogComponent, {
       width: '800px', maxWidth: '96vw',
-      data: { path, filename: p.filename, onCommitted: async () => {
-        const actual = await firstValueFrom(this.api.get<Photo>('/photo', { path }));
-        const patch = { persons: actual.persons, unassigned_faces: actual.unassigned_faces };
-        this.store.patchPhoto(path, patch);
-        if (!this.destroyRef.destroyed && this.photo()?.path === path) {
-          this.photo.update(current => current ? { ...current, ...patch } : current);
-        }
-        await this.store.reloadPersonOptions();
-        if (this.store.filters().person_id) await this.store.loadPhotos();
-      } },
+      data: { path, filename: p.filename, onCommitted: () => this.refreshPeople(path) },
     });
+  }
+
+  /**
+   * Re-read a photo's people from the server after a face changed hands, from the
+   * manual-face editor or the face layer. The server's answer replaces the store's
+   * optimistic patch, which cannot know whether a moved face emptied its old person.
+   */
+  protected async refreshPeople(path: string): Promise<void> {
+    const actual = await firstValueFrom(this.api.get<Photo>('/photo', { path }));
+    const patch = { persons: actual.persons, unassigned_faces: actual.unassigned_faces };
+    this.store.patchPhoto(path, patch);
+    if (!this.destroyRef.destroyed && this.photo()?.path === path) {
+      this.photo.update(current => current ? { ...current, ...patch } : current);
+    }
+    await this.store.reloadPersonOptions();
+    if (this.store.filters().person_id) await this.store.loadPhotos();
   }
 
   private applyConfirmed(p: Photo, confirmed: Partial<Photo>): void {

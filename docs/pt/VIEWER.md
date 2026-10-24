@@ -368,6 +368,10 @@ Acesse pelo botão no cabeçalho ou por `/persons`:
 | **Encontrar mais rostos** | O botão de busca no cartão de uma pessoa lista os rostos parecidos com ela, os mais parecidos primeiro (comparados ao centroide da pessoa por `GET /api/person/{id}/possible_faces`). Marque os corretos e adicione-os. Adicionar recalcula o centroide, então a próxima rodada é ordenada pelo que você acabou de confirmar; os rostos deixados desmarcados não são oferecidos de novo enquanto a caixa de diálogo estiver aberta. **Todos os rostos** busca também em outros clusters, **Somente não atribuídos** apenas entre os rostos não agrupados. Um rosto que pertence a uma pessoa de outro nome mostra esse nome e nunca vem pré-marcado; um que pertence a uma pessoa de mesmo nome, um cluster separado, vem pré-marcado como um rosto não atribuído |
 | **Ocultar** | Oculta um cluster da lista de pessoas, filtros e sugestões de mesclagem (reversível) |
 
+### Rostos na foto
+
+Na visualização da foto, aparece um quadro em volta de cada rosto detectado enquanto o ponteiro está sobre a foto, e passar sobre um rosto mostra o nome (quadro âmbar: ainda sem nome). Os quadros acompanham o zoom e o deslocamento. No modo de edição, clicar em um rosto abre um menu: **Trocar pessoa…** (ou **Nomear este rosto…**) para escolher uma pessoa existente ou digitar um novo nome, **Encontrar mais rostos de …** para essa pessoa e **Não é …** para tirar essa pessoa da foto. Rostos cujas dimensões salvas não são confiáveis não são desenhados. Os quadros vêm de `GET /api/photo/faces`, que retorna o `box` de cada rosto normalizado ao enquadramento.
+
 ### Marcar um rosto não detectado
 
 No modo de edição, abra uma foto e escolha **Marcar um rosto ausente**, mesmo que nenhum rosto tenha sido detectado. Desenhe um retângulo ou ajuste as coordenadas nos campos identificados. Escolha uma pessoa existente ou digite um novo nome e clique em **Salvar**. O desenho e o nome são apenas uma prévia; Cancelar não salva nada.

@@ -1708,6 +1708,13 @@
     "same_name_message": "{count} altro/i gruppo/i si chiamano già «{name}». Unirli in un'unica persona? Il gruppo più grande mantiene la sua grafia del nome.",
     "same_name_merge": "Unisci"
   },
+  "photo_faces": {
+    "unknown": "Sconosciuto",
+    "change_person": "Cambia persona…",
+    "name_face": "Dai un nome a questo volto…",
+    "find_more": "Trova altri volti di {name}",
+    "not_person": "Non è {name}"
+  },
   "person_selector": {
     "create_new": "Crea nuova persona"
   },

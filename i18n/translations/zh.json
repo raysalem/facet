@@ -1708,6 +1708,13 @@
     "same_name_message": "已有 {count} 个其他分组名为“{name}”。要合并为同一个人吗？最大的分组保留其名称写法。",
     "same_name_merge": "合并"
   },
+  "photo_faces": {
+    "unknown": "未知",
+    "change_person": "更换人物…",
+    "name_face": "为此面孔命名…",
+    "find_more": "查找 {name} 的更多面孔",
+    "not_person": "不是 {name}"
+  },
   "person_selector": {
     "create_new": "创建新人物"
   },
