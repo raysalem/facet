@@ -1685,7 +1685,10 @@
     "split_select_face": "选择第 {index} 张人脸",
     "no_faces": "未找到此人物的人脸",
     "split_done": "人物已拆分",
-    "split_error": "拆分人物失败"
+    "split_error": "拆分人物失败",
+    "same_name_title": "名称已被使用",
+    "same_name_message": "已有 {count} 个其他分组名为“{name}”。要合并为同一个人吗？最大的分组保留其名称写法。",
+    "same_name_merge": "合并"
   },
   "person_selector": {
     "create_new": "创建新人物"

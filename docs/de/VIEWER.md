@@ -364,7 +364,7 @@ Zugriff über die Header-Schaltfläche oder `/persons`:
 |--------|--------|
 | **Zusammenführen** | Quellperson auswählen, Ziel anklicken, bestätigen |
 | **Löschen** | Auf die Löschen-Schaltfläche der Personenkarte klicken |
-| **Umbenennen** | Auf den Personennamen klicken, um ihn inline zu bearbeiten |
+| **Umbenennen** | Auf den Personennamen klicken, um ihn inline zu bearbeiten. Wer den Namen einer anderen Person vergibt (ohne Groß-/Kleinschreibung), bekommt angeboten, alle Cluster dieses Namens in den größten zusammenzuführen, der seine Schreibweise behält; ablehnen, um Namensvettern getrennt zu halten |
 | **Aufteilen** | Die Gesichter einer Person öffnen, eine Teilmenge auswählen und in eine neue Person aufteilen |
 | **Ausblenden** | Ein Cluster aus der Personenliste, den Filtern und den Zusammenführungsvorschlägen ausblenden (umkehrbar) |
 

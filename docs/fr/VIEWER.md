@@ -364,7 +364,7 @@ Accessible via le bouton d'en-tête ou `/persons` :
 |--------|--------|
 | **Fusionner** | Sélectionnez la personne source, cliquez sur la cible, confirmez |
 | **Supprimer** | Cliquez sur le bouton de suppression de la carte de la personne |
-| **Renommer** | Cliquez sur le nom de la personne pour l'éditer en ligne |
+| **Renommer** | Cliquez sur le nom de la personne pour l'éditer en ligne. Lui donner le nom d'une autre personne, sans tenir compte de la casse, propose de fusionner tous les clusters de ce nom dans le plus grand, qui garde son orthographe ; refusez pour garder des homonymes séparés |
 | **Scinder** | Ouvrez les visages d'une personne, sélectionnez un sous-ensemble, scindez-les en une nouvelle personne |
 | **Masquer** | Masquez un cluster de la liste des personnes, des filtres et des suggestions de fusion (réversible) |
 

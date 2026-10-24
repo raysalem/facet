@@ -1685,7 +1685,10 @@
     "split_select_face": "Gesicht {index} auswählen",
     "no_faces": "Keine Gesichter für diese Person gefunden",
     "split_done": "Person aufgeteilt",
-    "split_error": "Person konnte nicht aufgeteilt werden"
+    "split_error": "Person konnte nicht aufgeteilt werden",
+    "same_name_title": "Name bereits vergeben",
+    "same_name_message": "{count} andere Gruppe(n) heißen bereits „{name}“. Zu einer Person zusammenführen? Die größte Gruppe behält ihre Schreibweise des Namens.",
+    "same_name_merge": "Zusammenführen"
   },
   "person_selector": {
     "create_new": "Neue Person erstellen"

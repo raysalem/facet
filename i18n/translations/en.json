@@ -1685,7 +1685,10 @@
     "split_select_face": "Select face {index}",
     "no_faces": "No faces found for this person",
     "split_done": "Person split",
-    "split_error": "Failed to split person"
+    "split_error": "Failed to split person",
+    "same_name_title": "Same name already used",
+    "same_name_message": "{count} other group(s) are already named “{name}”. Merge them into one person? The largest group keeps its spelling of the name.",
+    "same_name_merge": "Merge"
   },
   "person_selector": {
     "create_new": "Create new person"

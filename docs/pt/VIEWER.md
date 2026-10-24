@@ -363,7 +363,7 @@ Acesse pelo botão no cabeçalho ou por `/persons`:
 |--------|--------|
 | **Mesclar** | Selecione a pessoa de origem, clique no destino, confirme |
 | **Excluir** | Clique no botão excluir no cartão da pessoa |
-| **Renomear** | Clique no nome da pessoa para editar em linha |
+| **Renomear** | Clique no nome da pessoa para editar em linha. Dar a ele o nome de outra pessoa, sem diferenciar maiúsculas, oferece mesclar todos os clusters com esse nome no maior, que mantém sua grafia; recuse para manter homônimos separados |
 | **Dividir** | Abra os rostos de uma pessoa, selecione um subconjunto, divida-os em uma nova pessoa |
 | **Ocultar** | Oculta um cluster da lista de pessoas, filtros e sugestões de mesclagem (reversível) |
 

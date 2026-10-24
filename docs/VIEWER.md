@@ -432,7 +432,7 @@ Access via header button or `/persons`:
 |--------|--------|
 | **Merge** | Select source person, click target, confirm |
 | **Delete** | Click delete button on person card |
-| **Rename** | Click person name to edit inline |
+| **Rename** | Click person name to edit inline. Naming it after another person, ignoring case, offers to merge every cluster of that name into the largest, which keeps its spelling; decline to keep namesakes apart |
 | **Split** | Open a person's faces, select a subset, split them into a new person |
 | **Hide** | Hide a cluster from the persons list, filters, and merge suggestions (reversible) |
 

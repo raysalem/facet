@@ -363,7 +363,7 @@ Accede mediante el botón de la cabecera o `/persons`:
 |--------|--------|
 | **Fusionar** | Selecciona la persona de origen, haz clic en la de destino, confirma |
 | **Eliminar** | Haz clic en el botón eliminar de la tarjeta de la persona |
-| **Renombrar** | Haz clic en el nombre de la persona para editarlo en línea |
+| **Renombrar** | Haz clic en el nombre de la persona para editarlo en línea. Ponerle el nombre de otra persona, sin distinguir mayúsculas, ofrece fusionar todos los grupos con ese nombre en el más grande, que conserva su forma de escribirlo; rechaza para mantener separados a los homónimos |
 | **Dividir** | Abre las caras de una persona, selecciona un subconjunto y divídelas en una persona nueva |
 | **Ocultar** | Oculta un grupo de la lista de personas, los filtros y las sugerencias de fusión (reversible) |
 

@@ -1685,7 +1685,10 @@
     "split_select_face": "Sélectionner le visage {index}",
     "no_faces": "Aucun visage trouvé pour cette personne",
     "split_done": "Personne séparée",
-    "split_error": "Échec de la séparation de la personne"
+    "split_error": "Échec de la séparation de la personne",
+    "same_name_title": "Nom déjà utilisé",
+    "same_name_message": "{count} autre(s) groupe(s) s'appellent déjà « {name} ». Les fusionner en une seule personne ? Le plus grand groupe garde son orthographe du nom.",
+    "same_name_merge": "Fusionner"
   },
   "person_selector": {
     "create_new": "Créer une nouvelle personne"

@@ -1700,6 +1700,9 @@ export const I18N = {
     no_faces: "persons.no_faces",
     split_done: "persons.split_done",
     split_error: "persons.split_error",
+    same_name_title: "persons.same_name_title",
+    same_name_message: "persons.same_name_message",
+    same_name_merge: "persons.same_name_merge",
   },
   person_selector: {
     create_new: "person_selector.create_new",

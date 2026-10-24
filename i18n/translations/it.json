@@ -1685,7 +1685,10 @@
     "split_select_face": "Seleziona volto {index}",
     "no_faces": "Nessun volto trovato per questa persona",
     "split_done": "Persona divisa",
-    "split_error": "Impossibile dividere la persona"
+    "split_error": "Impossibile dividere la persona",
+    "same_name_title": "Nome già usato",
+    "same_name_message": "{count} altro/i gruppo/i si chiamano già «{name}». Unirli in un'unica persona? Il gruppo più grande mantiene la sua grafia del nome.",
+    "same_name_merge": "Unisci"
   },
   "person_selector": {
     "create_new": "Crea nuova persona"

@@ -364,7 +364,7 @@ Accessibile tramite il pulsante nell'intestazione o `/persons`:
 |--------|--------|
 | **Unisci** | Seleziona la persona di origine, clicca quella di destinazione, conferma |
 | **Elimina** | Clicca il pulsante di eliminazione sulla scheda della persona |
-| **Rinomina** | Clicca sul nome della persona per modificarlo in linea |
+| **Rinomina** | Clicca sul nome della persona per modificarlo in linea. Dargli il nome di un'altra persona, senza distinguere maiuscole e minuscole, propone di unire tutti i cluster con quel nome nel più grande, che mantiene la sua grafia; rifiuta per tenere separati gli omonimi |
 | **Dividi** | Apri i volti di una persona, seleziona un sottoinsieme, dividili in una nuova persona |
 | **Nascondi** | Nascondi un cluster dall'elenco delle persone, dai filtri e dai suggerimenti di unione (reversibile) |
 
