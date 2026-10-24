@@ -1703,7 +1703,10 @@
     "find_more_added": "{count} rostos adicionados",
     "find_more_error": "Não foi possível procurar rostos parecidos",
     "find_more_add_error": "Falha ao adicionar os rostos",
-    "find_more_no_centroid": "Esta pessoa ainda não tem um rosto de referência: atribua ou mescle alguns rostos primeiro e tente novamente"
+    "find_more_no_centroid": "Esta pessoa ainda não tem um rosto de referência: atribua ou mescle alguns rostos primeiro e tente novamente",
+    "same_name_title": "Nome já usado",
+    "same_name_message": "{count} outro(s) grupo(s) já se chamam “{name}”. Mesclá-los em uma só pessoa? O maior grupo mantém sua grafia do nome.",
+    "same_name_merge": "Mesclar"
   },
   "person_selector": {
     "create_new": "Criar nova pessoa"

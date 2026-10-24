@@ -1703,7 +1703,10 @@
     "find_more_added": "{count} Gesichter hinzugefügt",
     "find_more_error": "Suche nach ähnlichen Gesichtern fehlgeschlagen",
     "find_more_add_error": "Gesichter konnten nicht hinzugefügt werden",
-    "find_more_no_centroid": "Diese Person hat noch kein Referenzgesicht: Weisen Sie zuerst einige Gesichter zu oder führen Sie sie zusammen, und versuchen Sie es dann erneut"
+    "find_more_no_centroid": "Diese Person hat noch kein Referenzgesicht: Weisen Sie zuerst einige Gesichter zu oder führen Sie sie zusammen, und versuchen Sie es dann erneut",
+    "same_name_title": "Name bereits vergeben",
+    "same_name_message": "{count} andere Gruppe(n) heißen bereits „{name}“. Zu einer Person zusammenführen? Die größte Gruppe behält ihre Schreibweise des Namens.",
+    "same_name_merge": "Zusammenführen"
   },
   "person_selector": {
     "create_new": "Neue Person erstellen"

@@ -364,7 +364,7 @@ Zugriff über die Header-Schaltfläche oder `/persons`:
 |--------|--------|
 | **Zusammenführen** | Quellperson auswählen, Ziel anklicken, bestätigen |
 | **Löschen** | Auf die Löschen-Schaltfläche der Personenkarte klicken |
-| **Umbenennen** | Auf den Personennamen klicken, um ihn inline zu bearbeiten |
+| **Umbenennen** | Auf den Personennamen klicken, um ihn inline zu bearbeiten. Wer den Namen einer anderen Person vergibt (ohne Groß-/Kleinschreibung), bekommt angeboten, alle Cluster dieses Namens in den größten zusammenzuführen, der seine Schreibweise behält; ablehnen, um Namensvettern getrennt zu halten |
 | **Aufteilen** | Die Gesichter einer Person öffnen, eine Teilmenge auswählen und in eine neue Person aufteilen |
 | **Weitere Gesichter finden** | Die Suchschaltfläche auf einer Personenkarte listet Gesichter, die dieser Person ähneln, beste Treffer zuerst (verglichen mit dem Zentroid der Person über `GET /api/person/{id}/possible_faces`). Die richtigen anhaken und hinzufügen. Das Hinzufügen berechnet den Zentroid neu, sodass die nächste Runde nach dem gerade Bestätigten sortiert wird; nicht angehakte Gesichter werden nicht erneut angeboten, solange der Dialog offen ist. **Alle Gesichter** sucht auch in anderen Clustern, **Nur nicht zugewiesene** nur unter den nicht gruppierten Gesichtern. Ein Gesicht, das einer anders benannten Person gehört, zeigt deren Namen und ist nie vorab angehakt; eines, das einer gleichnamigen Person gehört, also einem abgespaltenen Cluster, ist wie ein nicht zugewiesenes Gesicht vorab angehakt |
 | **Ausblenden** | Ein Cluster aus der Personenliste, den Filtern und den Zusammenführungsvorschlägen ausblenden (umkehrbar) |

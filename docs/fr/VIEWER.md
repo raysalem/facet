@@ -364,7 +364,7 @@ Accessible via le bouton d'en-tête ou `/persons` :
 |--------|--------|
 | **Fusionner** | Sélectionnez la personne source, cliquez sur la cible, confirmez |
 | **Supprimer** | Cliquez sur le bouton de suppression de la carte de la personne |
-| **Renommer** | Cliquez sur le nom de la personne pour l'éditer en ligne |
+| **Renommer** | Cliquez sur le nom de la personne pour l'éditer en ligne. Lui donner le nom d'une autre personne, sans tenir compte de la casse, propose de fusionner tous les clusters de ce nom dans le plus grand, qui garde son orthographe ; refusez pour garder des homonymes séparés |
 | **Scinder** | Ouvrez les visages d'une personne, sélectionnez un sous-ensemble, scindez-les en une nouvelle personne |
 | **Trouver d'autres visages** | Le bouton de recherche de la carte d'une personne liste les visages qui lui ressemblent, les plus proches en premier (comparés au centroïde de la personne par `GET /api/person/{id}/possible_faces`). Cochez les bons et ajoutez-les. L'ajout recalcule le centroïde, donc le tour suivant est classé selon ce que vous venez de confirmer ; les visages laissés décochés ne sont plus proposés tant que la boîte de dialogue reste ouverte. **Tous les visages** cherche aussi dans les autres clusters, **Non attribués uniquement** seulement parmi les visages non regroupés. Un visage appartenant à une personne d'un autre nom affiche ce nom et n'est jamais précoché ; un visage appartenant à une personne du même nom, un cluster séparé, est précoché comme un visage non attribué |
 | **Masquer** | Masquez un cluster de la liste des personnes, des filtres et des suggestions de fusion (réversible) |

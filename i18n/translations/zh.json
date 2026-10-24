@@ -1703,7 +1703,10 @@
     "find_more_added": "已添加 {count} 张面孔",
     "find_more_error": "无法查找相似面孔",
     "find_more_add_error": "添加面孔失败",
-    "find_more_no_centroid": "此人还没有参考面孔：请先分配或合并几张面孔，然后重试"
+    "find_more_no_centroid": "此人还没有参考面孔：请先分配或合并几张面孔，然后重试",
+    "same_name_title": "名称已被使用",
+    "same_name_message": "已有 {count} 个其他分组名为“{name}”。要合并为同一个人吗？最大的分组保留其名称写法。",
+    "same_name_merge": "合并"
   },
   "person_selector": {
     "create_new": "创建新人物"

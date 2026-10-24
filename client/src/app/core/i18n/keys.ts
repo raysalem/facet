@@ -1718,6 +1718,9 @@ export const I18N = {
     find_more_error: "persons.find_more_error",
     find_more_add_error: "persons.find_more_add_error",
     find_more_no_centroid: "persons.find_more_no_centroid",
+    same_name_title: "persons.same_name_title",
+    same_name_message: "persons.same_name_message",
+    same_name_merge: "persons.same_name_merge",
   },
   person_selector: {
     create_new: "person_selector.create_new",

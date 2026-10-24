@@ -1703,7 +1703,10 @@
     "find_more_added": "{count} visages ajoutés",
     "find_more_error": "Impossible de rechercher des visages ressemblants",
     "find_more_add_error": "Échec de l'ajout des visages",
-    "find_more_no_centroid": "Cette personne n'a pas encore de visage de référence : attribuez ou fusionnez d'abord quelques visages, puis réessayez"
+    "find_more_no_centroid": "Cette personne n'a pas encore de visage de référence : attribuez ou fusionnez d'abord quelques visages, puis réessayez",
+    "same_name_title": "Nom déjà utilisé",
+    "same_name_message": "{count} autre(s) groupe(s) s'appellent déjà « {name} ». Les fusionner en une seule personne ? Le plus grand groupe garde son orthographe du nom.",
+    "same_name_merge": "Fusionner"
   },
   "person_selector": {
     "create_new": "Créer une nouvelle personne"
