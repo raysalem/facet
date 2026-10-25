@@ -3872,6 +3872,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/scenes/manual_tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Api Scene Manual Tags
+         * @description Add or remove one manual tag on every photo captured within ``[start, end]``.
+         *
+         *     Unlike the scene's own photo list, this reaches the burst repeats and rejected
+         *     frames of the window too, so a scene's name follows every shot of it. Scoped to
+         *     an album when ``album_id`` is given; the bulk tag endpoint's write rules apply
+         *     (writable photos only, the per-photo cap, an AI tag never duplicated as a
+         *     manual one).
+         */
+        post: operations["api_scene_manual_tags_api_scenes_manual_tags_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/search": {
         parameters: {
             query?: never;
@@ -7660,6 +7686,11 @@ export interface components {
             moment?: string | null;
             /** Moment Confidence */
             moment_confidence?: number | null;
+            /**
+             * Names
+             * @description Manual tags on at least 80% of the scene's photos: the names it was given.
+             */
+            names?: string[];
             /** Photos */
             photos?: components["schemas"]["ScenePhoto"][] | null;
             /** Scene Id */
@@ -7680,6 +7711,36 @@ export interface components {
             filename?: string | null;
             /** Path */
             path: string;
+        };
+        /**
+         * SceneTagBody
+         * @description Name (or un-name) a scene: tag every photo captured inside its window.
+         */
+        SceneTagBody: {
+            /**
+             * Action
+             * @default add
+             * @enum {string}
+             */
+            action?: "add" | "delete";
+            /** Album Id */
+            album_id?: number | null;
+            /** End */
+            end: string;
+            /** Start */
+            start: string;
+            /** Tag */
+            tag: string;
+        };
+        /**
+         * SceneTagResponse
+         * @description ``POST /api/scenes/manual_tags``: photos whose tags actually changed.
+         */
+        SceneTagResponse: {
+            /** Count */
+            count: number;
+            /** Success */
+            success: boolean;
         };
         /** ScenesResponse */
         ScenesResponse: {
@@ -14109,6 +14170,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScenesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    api_scene_manual_tags_api_scenes_manual_tags_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SceneTagBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SceneTagResponse"];
                 };
             };
             /** @description Validation Error */
