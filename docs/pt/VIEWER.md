@@ -353,7 +353,7 @@ O menu suspenso mostra pessoas com miniaturas de rostos. Clique para filtrar a g
 
 ### Galeria de Pessoa
 
-Clique no nome da pessoa para ver todas as suas fotos em `/person/<id>`.
+Clique no nome da pessoa para ver todas as suas fotos em `/person/<id>`. Na página Gerenciar pessoas, um clique duplo em um cartão (com nome, sem nome em "Precisa de nome" ou ignorado) abre a galeria com as fotos dessa pessoa; cliques duplos no campo de nome, na caixa de seleção e nos botões continuam com eles.
 
 ### Página Gerenciar Pessoas
 

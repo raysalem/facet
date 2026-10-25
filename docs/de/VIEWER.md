@@ -354,7 +354,7 @@ Das Dropdown zeigt Personen mit Gesichts-Vorschaubildern. Zum Filtern der Galeri
 
 ### Personengalerie
 
-Klicken Sie auf den Personennamen, um alle ihre Fotos unter `/person/<id>` anzuzeigen.
+Klicken Sie auf den Personennamen, um alle ihre Fotos unter `/person/<id>` anzuzeigen. Auf der Seite „Personen verwalten“ öffnet ein Doppelklick auf eine Personenkarte (benannt, unbenannt in „Zu benennen“ oder ignoriert) die Galerie mit den Fotos dieser Person; Doppelklicks auf Namensfeld, Kontrollkästchen und Schaltflächen bleiben diesen vorbehalten.
 
 ### Seite „Personen verwalten"
 

@@ -354,7 +354,7 @@ Le menu déroulant affiche les personnes avec des vignettes de visage. Cliquez p
 
 ### Galerie d'une personne
 
-Cliquez sur le nom d'une personne pour voir toutes ses photos à `/person/<id>`.
+Cliquez sur le nom d'une personne pour voir toutes ses photos à `/person/<id>`. Sur la page Gérer les personnes, un double-clic sur une carte (nommée, non nommée dans « À nommer », ou ignorée) ouvre la galerie sur les photos de cette personne ; les doubles-clics sur le champ de nom, la case et les boutons leur restent réservés.
 
 ### Page Gérer les personnes
 

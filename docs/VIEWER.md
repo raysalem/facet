@@ -422,7 +422,7 @@ Dropdown shows persons with face thumbnails. Click to filter gallery.
 
 ### Person Gallery
 
-Click person name to view all their photos at `/person/<id>`.
+Click person name to view all their photos at `/person/<id>`. On the Manage Persons page, double-clicking a person card (named, unnamed in Needs naming, or ignored) opens the gallery on that person's photos; double-clicks on the name field, checkbox and buttons are left to them.
 
 ### Manage Persons Page
 
