@@ -38,6 +38,8 @@ interface Scene {
   photos: ScenePhoto[];
   moment?: string | null;
   moment_confidence?: number | null;
+  /** Manual tags on most of the scene's photos: the names it was given. */
+  names?: string[];
 }
 
 interface ScenesResponse {
@@ -116,6 +118,36 @@ interface ScenesResponse {
                       [class.!opacity-50]="scene.moment_confidence | momentUncertain:momentConfidenceMin()">
                   <mat-icon class="!text-sm !w-4 !h-4 !leading-4">auto_awesome</mat-icon>{{ momentLabel }}@if (scene.moment_confidence | momentUncertain:momentConfidenceMin()) { <span class="opacity-80">({{ I18N.moments.uncertain | translate }})</span> }
                 </span>
+              }
+              @for (name of scene.names ?? []; track name) {
+                <span class="inline-flex items-center gap-1 text-xs pl-2 pr-1 py-0.5 rounded-full bg-[var(--mat-sys-tertiary)]/20 text-[var(--mat-sys-tertiary)]">
+                  <button class="inline-flex items-center gap-1 cursor-pointer"
+                          [matTooltip]="I18N.scenes.open_named | translate"
+                          (click)="openNamed(name)">
+                    <mat-icon class="!text-sm !w-4 !h-4 !leading-4">label</mat-icon>{{ name }}
+                  </button>
+                  @if (auth.isEdition()) {
+                    <button class="inline-flex items-center cursor-pointer opacity-70 hover:opacity-100"
+                            [matTooltip]="I18N.scenes.remove_name | translate"
+                            [attr.aria-label]="I18N.scenes.remove_name | translate"
+                            (click)="nameScene(scene, name, 'delete')">
+                      <mat-icon class="!text-sm !w-4 !h-4 !leading-4">close</mat-icon>
+                    </button>
+                  }
+                </span>
+              }
+              @if (auth.isEdition()) {
+                <input #sceneName
+                       class="bg-transparent border-b border-white/30 focus:border-white/70 outline-none text-sm text-white/90 py-0.5 w-40"
+                       [placeholder]="I18N.scenes.name_placeholder | translate"
+                       [attr.aria-label]="I18N.scenes.name_placeholder | translate"
+                       (keyup.enter)="nameScene(scene, sceneName.value); sceneName.value = ''" />
+                <button mat-icon-button class="!w-8 !h-8"
+                        [matTooltip]="I18N.scenes.name_save | translate"
+                        [attr.aria-label]="I18N.scenes.name_save | translate"
+                        (click)="nameScene(scene, sceneName.value); sceneName.value = ''">
+                  <mat-icon class="!text-lg">check</mat-icon>
+                </button>
               }
               @if (auth.isEdition()) {
                 <button mat-flat-button color="primary" class="!ml-auto"
@@ -248,6 +280,50 @@ export class ScenesComponent implements OnInit {
     if (!this.hasMore() || this.loading()) return;
     this.page++;
     await this.load();
+  }
+
+  /**
+   * Name (or un-name) a scene: tag every photo shot inside its time window, burst
+   * repeats included, then re-read just that scene so its name chips update.
+   */
+  protected async nameScene(scene: Scene, rawName: string, action: 'add' | 'delete' = 'add'): Promise<void> {
+    const tag = rawName.trim();
+    if (!tag || !scene.start || !scene.end) return;
+    const album = this.albumId();
+    try {
+      const res = await firstValueFrom(this.api.post<{ success: boolean; count: number }>('/scenes/manual_tags', {
+        start: scene.start, end: scene.end, tag, action,
+        ...(album ? { album_id: Number(album) } : {}),
+      }));
+      this.snack.open(
+        this.i18n.t(action === 'add' ? I18N.scenes.named : I18N.scenes.name_removed, { name: tag, count: res.count }),
+        '', { duration: 2500 },
+      );
+      await this.refreshSceneNames(scene);
+    } catch {
+      this.snack.open(this.i18n.t(I18N.scenes.name_error), this.i18n.t(I18N.common.dismiss), { duration: 3000 });
+    }
+  }
+
+  /** Re-read one scene (by its own window) and copy its names into the list. */
+  private async refreshSceneNames(scene: Scene): Promise<void> {
+    const params: Record<string, string | number> = {
+      date_from: scene.start ?? '', date_to: scene.end ?? '', per_page: 1, summary: 'true',
+    };
+    const album = this.albumId();
+    if (album) params['album_id'] = album;
+    try {
+      const data = await firstValueFrom(this.api.get<ScenesResponse>('/scenes', params));
+      const names = data.scenes[0]?.names ?? [];
+      this.scenes.update((list) => list.map((s) => (s.scene_id === scene.scene_id ? { ...s, names } : s)));
+    } catch {
+      // keep the chips as they were; a reload shows the truth
+    }
+  }
+
+  /** Open the gallery on every photo carrying this scene name; add persons there. */
+  protected openNamed(name: string): void {
+    void this.router.navigate(['/'], { queryParams: { tag: name } });
   }
 
   /** Open the rich culling darkroom scoped to just this scene's capture window

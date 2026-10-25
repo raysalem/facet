@@ -2237,7 +2237,14 @@
     "loupe_hint": "Activer la loupe (Z) — survolez une photo pour l'agrandir",
     "best": "MEILLEUR",
     "load_more": "Charger plus",
-    "load_error": "Échec du chargement des scènes"
+    "load_error": "Échec du chargement des scènes",
+    "name_placeholder": "Nommer cette scène",
+    "name_save": "Enregistrer le nom",
+    "named": "Nommée « {name} » : {count} photos étiquetées",
+    "name_removed": "« {name} » retiré de {count} photos",
+    "name_error": "Impossible de nommer la scène",
+    "open_named": "Afficher ces photos dans la galerie (ajoutez-y des personnes)",
+    "remove_name": "Retirer ce nom"
   },
   "common": {
     "dismiss": "Fermer"

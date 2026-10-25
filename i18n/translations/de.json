@@ -2237,7 +2237,14 @@
     "loupe_hint": "Lupe umschalten (Z) – Foto überfahren zum Vergrößern",
     "best": "BESTE",
     "load_more": "Mehr laden",
-    "load_error": "Szenen konnten nicht geladen werden"
+    "load_error": "Szenen konnten nicht geladen werden",
+    "name_placeholder": "Diese Szene benennen",
+    "name_save": "Namen speichern",
+    "named": "„{name}“ vergeben: {count} Fotos markiert",
+    "name_removed": "„{name}“ von {count} Fotos entfernt",
+    "name_error": "Szene konnte nicht benannt werden",
+    "open_named": "Diese Fotos in der Galerie zeigen (dort Personen hinzufügen)",
+    "remove_name": "Diesen Namen entfernen"
   },
   "common": {
     "dismiss": "Schließen"

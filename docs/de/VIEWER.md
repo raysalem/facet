@@ -762,6 +762,8 @@ Momente erscheinen als Szenentitel und als Galerie-Filter (`GET /api/photos?narr
 
 API: siehe den Abschnitt [API-Endpunkte](#api-endpunkte) weiter unten.
 
+**Eine Szene benennen.** Im Bearbeitungsmodus hat jeder Szenenkopf ein Namensfeld: Ein Name („Pool“, „Torte“) markiert jedes im Zeitfenster der Szene aufgenommene Foto, Serienbilder und abgelehnte Fotos eingeschlossen (`POST /api/scenes/manual_tags`). Der Name erscheint dann als Chip an der Szene (jede manuelle Markierung auf mindestens 80 % ihrer Fotos, `names` in `GET /api/scenes`); ✕ entfernt ihn wieder, ein Klick auf den Chip öffnet die Galerie mit diesen Fotos, wo der Personenfilter eingrenzt, wer dabei war. Szenengrenzen folgen `scenes.gap_minutes`; bei einem Ereignis mit nur einer Kamera `adaptive` ausschalten, damit der Abstand exakt gilt.
+
 Gesteuert über `viewer.features.show_scenes` (Standard: `true`). Siehe [Konfiguration — Szenen](CONFIGURATION.md#scenes) für `gap_minutes`, `min_size`, `max_photos`, `max_scene_size`, `adaptive` und `adaptive_k`.
 
 ## Müll aufräumen

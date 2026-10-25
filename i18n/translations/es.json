@@ -2237,7 +2237,14 @@
     "loupe_hint": "Activar la lupa (Z) — pasa el cursor sobre una foto para ampliarla",
     "best": "MEJOR",
     "load_more": "Cargar más",
-    "load_error": "Error al cargar las escenas"
+    "load_error": "Error al cargar las escenas",
+    "name_placeholder": "Nombrar esta escena",
+    "name_save": "Guardar nombre",
+    "named": "Nombrada «{name}»: {count} fotos etiquetadas",
+    "name_removed": "Se quitó «{name}» de {count} fotos",
+    "name_error": "No se pudo nombrar la escena",
+    "open_named": "Ver estas fotos en la galería (añade personas allí)",
+    "remove_name": "Quitar este nombre"
   },
   "common": {
     "dismiss": "Cerrar"

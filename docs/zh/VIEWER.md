@@ -821,6 +821,8 @@ Facet 会为每张照片标注它所描绘的场景／活动“时刻”。默�
 
 API：参见下文的 [API 端点](#api-端点)一节。
 
+**为场景命名。** 在编辑模式下，每个场景标题都有名称输入框：输入名称（“泳池”“蛋糕”）会给该场景时间窗口内拍摄的每张照片加上此标签，连拍和被拒绝的照片也包括在内（`POST /api/scenes/manual_tags`）。名称随后显示为场景上的标签（任何出现在至少 80% 照片上的手动标签，即 `GET /api/scenes` 中的 `names`）；✕ 可移除，点击标签会在图库中打开这些照片，再用人物筛选确定谁在场。场景边界取决于 `scenes.gap_minutes`；单相机活动请关闭 `adaptive` 以使用精确间隔。
+
 由 `viewer.features.show_scenes` 控制（默认：`true`）。`gap_minutes`、`min_size`、`max_photos`、`max_scene_size`、`adaptive` 和 `adaptive_k` 参见[配置——场景](CONFIGURATION.md#场景)。
 
 ## 废片清理

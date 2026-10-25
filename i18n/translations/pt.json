@@ -2237,7 +2237,14 @@
     "loupe_hint": "Alterne a lupa (Z) — passe o cursor sobre uma foto para ampliá-la",
     "best": "MELHOR",
     "load_more": "Carregar mais",
-    "load_error": "Falha ao carregar as cenas"
+    "load_error": "Falha ao carregar as cenas",
+    "name_placeholder": "Nomear esta cena",
+    "name_save": "Salvar nome",
+    "named": "Nomeada “{name}”: {count} fotos marcadas",
+    "name_removed": "“{name}” removido de {count} fotos",
+    "name_error": "Não foi possível nomear a cena",
+    "open_named": "Mostrar estas fotos na galeria (adicione pessoas lá)",
+    "remove_name": "Remover este nome"
   },
   "common": {
     "dismiss": "Dispensar"

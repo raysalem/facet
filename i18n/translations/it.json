@@ -2237,7 +2237,14 @@
     "loupe_hint": "Attiva la lente (Z) — passa sopra una foto per ingrandirla",
     "best": "MIGLIORE",
     "load_more": "Carica altro",
-    "load_error": "Caricamento delle scene non riuscito"
+    "load_error": "Caricamento delle scene non riuscito",
+    "name_placeholder": "Dai un nome a questa scena",
+    "name_save": "Salva nome",
+    "named": "Chiamata «{name}»: {count} foto etichettate",
+    "name_removed": "Rimosso «{name}» da {count} foto",
+    "name_error": "Impossibile dare un nome alla scena",
+    "open_named": "Mostra queste foto nella galleria (aggiungi lì le persone)",
+    "remove_name": "Rimuovi questo nome"
   },
   "common": {
     "dismiss": "Chiudi"

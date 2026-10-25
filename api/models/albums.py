@@ -3,7 +3,7 @@ merge-suggestions and scenes endpoints."""
 
 from typing import Any, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from api.models.common import PaginationEnvelope
 from api.models.gallery import Photo
@@ -169,6 +169,16 @@ class Scene(BaseModel):
     photos: Optional[list[ScenePhoto]] = None
     moment: Optional[str] = None
     moment_confidence: Optional[float] = None
+    names: list[str] = Field(
+        default_factory=list,
+        description="Manual tags on at least 80% of the scene's photos: the names it was given.")
+
+
+class SceneTagResponse(BaseModel):
+    """``POST /api/scenes/manual_tags``: photos whose tags actually changed."""
+
+    success: bool
+    count: int
 
 
 class ScenesResponse(BaseModel):

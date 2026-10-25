@@ -9,21 +9,22 @@ like burst/similar culling.
 """
 
 import json
+import sqlite3
 import logging
 import time
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from api.auth import CurrentUser, get_optional_user, require_edition
 from api.database import get_db
 from api.db_helpers import (
     get_visibility_clause, record_culling_decision, set_photos_rejected,
     album_filter_clause, time_window_clauses, scope_cache_key, paginate,
-    HIDE_BURSTS_SQL, scope_sql,
+    HIDE_BURSTS_SQL, scope_sql, is_locked_error, retry_on_locked,
 )
-from api.models.albums import ScenesResponse
+from api.models.albums import SceneTagResponse, ScenesResponse
 from db.stats_cache import cache_stats_best_effort
 from utils.date_utils import parse_date
 
@@ -311,6 +312,126 @@ def compute_scenes(conn, user_id=None, album_id=None, date_from=None, date_to=No
     return scenes
 
 
+# A manual tag names a scene when it is on at least this share of the scene's photos.
+SCENE_NAME_MIN_SHARE = 0.8
+SQL_CHUNK = 900
+
+
+def _with_scene_names(conn, scenes):
+    """Attach ``names``: the manual tags carried by most of each scene's photos.
+
+    A scene is named by tagging its photos (``POST /api/scenes/manual_tags``), so the
+    name is read back from the tags on every request rather than stored with the
+    scene, whose boundaries move with the gap settings and are cached for an hour.
+    """
+    paths = [p['path'] for scene in scenes for p in scene.get('photos') or ()]
+    tags_by_path: dict[str, list[str]] = {}
+    for at in range(0, len(paths), SQL_CHUNK):
+        chunk = paths[at:at + SQL_CHUNK]
+        for row in conn.execute(
+            "SELECT photo_path, tag FROM photo_manual_tags "
+            f"WHERE photo_path IN ({','.join('?' * len(chunk))})",
+            chunk,
+        ):
+            tags_by_path.setdefault(row[0], []).append(row[1])
+    named = []
+    for scene in scenes:
+        photos = scene.get('photos') or ()
+        counts: dict[str, int] = {}
+        for photo in photos:
+            for tag in tags_by_path.get(photo['path'], ()):
+                counts[tag] = counts.get(tag, 0) + 1
+        need = SCENE_NAME_MIN_SHARE * len(photos)
+        names = sorted((t for t, n in counts.items() if photos and n >= need),
+                       key=lambda t: (-counts[t], t))
+        named.append({**scene, 'names': names})
+    return named
+
+
+class SceneTagBody(BaseModel):
+    """Name (or un-name) a scene: tag every photo captured inside its window."""
+
+    start: str = Field(min_length=1, max_length=40)
+    end: str = Field(min_length=1, max_length=40)
+    tag: str = Field(min_length=1, max_length=100)
+    action: Literal['add', 'delete'] = 'add'
+    album_id: Optional[int] = None
+
+
+@router.post("/api/scenes/manual_tags", response_model=SceneTagResponse)
+@retry_on_locked()
+def api_scene_manual_tags(
+    body: SceneTagBody,
+    user: CurrentUser = Depends(require_edition),
+):
+    """Add or remove one manual tag on every photo captured within ``[start, end]``.
+
+    Unlike the scene's own photo list, this reaches the burst repeats and rejected
+    frames of the window too, so a scene's name follows every shot of it. Scoped to
+    an album when ``album_id`` is given; the bulk tag endpoint's write rules apply
+    (writable photos only, the per-photo cap, an AI tag never duplicated as a
+    manual one).
+    """
+    from api.routers.manual_tags import (
+        _after_commit, _created_by, _drop_tag_caches, _normalized, _writable_photo_paths,
+    )
+    from db.manual_tags import MAX_TAGS_PER_PHOTO, SOURCE_USER, ai_tag_absent_sql
+
+    tag = _normalized(body.tag)
+    user_id = user.user_id if user else None
+    vis_sql, vis_params = get_visibility_clause(user_id)
+    album_sql, album_params = album_filter_clause(body.album_id)
+    window, window_params = time_window_clauses(body.start, body.end)
+    with get_db() as conn:
+        if album_params:
+            from api.routers.albums import _check_album_access
+            _check_album_access(conn, album_params[0], user_id)
+        candidates = [r[0] for r in conn.execute(
+            f"SELECT path FROM photos WHERE {' AND '.join([vis_sql, album_sql, *window])}",
+            vis_params + album_params + window_params,
+        )]
+        paths = _writable_photo_paths(conn, user, candidates)
+        if not paths:
+            return {"success": True, "count": 0}
+        try:
+            count = 0
+            for at in range(0, len(paths), SQL_CHUNK):
+                chunk = paths[at:at + SQL_CHUNK]
+                scope = f"photos WHERE photos.path IN ({','.join('?' * len(chunk))})"
+                if body.action == 'add':
+                    absent_sql, absent_params = ai_tag_absent_sql(tag)
+                    cursor = conn.execute(
+                        "INSERT OR IGNORE INTO photo_manual_tags "
+                        "(photo_path, tag, source, created_by, created_at) "
+                        f"SELECT photos.path, ?, ?, ?, datetime('now') FROM {scope} "
+                        f"AND {absent_sql} "
+                        "AND (SELECT COUNT(*) FROM photo_manual_tags pmt "
+                        "WHERE pmt.photo_path = photos.path) < ?",
+                        [tag, SOURCE_USER, _created_by(user), *chunk, *absent_params,
+                         MAX_TAGS_PER_PHOTO],
+                    )
+                else:
+                    cursor = conn.execute(
+                        "DELETE FROM photo_manual_tags WHERE tag = ? AND photo_path IN "
+                        f"(SELECT photos.path FROM {scope})",
+                        [tag, *chunk],
+                    )
+                count += cursor.rowcount
+            _drop_tag_caches(conn)
+            conn.commit()
+        except HTTPException:
+            raise
+        except sqlite3.Error as ex:
+            conn.rollback()
+            if is_locked_error(ex):
+                raise
+            logger.exception("Database error tagging a scene")
+            raise HTTPException(status_code=500, detail='Internal server error')
+    _after_commit()
+    return {"success": True, "count": count}
+
+
+
 @router.get(
     "/api/scenes",
     response_model=ScenesResponse,
@@ -339,6 +460,8 @@ def api_scenes(
     total = len(scenes)
     total_pages, start = paginate(total, page, per_page)
     page_scenes = scenes[start:start + per_page]
+    with get_db() as conn:
+        page_scenes = _with_scene_names(conn, page_scenes)
     if summary:
         page_scenes = [{k: v for k, v in s.items() if k != 'photos'} for s in page_scenes]
     return {

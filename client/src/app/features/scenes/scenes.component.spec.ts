@@ -52,3 +52,68 @@ describe('ScenesComponent page context', () => {
     expect(pageContext.snapshot()).toBeNull();
   });
 });
+
+describe('ScenesComponent scene names', () => {
+  let mockApi: { get: Mock; post: Mock };
+  let router: { navigate: Mock };
+  let component: ScenesComponent;
+  const scene = {
+    scene_id: 3, start: '2025:07:27 14:18:10', end: '2025:07:27 14:34:15', count: 26,
+    best_path: '/p/a.jpg', photos: [], names: [] as string[],
+  };
+  interface Testable {
+    nameScene: (s: typeof scene, n: string, a?: 'add' | 'delete') => Promise<void>;
+    openNamed: (n: string) => void;
+    scenes: { set: (v: unknown[]) => void; (): (typeof scene)[] };
+  }
+
+  beforeEach(() => {
+    mockApi = {
+      get: vi.fn(() => of({ scenes: [{ ...scene, names: ['pool'] }], total: 1, page: 1, per_page: 1, total_pages: 1 })),
+      post: vi.fn(() => of({ success: true, count: 30 })),
+    };
+    router = { navigate: vi.fn() };
+    TestBed.configureTestingModule({
+      providers: [
+        ScenesComponent,
+        { provide: ApiService, useValue: mockApi },
+        { provide: MatSnackBar, useValue: { open: vi.fn() } },
+        { provide: I18nService, useValue: { t: vi.fn((key: string) => key) } },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: () => null } } } },
+        { provide: Router, useValue: router },
+        { provide: AlbumService, useValue: { listNonSmart: () => of([]) } },
+        { provide: AuthService, useValue: { isEdition: vi.fn(() => true) } },
+        { provide: GalleryStore, useValue: { config: () => null } },
+      ],
+    });
+    component = TestBed.inject(ScenesComponent);
+    (component as unknown as Testable).scenes.set([scene]);
+  });
+
+  it('tags the scene window, then shows the name it reads back', async () => {
+    await (component as unknown as Testable).nameScene(scene, '  Pool ');
+
+    expect(mockApi.post).toHaveBeenCalledWith('/scenes/manual_tags', {
+      start: scene.start, end: scene.end, tag: 'Pool', action: 'add',
+    });
+    expect(mockApi.get).toHaveBeenCalledWith('/scenes', {
+      date_from: scene.start, date_to: scene.end, per_page: 1, summary: 'true',
+    });
+    expect((component as unknown as Testable).scenes()[0].names).toEqual(['pool']);
+  });
+
+  it('removes a name', async () => {
+    await (component as unknown as Testable).nameScene(scene, 'pool', 'delete');
+    expect(mockApi.post.mock.calls[0][1]).toMatchObject({ tag: 'pool', action: 'delete' });
+  });
+
+  it('ignores an empty name', async () => {
+    await (component as unknown as Testable).nameScene(scene, '   ');
+    expect(mockApi.post).not.toHaveBeenCalled();
+  });
+
+  it('opens the gallery on the named photos', () => {
+    (component as unknown as Testable).openNamed('pool');
+    expect(router.navigate).toHaveBeenCalledWith(['/'], { queryParams: { tag: 'pool' } });
+  });
+});

@@ -30,6 +30,7 @@ _SCHEMA = """
     );
     CREATE TABLE albums (id INTEGER PRIMARY KEY, user_id TEXT);
     CREATE TABLE stats_cache (key TEXT PRIMARY KEY, value TEXT, updated_at REAL);
+    CREATE TABLE photo_manual_tags (photo_path TEXT NOT NULL, tag TEXT NOT NULL);
     CREATE TABLE comparisons (
         id INTEGER PRIMARY KEY, photo_a_path TEXT, photo_b_path TEXT, winner TEXT,
         category TEXT, session_id TEXT, user_id TEXT, source TEXT,
@@ -220,6 +221,7 @@ _MOMENT_SCHEMA = """
     );
     CREATE TABLE album_photos (id INTEGER PRIMARY KEY, album_id INTEGER, photo_path TEXT);
     CREATE TABLE stats_cache (key TEXT PRIMARY KEY, value TEXT, updated_at REAL);
+    CREATE TABLE photo_manual_tags (photo_path TEXT NOT NULL, tag TEXT NOT NULL);
 """
 
 

@@ -2252,6 +2252,13 @@ export const I18N = {
     best: "scenes.best",
     load_more: "scenes.load_more",
     load_error: "scenes.load_error",
+    name_placeholder: "scenes.name_placeholder",
+    name_save: "scenes.name_save",
+    named: "scenes.named",
+    name_removed: "scenes.name_removed",
+    name_error: "scenes.name_error",
+    open_named: "scenes.open_named",
+    remove_name: "scenes.remove_name",
   },
   common: {
     dismiss: "common.dismiss",
