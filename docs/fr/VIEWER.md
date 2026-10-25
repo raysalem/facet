@@ -758,6 +758,8 @@ Les moments apparaissent comme titres de scène et comme filtre de galerie (`GET
 
 API : voir la section [Points d'accès API](#points-daccès-api) ci-dessous.
 
+**Nommer une scène.** En mode édition, chaque en-tête de scène a un champ de nom : saisir un nom (« Piscine », « Gâteau ») étiquette chaque photo prise dans la fenêtre de temps de la scène, rafales et photos rejetées comprises (`POST /api/scenes/manual_tags`). Le nom apparaît alors sur la scène (toute étiquette manuelle présente sur au moins 80 % de ses photos, `names` dans `GET /api/scenes`) ; ✕ le retire, et un clic sur la puce ouvre la galerie sur ces photos, où le filtre de personnes précise qui était là. Les limites des scènes suivent `scenes.gap_minutes` ; pour un événement à un seul appareil, désactivez `adaptive` pour un écart exact.
+
 Contrôlé par `viewer.features.show_scenes` (par défaut : `true`). Voir [Configuration — Scenes](CONFIGURATION.md#scenes) pour `gap_minutes`, `min_size`, `max_photos`, `max_scene_size`, `adaptive` et `adaptive_k`.
 
 ## Nettoyage des indésirables

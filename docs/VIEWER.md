@@ -826,6 +826,8 @@ Moments surface as scene titles and as a gallery filter (`GET /api/photos?narrat
 
 API: see the [API Endpoints](#api-endpoints) section below.
 
+**Naming a scene.** In edition mode each scene header has a name field: typing a name ("Pool", "Cake") tags every photo captured within that scene's time window with it, burst repeats and rejected frames included (`POST /api/scenes/manual_tags`). The name then shows as a chip on the scene (any manual tag on at least 80% of its photos, `names` in `GET /api/scenes`); ✕ removes it from the window again, and clicking the chip opens the gallery on those photos, where the person filter narrows it to who was there (for example two children at the pool). Scene boundaries follow `scenes.gap_minutes`; for a one-camera event set `adaptive` off so the gap is exact.
+
 Controlled by `viewer.features.show_scenes` (default: `true`). See [Configuration — Scenes](CONFIGURATION.md#scenes) for `gap_minutes`, `min_size`, `max_photos`, `max_scene_size`, `adaptive`, and `adaptive_k`.
 
 ## Junk Sweep

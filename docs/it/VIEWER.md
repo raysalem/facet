@@ -757,6 +757,8 @@ I momenti emergono come titoli di scena e come filtro della galleria (`GET /api/
 
 API: vedi la sezione [Endpoint API](#endpoint-api) più sotto.
 
+**Dare un nome a una scena.** In modalità modifica ogni intestazione di scena ha un campo nome: un nome («Piscina», «Torta») etichetta ogni foto scattata nella finestra temporale della scena, raffiche e foto scartate comprese (`POST /api/scenes/manual_tags`). Il nome compare poi come chip sulla scena (ogni etichetta manuale presente su almeno l'80% delle sue foto, `names` in `GET /api/scenes`); ✕ lo rimuove, e un clic sul chip apre la galleria su quelle foto, dove il filtro persone restringe a chi c'era. I confini delle scene seguono `scenes.gap_minutes`; per un evento con una sola fotocamera disattiva `adaptive` perché l'intervallo sia esatto.
+
 Controllato da `viewer.features.show_scenes` (predefinito: `true`). Vedi [Configurazione — Scene](CONFIGURATION.md#scenes) per `gap_minutes`, `min_size`, `max_photos`, `max_scene_size`, `adaptive` e `adaptive_k`.
 
 ## Pulizia degli scarti

@@ -2200,7 +2200,14 @@
     "loupe_hint": "Toggle the loupe (Z) — hover a photo to magnify it",
     "best": "BEST",
     "load_more": "Load more",
-    "load_error": "Failed to load scenes"
+    "load_error": "Failed to load scenes",
+    "name_placeholder": "Name this scene",
+    "name_save": "Save name",
+    "named": "Named “{name}”: {count} photos tagged",
+    "name_removed": "Removed “{name}” from {count} photos",
+    "name_error": "Could not name the scene",
+    "open_named": "Show these photos in the gallery (add people there)",
+    "remove_name": "Remove this name"
   },
   "common": {
     "dismiss": "Dismiss"

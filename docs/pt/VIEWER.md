@@ -756,6 +756,8 @@ Os momentos surgem como títulos de cenas e como um filtro de galeria (`GET /api
 
 API: veja a seção [Endpoints da API](#endpoints-da-api) abaixo.
 
+**Nomear uma cena.** No modo de edição, cada cabeçalho de cena tem um campo de nome: digitar um nome ("Piscina", "Bolo") marca cada foto tirada na janela de tempo da cena, incluindo rajadas e fotos rejeitadas (`POST /api/scenes/manual_tags`). O nome aparece como etiqueta na cena (qualquer marcação manual presente em pelo menos 80% das fotos, `names` em `GET /api/scenes`); ✕ remove, e clicar na etiqueta abre a galeria com essas fotos, onde o filtro de pessoas mostra quem estava lá. Os limites das cenas seguem `scenes.gap_minutes`; para um evento de uma só câmera desative `adaptive` para um intervalo exato.
+
 Controlado por `viewer.features.show_scenes` (padrão: `true`). Veja [Configuração — Cenas](CONFIGURATION.md#scenes) para `gap_minutes`, `min_size`, `max_photos`, `max_scene_size`, `adaptive` e `adaptive_k`.
 
 ## Limpeza de lixo

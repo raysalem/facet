@@ -2200,7 +2200,14 @@
     "loupe_hint": "切换放大镜（Z），悬停在照片上可放大查看",
     "best": "最佳",
     "load_more": "加载更多",
-    "load_error": "加载场景失败"
+    "load_error": "加载场景失败",
+    "name_placeholder": "为此场景命名",
+    "name_save": "保存名称",
+    "named": "已命名“{name}”：已标记 {count} 张照片",
+    "name_removed": "已从 {count} 张照片中移除“{name}”",
+    "name_error": "无法为场景命名",
+    "open_named": "在图库中显示这些照片（可在那里添加人物）",
+    "remove_name": "移除此名称"
   },
   "common": {
     "dismiss": "关闭提示"
