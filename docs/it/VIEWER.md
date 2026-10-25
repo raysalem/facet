@@ -367,7 +367,7 @@ Accessibile tramite il pulsante nell'intestazione o `/persons`:
 | **Rinomina** | Clicca sul nome della persona per modificarlo in linea |
 | **Dividi** | Apri i volti di una persona, seleziona un sottoinsieme, dividili in una nuova persona |
 | **Trova altri volti** | Il pulsante di ricerca sulla scheda di una persona elenca i volti che le somigliano, i più simili per primi (confrontati con il centroide della persona tramite `GET /api/person/{id}/possible_faces`). Seleziona quelli giusti e aggiungili. L'aggiunta ricalcola il centroide, quindi il giro successivo è ordinato in base a ciò che hai appena confermato; i volti lasciati deselezionati non vengono più proposti finché la finestra resta aperta. **Tutti i volti** cerca anche negli altri cluster, **Solo non assegnati** solo tra i volti non raggruppati. Un volto che appartiene a una persona con un altro nome mostra quel nome e non è mai preselezionato; uno che appartiene a una persona con lo stesso nome, un cluster separato, è preselezionato come un volto non assegnato |
-| **Nascondi** | Nascondi un cluster dall'elenco delle persone, dai filtri e dai suggerimenti di unione (reversibile) |
+| **Ignora** | Ignorare un cluster (personale, sconosciuti): il pulsante ⊘ di una scheda, anche sulle schede «Da nominare». Le persone ignorate escono da elenco, «Da nominare», filtri, suggerimenti di unione e ricerca volti, e compaiono in una sezione richiudibile **Ignorate** con **Ripristina** (`GET /api/persons?hidden_only=true`). Stesso flag `is_hidden` di prima |
 
 ### Segnare un volto non rilevato
 
@@ -1254,7 +1254,7 @@ I tipi TypeScript del client sono generati da questo schema in `client/src/app/c
 
 | Endpoint | Descrizione |
 |----------|-------------|
-| `GET /api/persons` | Elenca tutte le persone |
+| `GET /api/persons` | Elenca tutte le persone; `hidden_only=true` elenca solo quelle ignorate (nascoste) |
 | `POST /api/persons` | Crea una nuova persona, allegando facoltativamente dei volti (riservato alla modalità di modifica). Corpo: `{name, face_ids}` |
 | `GET /api/persons/needs_naming?min_faces=N` | Elenca le persone raggruppate automaticamente senza nome con `face_count >= N` (predefinito da `viewer.persons.needs_naming_min_faces`) |
 | `POST /api/persons/{id}/rename` | Rinomina una persona |

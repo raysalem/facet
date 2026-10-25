@@ -139,18 +139,22 @@ async def list_persons(
     search: str = Query(""),
     sort: str = Query("count_desc", pattern="^(count_asc|count_desc|quality_asc|quality_desc|name_asc|name_desc)$"),
     include_hidden: bool = Query(False),
+    hidden_only: bool = Query(False),
     user: CurrentUser = Depends(require_authenticated),
 ):
     """List all persons with pagination and search.
 
     Hidden persons (``is_hidden = 1``) are excluded by default; pass
-    ``include_hidden=true`` to surface them.
+    ``include_hidden=true`` to surface them, or ``hidden_only=true`` for the hidden
+    ones alone (the persons page's Ignored section).
     """
     order_clause = _SORT_CLAUSES.get(sort, _SORT_CLAUSES["count_desc"])
 
     where_parts: list = []
     params: list = []
-    if not include_hidden:
+    if hidden_only:
+        where_parts.append(f"NOT {person_not_hidden_clause('p')}")
+    elif not include_hidden:
         where_parts.append(person_not_hidden_clause('p'))
     if search.strip():
         term = search.strip()

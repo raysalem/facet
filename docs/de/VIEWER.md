@@ -367,7 +367,7 @@ Zugriff über die Header-Schaltfläche oder `/persons`:
 | **Umbenennen** | Auf den Personennamen klicken, um ihn inline zu bearbeiten |
 | **Aufteilen** | Die Gesichter einer Person öffnen, eine Teilmenge auswählen und in eine neue Person aufteilen |
 | **Weitere Gesichter finden** | Die Suchschaltfläche auf einer Personenkarte listet Gesichter, die dieser Person ähneln, beste Treffer zuerst (verglichen mit dem Zentroid der Person über `GET /api/person/{id}/possible_faces`). Die richtigen anhaken und hinzufügen. Das Hinzufügen berechnet den Zentroid neu, sodass die nächste Runde nach dem gerade Bestätigten sortiert wird; nicht angehakte Gesichter werden nicht erneut angeboten, solange der Dialog offen ist. **Alle Gesichter** sucht auch in anderen Clustern, **Nur nicht zugewiesene** nur unter den nicht gruppierten Gesichtern. Ein Gesicht, das einer anders benannten Person gehört, zeigt deren Namen und ist nie vorab angehakt; eines, das einer gleichnamigen Person gehört, also einem abgespaltenen Cluster, ist wie ein nicht zugewiesenes Gesicht vorab angehakt |
-| **Ausblenden** | Ein Cluster aus der Personenliste, den Filtern und den Zusammenführungsvorschlägen ausblenden (umkehrbar) |
+| **Ignorieren** | Ein Cluster ignorieren (Personal, Fremde): die ⊘-Schaltfläche einer Karte, auch auf „Zu benennen“-Karten. Ignorierte Personen verschwinden aus Liste, „Zu benennen“, Filtern, Zusammenführungsvorschlägen und Gesichtersuche und stehen in einem einklappbaren Abschnitt **Ignoriert** mit **Wiederherstellen** (`GET /api/persons?hidden_only=true`). Dasselbe `is_hidden`-Flag wie bisher |
 
 ### Ein übersehenes Gesicht markieren
 
@@ -1255,7 +1255,7 @@ Die TypeScript-Typen des Clients werden mit `cd client && npm run gen:api` aus d
 
 | Endpunkt | Beschreibung |
 |----------|-------------|
-| `GET /api/persons` | Alle Personen auflisten |
+| `GET /api/persons` | Alle Personen auflisten; `hidden_only=true` listet nur die ignorierten (ausgeblendeten) |
 | `POST /api/persons` | Eine neue Person erstellen, optional mit Gesichtern (Bearbeitungsmodus erforderlich). Body: `{name, face_ids}` |
 | `GET /api/persons/needs_naming?min_faces=N` | Unbenannte, automatisch geclusterte Personen mit `face_count >= N` auflisten (Standard aus `viewer.persons.needs_naming_min_faces`) |
 | `POST /api/persons/{id}/rename` | Eine Person umbenennen |

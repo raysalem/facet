@@ -366,7 +366,7 @@ Accede mediante el botón de la cabecera o `/persons`:
 | **Renombrar** | Haz clic en el nombre de la persona para editarlo en línea |
 | **Dividir** | Abre las caras de una persona, selecciona un subconjunto y divídelas en una persona nueva |
 | **Buscar más caras** | El botón de búsqueda de la tarjeta de una persona lista las caras que se le parecen, las más parecidas primero (comparadas con el centroide de la persona mediante `GET /api/person/{id}/possible_faces`). Marca las correctas y añádelas. Añadir recalcula el centroide, así que la siguiente ronda se ordena según lo que acabas de confirmar; las caras que dejas sin marcar no se vuelven a ofrecer mientras el diálogo siga abierto. **Todas las caras** busca también en otros grupos, **Solo sin asignar** solo entre las caras sin agrupar. Una cara que pertenece a una persona con otro nombre muestra ese nombre y nunca aparece marcada de antemano; una que pertenece a una persona con el mismo nombre, un grupo separado, aparece marcada como una cara sin asignar |
-| **Ocultar** | Oculta un grupo de la lista de personas, los filtros y las sugerencias de fusión (reversible) |
+| **Ignorar** | Ignorar un grupo (personal, desconocidos): el botón ⊘ de una tarjeta, también en las tarjetas «Por nombrar». Las personas ignoradas salen de la lista, «Por nombrar», los filtros, las sugerencias de fusión y la búsqueda de caras, y aparecen en una sección plegable **Ignoradas** con **Restaurar** (`GET /api/persons?hidden_only=true`). Mismo indicador `is_hidden` que antes |
 
 ### Marcar una cara no detectada
 
@@ -1253,7 +1253,7 @@ Los tipos TypeScript del cliente se generan a partir de ese esquema en `client/s
 
 | Endpoint | Descripción |
 |----------|-------------|
-| `GET /api/persons` | Listar todas las personas |
+| `GET /api/persons` | Listar todas las personas; `hidden_only=true` lista solo las ignoradas (ocultas) |
 | `POST /api/persons` | Crear una persona nueva, opcionalmente adjuntando caras (restringido a edición). Cuerpo: `{name, face_ids}` |
 | `GET /api/persons/needs_naming?min_faces=N` | Listar las personas autoagrupadas sin nombre con `face_count >= N` (predeterminado desde `viewer.persons.needs_naming_min_faces`) |
 | `POST /api/persons/{id}/rename` | Renombrar una persona |

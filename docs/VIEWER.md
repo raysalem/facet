@@ -435,7 +435,7 @@ Access via header button or `/persons`:
 | **Rename** | Click person name to edit inline |
 | **Split** | Open a person's faces, select a subset, split them into a new person |
 | **Find more faces** | The person-search button on a person card lists faces that look like that person, best match first (scored against the person's centroid by `GET /api/person/{id}/possible_faces`). Tick the right ones and add them. Adding recomputes the centroid, so the next round is ranked against what you just confirmed; faces you leave unticked are not offered again while the dialog is open. **All faces** also searches other clusters, **Unassigned only** just the unclustered faces. A face owned by a differently named person shows that name and is never pre-ticked; one owned by a person of the same name, a split-off cluster, is pre-ticked like an unassigned face |
-| **Hide** | Hide a cluster from the persons list, filters, and merge suggestions (reversible) |
+| **Ignore** | Ignore a cluster (staff, strangers): the ⊘ button on a card, also on Needs naming cards. Ignored persons leave the persons list, Needs naming, filters, merge suggestions and Find more, and are listed in a collapsible **Ignored** section with **Restore** (`GET /api/persons?hidden_only=true`). Same `is_hidden` flag as before |
 
 ### Mark a missed face
 
@@ -1325,7 +1325,7 @@ The client's TypeScript types are generated from that schema into `client/src/ap
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /api/persons` | List all persons |
+| `GET /api/persons` | List all persons; `hidden_only=true` lists only the ignored (hidden) ones |
 | `POST /api/persons` | Create a new person, optionally attaching faces (edition-gated). Body: `{name, face_ids}` |
 | `GET /api/persons/needs_naming?min_faces=N` | List unnamed auto-clustered persons with `face_count >= N` (default from `viewer.persons.needs_naming_min_faces`) |
 | `POST /api/persons/{id}/rename` | Rename a person |
