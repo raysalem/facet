@@ -370,7 +370,7 @@ Acesse pelo botão no cabeçalho ou por `/persons`:
 
 ### Rostos na foto
 
-Na visualização da foto, aparece um quadro em volta de cada rosto detectado enquanto o ponteiro está sobre a foto, e passar sobre um rosto mostra o nome (quadro âmbar: ainda sem nome). Os quadros acompanham o zoom e o deslocamento. No modo de edição, clicar em um rosto abre um menu: **Trocar pessoa…** (ou **Nomear este rosto…**) para escolher uma pessoa existente ou digitar um novo nome, **Encontrar mais rostos de …** para essa pessoa e **Não é …** para tirar essa pessoa da foto. Rostos cujas dimensões salvas não são confiáveis não são desenhados. Os quadros vêm de `GET /api/photo/faces`, que retorna o `box` de cada rosto normalizado ao enquadramento.
+Na visualização da foto, aparece um quadro em volta de cada rosto detectado enquanto o ponteiro está sobre a foto, e passar sobre um rosto mostra o nome (quadro âmbar: ainda sem nome). Os quadros acompanham o zoom e o deslocamento. No modo de edição, clicar em um rosto abre um menu: **Trocar pessoa…** (ou **Nomear este rosto…**) para escolher uma pessoa existente ou digitar um novo nome, **Encontrar mais rostos de …** para essa pessoa e **Não é …** para tirar essa pessoa da foto. Rostos cujas dimensões salvas não são confiáveis não são desenhados. Os quadros vêm de `GET /api/photo/faces`, que retorna o `box` de cada rosto normalizado ao enquadramento. Todo rosto que pertence a uma pessoa, com ou sem nome, também oferece **Ver todas as fotos de …** (ou **Ver todas as fotos deste grupo**), que abre a galeria filtrada por essa pessoa; isso funciona também em modo somente leitura.
 
 ### Marcar um rosto não detectado
 
