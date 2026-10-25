@@ -354,7 +354,7 @@ Il menu a tendina mostra le persone con le miniature dei volti. Clicca per filtr
 
 ### Galleria della persona
 
-Clicca sul nome di una persona per visualizzare tutte le sue foto in `/person/<id>`.
+Clicca sul nome di una persona per visualizzare tutte le sue foto in `/person/<id>`. Nella pagina Gestisci persone, un doppio clic su una scheda (con nome, senza nome in «Da nominare» o ignorata) apre la galleria sulle foto di quella persona; i doppi clic su campo nome, casella e pulsanti restano a loro.
 
 ### Pagina Gestisci persone
 
