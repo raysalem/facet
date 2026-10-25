@@ -52,6 +52,16 @@ const SOCIAL_SOURCE_KEYS: Record<string, string> = {
   center: I18N.social_export.source.center,
 };
 
+const SHOW_FACE_BOXES_KEY = 'facet_show_face_boxes';
+
+function readShowFaceBoxes(): boolean {
+  try {
+    return localStorage.getItem(SHOW_FACE_BOXES_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 @Component({
   selector: 'app-photo-detail',
   imports: [
@@ -135,6 +145,13 @@ const SOCIAL_SOURCE_KEYS: Record<string, string> = {
             </button>
           </mat-menu>
         }
+
+        <button mat-icon-button (click)="toggleFaceBoxes()"
+          [attr.aria-pressed]="showFaceBoxes()"
+          [matTooltip]="(showFaceBoxes() ? I18N.photo_faces.hide_boxes : I18N.photo_faces.show_boxes) | translate"
+          [attr.aria-label]="(showFaceBoxes() ? I18N.photo_faces.hide_boxes : I18N.photo_faces.show_boxes) | translate">
+          <mat-icon>{{ showFaceBoxes() ? 'face' : 'face_retouching_off' }}</mat-icon>
+        </button>
 
         @if (auth.isEdition()) {
           <button mat-icon-button (click)="openManualFaces(p)"
@@ -224,6 +241,8 @@ const SOCIAL_SOURCE_KEYS: Record<string, string> = {
             [imageHeight]="p.image_height"
             [transform]="zoomTransform()"
             [canEdit]="auth.isEdition()"
+            [showAll]="showFaceBoxes()"
+            [focusPersonIds]="focusPersonIds()"
             (changed)="refreshPeople(p.path)" />
         </div>
 
@@ -667,6 +686,22 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   protected readonly explainerOpen = signal(false);
   protected readonly explainerCategories = signal<string[]>([]);
   protected readonly explainerTargetCategory = signal<string | null>(null);
+
+  // Face boxes: always shown (true) or on hover only. Remembered per browser.
+  protected readonly showFaceBoxes = signal(readShowFaceBoxes());
+  /** The gallery's person filter: those persons' faces stay boxed while browsing them. */
+  protected readonly focusPersonIds = computed(() =>
+    (this.store.filters().person_id || '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0));
+
+  protected toggleFaceBoxes(): void {
+    const next = !this.showFaceBoxes();
+    this.showFaceBoxes.set(next);
+    try {
+      localStorage.setItem(SHOW_FACE_BOXES_KEY, next ? '1' : '0');
+    } catch {
+      // private window or blocked storage: the choice lasts for this page only
+    }
+  }
 
   // Zoom & pan state
   private readonly imagePanel = viewChild<ElementRef<HTMLDivElement>>('imagePanel');
