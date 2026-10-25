@@ -366,7 +366,7 @@ Acesse pelo botão no cabeçalho ou por `/persons`:
 | **Renomear** | Clique no nome da pessoa para editar em linha. Dar a ele o nome de outra pessoa, sem diferenciar maiúsculas, oferece mesclar todos os clusters com esse nome no maior, que mantém sua grafia; recuse para manter homônimos separados |
 | **Dividir** | Abra os rostos de uma pessoa, selecione um subconjunto, divida-os em uma nova pessoa |
 | **Encontrar mais rostos** | O botão de busca no cartão de uma pessoa lista os rostos parecidos com ela, os mais parecidos primeiro (comparados ao centroide da pessoa por `GET /api/person/{id}/possible_faces`). Marque os corretos e adicione-os. Adicionar recalcula o centroide, então a próxima rodada é ordenada pelo que você acabou de confirmar; os rostos deixados desmarcados não são oferecidos de novo enquanto a caixa de diálogo estiver aberta. **Todos os rostos** busca também em outros clusters, **Somente não atribuídos** apenas entre os rostos não agrupados. Um rosto que pertence a uma pessoa de outro nome mostra esse nome e nunca vem pré-marcado; um que pertence a uma pessoa de mesmo nome, um cluster separado, vem pré-marcado como um rosto não atribuído |
-| **Ocultar** | Oculta um cluster da lista de pessoas, filtros e sugestões de mesclagem (reversível) |
+| **Ignorar** | Ignorar um cluster (equipe, desconhecidos): o botão ⊘ de um cartão, também nos cartões "Precisa de nome". Pessoas ignoradas saem da lista, de "Precisa de nome", dos filtros, das sugestões de mesclagem e da busca de rostos, e aparecem numa seção recolhível **Ignoradas** com **Restaurar** (`GET /api/persons?hidden_only=true`). Mesmo sinalizador `is_hidden` de antes |
 
 ### Rostos na foto
 
@@ -1258,7 +1258,7 @@ Os tipos TypeScript do cliente são gerados a partir desse esquema em `client/sr
 
 | Endpoint | Descrição |
 |----------|-------------|
-| `GET /api/persons` | Lista todas as pessoas; `named_only=true` omite as sem nome (a página de pessoas faz isso enquanto "Precisa de nome" é mostrado) |
+| `GET /api/persons` | Lista todas as pessoas; `named_only=true` omite as sem nome (a página de pessoas faz isso enquanto "Precisa de nome" é mostrado); `hidden_only=true` lista só as ignoradas (ocultas) |
 | `POST /api/persons` | Cria uma nova pessoa, opcionalmente anexando rostos (restrito à edição). Corpo: `{name, face_ids}` |
 | `GET /api/persons/needs_naming?min_faces=N` | Lista pessoas sem nome (ausente ou em branco), não ocultas, com `face_count >= N`, do agrupamento ou de uma divisão (padrão de `viewer.persons.needs_naming_min_faces`) |
 | `POST /api/persons/{id}/rename` | Renomeia uma pessoa |

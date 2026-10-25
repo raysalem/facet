@@ -1721,6 +1721,8 @@ export const I18N = {
     same_name_title: "persons.same_name_title",
     same_name_message: "persons.same_name_message",
     same_name_merge: "persons.same_name_merge",
+    ignored_section: "persons.ignored_section",
+    ignored_help: "persons.ignored_help",
   },
   photo_faces: {
     unknown: "photo_faces.unknown",
