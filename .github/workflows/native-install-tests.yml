@@ -1,0 +1,213 @@
+name: Native install tests
+
+# Exercises the native Windows install (installer/) and the Docker-to-Windows path
+# rewrite (scripts/rewrite_db_paths.py) on three hosted machines: the Linux suite,
+# the CPU Docker image, and a plain Windows runner that installs the MSI for real.
+on:
+  push:
+    branches: ["ci/**"]
+  workflow_dispatch:
+    inputs:
+      scan:
+        description: "Windows: score generated photos (downloads the models, ~15 min)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Linux - test suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install ExifTool
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libimage-exiftool-perl
+      - name: Install test dependencies
+        # Same list as ci.yml's python-tests job.
+        run: pip install pytest pytest-asyncio pytest-cov fastapi[standard] httpx pyjwt mcp==2.3.0 websockets pillow pillow-heif numpy scipy scikit-learn opencv-python-headless tqdm aiosqlite sqlite-vec imagehash psutil watchdog send2trash tifffile imagecodecs lupa jsonschema==4.26.0 pytest-timeout==2.4.0 pytest-xdist==3.8.0
+      - name: Path rewrite tool
+        run: python -m pytest tests/test_rewrite_db_paths.py -v --tb=short
+      - name: Whole suite (nothing outside installer/ and scripts/ changed)
+        run: python -m pytest -n 4 --tb=short -q
+
+  docker:
+    name: Docker - CPU image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Reclaim runner disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost
+          df -h /
+      - name: Build the CPU image (as docker-publish.yml's cpu variant)
+        run: >
+          docker build -t facet:ci
+          --build-arg BASE_IMAGE=python:3.12-slim
+          --build-arg STRIP_TORCH=0
+          --build-arg INSTALL_CUML=0 .
+      - name: Viewer starts and answers
+        run: |
+          mkdir -p "$RUNNER_TEMP/data" "$RUNNER_TEMP/config" "$RUNNER_TEMP/photos"
+          # Same mounts and environment as docker-compose.yml.
+          docker run -d --name facet -p 5000:5000 \
+            -e DB_PATH=/app/data/photo_scores_pro.db -e FACET_CONFIG=/config/scoring_config.json \
+            -v "$RUNNER_TEMP/data:/app/data" -v "$RUNNER_TEMP/config:/config" \
+            -v "$RUNNER_TEMP/photos:/data/photos:ro" facet:ci
+          for i in $(seq 1 120); do
+            if curl -fsS http://localhost:5000/health; then echo; break; fi
+            sleep 2
+          done
+          curl -fsS http://localhost:5000/health
+          curl -fsS http://localhost:5000/ | grep -qi "<app-root\|<html"
+      - name: ExifTool and the rewrite tool inside the image
+        run: |
+          test "$(docker exec facet exiftool -ver)" = "13.55"
+          docker exec facet python -c "from db.schema import init_database; import sqlite3; init_database('/tmp/t.db'); c = sqlite3.connect('/tmp/t.db'); c.execute(\"INSERT INTO photos (path, filename) VALUES ('/data/photos/a.jpg', 'a.jpg')\"); c.commit()"
+          docker exec facet python scripts/rewrite_db_paths.py /tmp/t.db /data/photos '\\NAS\Photos' | tee out.txt
+          grep -q "photos left on old prefix: 0" out.txt
+      - name: Container log
+        if: always()
+        run: docker logs facet || true
+
+  windows:
+    name: Windows - MSI install, setup, viewer, scan
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: powershell
+    env:
+      WIX_URL: https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip
+      WIX_SHA256: 6AC824E1642D6F7277D0ED7EA09411A508F6116BA6FAE0AA5F2C7DAA2FF43D31
+      PORT: "5000"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: client/package-lock.json
+      - name: Build the client
+        working-directory: client
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+          if ($LASTEXITCODE) { throw 'client build failed' }
+
+      - name: uv and WiX 3.14
+        run: |
+          python -m pip install uv==0.10.7
+          $uv = (Get-Command uv).Source
+          "UV_EXE=$uv" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          $zip = Join-Path $env:RUNNER_TEMP 'wix.zip'
+          Invoke-WebRequest $env:WIX_URL -OutFile $zip -UseBasicParsing
+          if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne $env:WIX_SHA256) { throw 'WiX download failed its checksum' }
+          Expand-Archive $zip (Join-Path $env:RUNNER_TEMP 'wix')
+
+      - name: Build the MSI
+        run: |
+          & .\installer\build-msi.ps1 -WixDir (Join-Path $env:RUNNER_TEMP 'wix') -Uv $env:UV_EXE
+          $msi = (Get-ChildItem installer\out\*.msi).FullName
+          "MSI=$msi" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+      - uses: actions/upload-artifact@v4
+        with:
+          name: facet-msi
+          path: installer/out/*.msi
+
+      - name: Install the MSI (per user, no admin, setup deferred)
+        run: |
+          $p = Start-Process msiexec -ArgumentList '/i', "`"$env:MSI`"", '/qn', '/l*v', "`"$env:RUNNER_TEMP\install.log`"", 'FACET_SKIP_SETUP=1' -Wait -PassThru
+          if ($p.ExitCode) { throw "msiexec /i exited $($p.ExitCode)" }
+          $app = Join-Path $env:LOCALAPPDATA 'Facet\app'
+          foreach ($f in 'viewer.py', 'facet.py', 'installer\Start-Facet.ps1', 'installer\bin\uv.exe', 'client\dist\client\browser\index.html') {
+            if (-not (Test-Path (Join-Path $app $f))) { throw "missing after install: $f" }
+          }
+          $menu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Facet'
+          Get-ChildItem $menu | ForEach-Object Name
+          if ((Get-ChildItem $menu -Filter *.lnk).Count -ne 3) { throw 'expected 3 Start-menu shortcuts' }
+          "FACET_APP=$app" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Setup builds the environment (CPU path, no NVIDIA driver)
+        run: |
+          & "$env:FACET_APP\installer\Setup-Facet.ps1"
+          . "$env:FACET_APP\installer\Facet-Env.ps1"
+          & $FacetPython -c "import torch, onnxruntime as o; assert not torch.cuda.is_available(); assert '+cpu' in torch.__version__, torch.__version__; print(torch.__version__, o.get_available_providers())"
+          if ($LASTEXITCODE) { throw 'torch/onnxruntime check failed' }
+          $ver = & (Join-Path $FacetExifTool 'exiftool.exe') -ver
+          if ($ver -ne '13.55') { throw "exiftool is $ver, expected 13.55" }
+      - name: Setup is a no-op the second time
+        run: |
+          $out = & "$env:FACET_APP\installer\Setup-Facet.ps1" *>&1 | Out-String
+          if ($out -notmatch 'already set up') { throw "second setup did work:`n$out" }
+
+      - name: Start, health, idempotent start, port guard
+        run: |
+          & "$env:FACET_APP\installer\Start-Facet.ps1" -Port $env:PORT -NoBrowser
+          $h = Invoke-RestMethod "http://127.0.0.1:$env:PORT/health"
+          $h | ConvertTo-Json -Compress
+          $index = Invoke-WebRequest "http://127.0.0.1:$env:PORT/" -UseBasicParsing
+          if ($index.StatusCode -ne 200) { throw 'client not served' }
+          & "$env:FACET_APP\installer\Start-Facet.ps1" -Port $env:PORT -NoBrowser   # ours: returns quietly
+          $l = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 5010); $l.Start()
+          try {
+            $refused = $false
+            try { & "$env:FACET_APP\installer\Start-Facet.ps1" -Port 5010 -NoBrowser } catch { $refused = $_.Exception.Message -match 'already in use' }
+            if (-not $refused) { throw 'Start-Facet did not refuse a port held by another program' }
+          } finally { $l.Stop() }
+
+      - name: Scan generated photos
+        if: github.event_name == 'push' || inputs.scan
+        run: |
+          . "$env:FACET_APP\installer\Facet-Env.ps1"
+          $photos = Join-Path $env:RUNNER_TEMP 'photos with space'
+          New-Item -ItemType Directory -Force $photos | Out-Null
+          & $FacetPython -c "import sys, numpy as np; from PIL import Image; [Image.fromarray((np.random.default_rng(i).random((900, 1200, 3)) * 255).astype('uint8')).save(f'{sys.argv[1]}/gen_{i}.jpg', quality=90) for i in range(3)]" $photos
+          & "$env:FACET_APP\installer\Scan-Facet.ps1" $photos
+          if ($LASTEXITCODE) { throw "scan exited $LASTEXITCODE" }
+          $n = & $FacetPython -c "import os, sqlite3; print(sqlite3.connect(os.environ['DB_PATH']).execute('SELECT count(*) FROM photos WHERE aggregate IS NOT NULL').fetchone()[0])"
+          if ([int]$n -ne 3) { throw "expected 3 scored photos, found $n" }
+          $page = Invoke-RestMethod "http://127.0.0.1:$env:PORT/api/photos?per_page=10"
+          ($page | ConvertTo-Json -Depth 2).Substring(0, 300)
+
+      - name: Path rewrite tests with the installed environment
+        run: |
+          . "$env:FACET_APP\installer\Facet-Env.ps1"
+          & $FacetUv pip install --python $FacetPython pytest pytest-asyncio pytest-timeout==2.4.0
+          & $FacetPython -m pytest tests/test_rewrite_db_paths.py -v --tb=short -p no:cacheprovider
+          if ($LASTEXITCODE) { throw 'rewrite tests failed' }
+
+      - name: Stop leaves nothing running
+        run: |
+          & "$env:FACET_APP\installer\Stop-Facet.ps1"
+          Start-Sleep -Seconds 2
+          . "$env:FACET_APP\installer\Facet-Env.ps1"
+          if (Test-PortOpen ([int]$env:PORT)) { throw 'port still open after Stop-Facet' }
+          if (@(Get-FacetProcesses).Count) { throw 'Facet processes left after Stop-Facet' }
+
+      - name: Uninstall removes the program, keeps the data
+        run: |
+          $p = Start-Process msiexec -ArgumentList '/x', "`"$env:MSI`"", '/qn' -Wait -PassThru
+          if ($p.ExitCode) { throw "msiexec /x exited $($p.ExitCode)" }
+          if (Test-Path "$env:FACET_APP\viewer.py") { throw 'program files left after uninstall' }
+          if (-not (Test-Path "$env:LOCALAPPDATA\Facet\data\photo_scores_pro.db")) { throw 'uninstall removed the database' }
+
+      - name: Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-logs
+          path: |
+            ${{ runner.temp }}/install.log
+            ~/AppData/Local/Facet/data/logs/
+          if-no-files-found: ignore
