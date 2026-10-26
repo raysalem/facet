@@ -355,6 +355,8 @@ O menu suspenso mostra pessoas com miniaturas de rostos. Clique para filtrar a g
 
 Clique no nome da pessoa para ver todas as suas fotos em `/person/<id>`.
 
+**Nomear pela galeria.** Quando a galeria está filtrada por uma pessoa (`?person_id=95`), uma barra acima da grade mostra quem é ("Sem nome n.º 95" para um cluster sem nome) e quantas fotos. No modo de edição ela tem um campo de nome com sugestões: depois de revisar as fotos, digite um nome novo para nomear a pessoa, ou escolha o nome de uma pessoa existente (sem diferenciar maiúsculas e espaços) para mover todos os rostos para ela após confirmar (`POST /api/persons/merge`); a galeria então passa para essa pessoa.
+
 ### Página Gerenciar Pessoas
 
 Acesse pelo botão no cabeçalho ou por `/persons`:

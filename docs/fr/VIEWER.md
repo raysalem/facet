@@ -356,6 +356,8 @@ Le menu déroulant affiche les personnes avec des vignettes de visage. Cliquez p
 
 Cliquez sur le nom d'une personne pour voir toutes ses photos à `/person/<id>`.
 
+**Nommer depuis la galerie.** Quand la galerie est filtrée sur une personne (`?person_id=95`), une barre au-dessus de la grille indique qui c'est (« Sans nom n° 95 » pour un cluster sans nom) et le nombre de photos. En mode édition, elle propose un champ de nom avec suggestions : après avoir vérifié les photos, saisissez un nouveau nom pour nommer la personne, ou choisissez le nom d'une personne existante (casse et espaces ignorés) pour y déplacer tous ses visages après confirmation (`POST /api/persons/merge`) ; la galerie passe alors à cette personne.
+
 ### Page Gérer les personnes
 
 Accessible via le bouton d'en-tête ou `/persons` :

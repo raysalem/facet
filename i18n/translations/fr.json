@@ -1296,7 +1296,20 @@
       "badge_shadow": "Ombres écrêtées : {percent} % des pixels"
     },
     "channel_clip_highlight_range": "Hautes lumières écrêtées %",
-    "channel_clip_shadow_range": "Ombres écrêtées %"
+    "channel_clip_shadow_range": "Ombres écrêtées %",
+    "person_bar": {
+      "unnamed": "Sans nom n° {id}",
+      "photos": "{count} photos",
+      "name_placeholder": "Qui est-ce ? Saisissez ou choisissez un nom",
+      "rename_placeholder": "Renommer ou fusionner dans…",
+      "assign": "Attribuer",
+      "named": "Nommé {name}",
+      "merge_title": "Ajouter à {name} ?",
+      "merge_message": "Déplacer tous les visages de {from} ({count} photos) vers {name} ? Ils ne forment plus qu'une personne.",
+      "merge_confirm": "Ajouter à cette personne",
+      "merged": "Ajouté à {name}",
+      "error": "Impossible d'enregistrer le nom"
+    }
   },
   "composition_patterns": {
     "none": "Aucun",

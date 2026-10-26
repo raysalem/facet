@@ -35,6 +35,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltip, MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, NavigationStart, Router, RouterOutlet } from '@angular/router';
 import { filter, firstValueFrom } from 'rxjs';
+import { PersonNamingBarComponent } from './person-naming-bar.component';
 import { GalleryStore, BatchResult } from './gallery.store';
 import { Photo } from '../../shared/models/photo.model';
 import { isTypingContext } from '../../shared/utils/keyboard';
@@ -91,6 +92,7 @@ const RENDER_MIGRATION_DISMISSED_KEY = 'facet_render_migration_dismissed';
 @Component({
   selector: 'app-gallery',
   imports: [
+    PersonNamingBarComponent,
     MatSidenavModule,
     MatProgressSpinnerModule,
     MatIconModule,
@@ -275,6 +277,11 @@ const RENDER_MIGRATION_DISMISSED_KEY = 'facet_render_migration_dismissed';
               }
             </div>
           }
+        }
+
+        <!-- One person in view: who it is, and (edition) a name field to settle it here -->
+        @if (singlePersonId(); as personId) {
+          <app-person-naming-bar [personId]="personId" [canEdit]="auth.isEdition()" />
         }
 
         <!-- Photo grid / mosaic -->
@@ -750,6 +757,11 @@ export class GalleryComponent implements OnInit, OnDestroy {
   protected readonly I18N = i18nKeys();
   protected readonly store = inject(GalleryStore);
   protected readonly auth = inject(AuthService);
+  /** The person the gallery is filtered to, when it is exactly one (``person_id=95``). */
+  protected readonly singlePersonId = computed(() => {
+    const raw = this.store.filters().person_id;
+    return /^\d+$/.test(raw ?? '') ? Number(raw) : null;
+  });
   protected readonly scan = inject(ScanService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly bottomSheet = inject(MatBottomSheet);

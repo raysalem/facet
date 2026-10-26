@@ -424,6 +424,8 @@ Dropdown shows persons with face thumbnails. Click to filter gallery.
 
 Click person name to view all their photos at `/person/<id>`.
 
+**Naming from the gallery.** When the gallery is filtered to one person (`?person_id=95`), a bar above the grid shows who it is ("Unnamed #95" for an unnamed cluster) and how many photos. In edition mode it has a name field with suggestions: after reviewing the photos, type a new name to name the person, or pick an existing person's name (case and spaces ignored) to move all of this person's faces into that one after a confirm (`POST /api/persons/merge`); the gallery then switches to that person.
+
 ### Manage Persons Page
 
 Access via header button or `/persons`:
