@@ -355,6 +355,8 @@ El desplegable muestra las personas con miniaturas de cara. Haz clic para filtra
 
 Haz clic en el nombre de una persona para ver todas sus fotos en `/person/<id>`. En la página de gestión de personas, hacer doble clic en una tarjeta (con nombre, sin nombre en «Por nombrar» o ignorada) abre la galería con las fotos de esa persona; los dobles clics en el campo de nombre, la casilla y los botones quedan para ellos.
 
+**Nombrar desde la galería.** Cuando la galería está filtrada por una persona (`?person_id=95`), una barra sobre la cuadrícula muestra quién es («Sin nombre n.º 95» para un grupo sin nombre) y cuántas fotos. En modo edición tiene un campo de nombre con sugerencias: tras revisar las fotos, escribe un nombre nuevo para nombrar a la persona, o elige el de una persona existente (sin distinguir mayúsculas ni espacios) para mover todas sus caras a esa persona tras confirmar (`POST /api/persons/merge`); la galería pasa entonces a esa persona.
+
 ### Página Gestionar personas
 
 Accede mediante el botón de la cabecera o `/persons`:

@@ -356,6 +356,8 @@ Das Dropdown zeigt Personen mit Gesichts-Vorschaubildern. Zum Filtern der Galeri
 
 Klicken Sie auf den Personennamen, um alle ihre Fotos unter `/person/<id>` anzuzeigen. Auf der Seite „Personen verwalten“ öffnet ein Doppelklick auf eine Personenkarte (benannt, unbenannt in „Zu benennen“ oder ignoriert) die Galerie mit den Fotos dieser Person; Doppelklicks auf Namensfeld, Kontrollkästchen und Schaltflächen bleiben diesen vorbehalten.
 
+**Benennen aus der Galerie.** Ist die Galerie auf eine Person gefiltert (`?person_id=95`), zeigt eine Leiste über dem Raster, wer es ist („Unbenannt #95“ bei einem unbenannten Cluster) und wie viele Fotos. Im Bearbeitungsmodus hat sie ein Namensfeld mit Vorschlägen: Nach dem Durchsehen der Fotos einen neuen Namen eingeben, um die Person zu benennen, oder den Namen einer vorhandenen Person wählen (Groß-/Kleinschreibung und Leerzeichen egal), um nach einer Bestätigung alle Gesichter in diese zu verschieben (`POST /api/persons/merge`); die Galerie wechselt dann zu dieser Person.
+
 ### Seite „Personen verwalten"
 
 Zugriff über die Header-Schaltfläche oder `/persons`:
