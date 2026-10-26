@@ -161,6 +161,7 @@ EXPECTED_EDITION_ROUTES = frozenset({
     ('POST', '/api/recalculate'),
     ('POST', '/api/scan/detect_panoramas'),
     ('POST', '/api/scan/recompute'),
+    ('POST', '/api/scenes/manual_tags'),
     ('POST', '/api/similar-groups/select'),
     ('POST', '/api/stats/categories/recompute'),
     ('POST', '/api/stats/categories/update'),
