@@ -71,7 +71,8 @@ jobs:
         run: |
           test "$(docker exec facet exiftool -ver)" = "13.55"
           docker exec facet python -c "from db.schema import init_database; import sqlite3; init_database('/tmp/t.db'); c = sqlite3.connect('/tmp/t.db'); c.execute(\"INSERT INTO photos (path, filename) VALUES ('/data/photos/a.jpg', 'a.jpg')\"); c.commit()"
-          docker exec facet python scripts/rewrite_db_paths.py /tmp/t.db /data/photos '\\NAS\Photos' | tee out.txt
+          # The image ships no scripts/ folder, so feed the script on stdin.
+          docker exec -i facet python - /tmp/t.db /data/photos '\\NAS\Photos' < scripts/rewrite_db_paths.py | tee out.txt
           grep -q "photos left on old prefix: 0" out.txt
       - name: Container log
         if: always()
@@ -177,6 +178,9 @@ jobs:
           if ($LASTEXITCODE) { throw "scan exited $LASTEXITCODE" }
           $n = & $FacetPython -c "import os, sqlite3; print(sqlite3.connect(os.environ['DB_PATH']).execute('SELECT count(*) FROM photos WHERE aggregate IS NOT NULL').fetchone()[0])"
           if ([int]$n -ne 3) { throw "expected 3 scored photos, found $n" }
+          # The runner ends a step's child processes when the step finishes, so the viewer
+          # from the Start step is gone; Start-Facet brings it back on the same install.
+          & "$env:FACET_APP\installer\Start-Facet.ps1" -Port $env:PORT -NoBrowser
           $page = Invoke-RestMethod "http://127.0.0.1:$env:PORT/api/photos?per_page=10"
           ($page | ConvertTo-Json -Depth 2).Substring(0, 300)
 
@@ -189,6 +193,9 @@ jobs:
 
       - name: Stop leaves nothing running
         run: |
+          & "$env:FACET_APP\installer\Start-Facet.ps1" -Port $env:PORT -NoBrowser
+          . "$env:FACET_APP\installer\Facet-Env.ps1"
+          if (-not (Test-PortOpen ([int]$env:PORT))) { throw 'viewer did not start' }
           & "$env:FACET_APP\installer\Stop-Facet.ps1"
           Start-Sleep -Seconds 2
           . "$env:FACET_APP\installer\Facet-Env.ps1"
@@ -202,12 +209,17 @@ jobs:
           if (Test-Path "$env:FACET_APP\viewer.py") { throw 'program files left after uninstall' }
           if (-not (Test-Path "$env:LOCALAPPDATA\Facet\data\photo_scores_pro.db")) { throw 'uninstall removed the database' }
 
+      - name: Collect logs
+        if: always()
+        run: |
+          New-Item -ItemType Directory -Force ci-logs | Out-Null
+          Copy-Item "$env:RUNNER_TEMP\install.log" ci-logs -ErrorAction SilentlyContinue
+          Copy-Item "$env:LOCALAPPDATA\Facet\data\logs\*" ci-logs -ErrorAction SilentlyContinue
+          exit 0
       - name: Logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: windows-logs
-          path: |
-            ${{ runner.temp }}/install.log
-            ~/AppData/Local/Facet/data/logs/
+          path: ci-logs/
           if-no-files-found: ignore
