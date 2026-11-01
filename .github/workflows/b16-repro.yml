@@ -1,0 +1,50 @@
+# Temporary: reproduce B16 ("no such table: photos" in tests/test_jpegxl.py on Windows).
+# Same setup as ci.yml's windows-tests job, run 8 times in parallel, verbose, with the
+# b16probe diagnostic plugin. Lives only on the fork's b16-repro branch.
+name: B16 repro (Windows)
+
+on:
+  push:
+    branches: [b16-repro]
+  workflow_dispatch:
+
+jobs:
+  windows-tests:
+    name: Windows repro ${{ matrix.copy }}
+    runs-on: windows-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        copy: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install ExifTool
+        run: |
+          choco install exiftool --yes --no-progress
+          exiftool -ver
+      - name: Install test dependencies
+        run: pip install pytest pytest-asyncio pytest-cov fastapi[standard] httpx pyjwt mcp==2.3.0 websockets pillow pillow-heif numpy scipy scikit-learn opencv-python-headless tqdm aiosqlite sqlite-vec imagehash psutil watchdog send2trash tifffile imagecodecs lupa jsonschema==4.26.0 pytest-timeout==2.4.0 pytest-xdist==3.8.0
+      - name: Disk space
+        shell: pwsh
+        run: Get-PSDrive -PSProvider FileSystem | Format-Table Name,Free,Used
+      - name: Run the whole suite (verbose, probed)
+        shell: bash
+        env:
+          PYTHONPATH: .github
+        run: python -m pytest -n 4 -v --durations=30 --tb=short -rfE --timeout=600 -p b16probe 2>&1 | tee pytest-verbose.log; exit ${PIPESTATUS[0]}
+      - name: Disk space after
+        if: always()
+        shell: pwsh
+        run: Get-PSDrive -PSProvider FileSystem | Format-Table Name,Free,Used
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: b16-copy-${{ matrix.copy }}
+          path: |
+            pytest-verbose.log
+            b16-probe/
