@@ -1,0 +1,56 @@
+# Temporary (fork-only): fast B16 repro. Instead of the whole 30-min suite:
+#   stress - tests/test_zz_b16_stress.py, the failing pattern x B16_ITER per xdist worker
+#   replay - only the failing worker's exact test sequence (.github/b16-replay-args.txt), one process, twice
+name: B16 fast repro (Windows)
+
+on:
+  push:
+    branches: [b16-repro]
+  workflow_dispatch:
+
+jobs:
+  fast:
+    name: "${{ matrix.mode }} ${{ matrix.copy }}"
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [stress, replay]
+        copy: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install ExifTool
+        run: choco install exiftool --yes --no-progress
+      - name: Install test dependencies
+        run: pip install pytest pytest-asyncio pytest-cov fastapi[standard] httpx pyjwt mcp==2.3.0 websockets pillow pillow-heif numpy scipy scikit-learn opencv-python-headless tqdm aiosqlite sqlite-vec imagehash psutil watchdog send2trash tifffile imagecodecs lupa jsonschema==4.26.0 pytest-timeout==2.4.0 pytest-xdist==3.8.0
+      - name: Stress
+        if: matrix.mode == 'stress'
+        shell: bash
+        env:
+          PYTHONPATH: .github
+          B16_ITER: "300"
+        run: python -m pytest -n 4 -q -rfE --tb=short --timeout=600 -p b16probe tests/test_zz_b16_stress.py 2>&1 | tee pytest-verbose.log; exit ${PIPESTATUS[0]}
+      - name: Replay the failing worker's sequence (x2)
+        if: matrix.mode == 'replay'
+        shell: bash
+        env:
+          PYTHONPATH: .github
+        run: |
+          rc=0
+          for k in 1 2; do
+            python -m pytest -q -rfE --tb=short --timeout=600 -p b16probe @.github/b16-replay-args.txt 2>&1 | tee -a pytest-verbose.log
+            [ "${PIPESTATUS[0]}" = 0 ] || rc=1
+          done
+          exit $rc
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: b16-${{ matrix.mode }}-${{ matrix.copy }}
+          path: |
+            pytest-verbose.log
+            b16-probe/

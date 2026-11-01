@@ -4,9 +4,7 @@
 name: B16 repro (Windows)
 
 on:
-  push:
-    branches: [b16-repro]
-  workflow_dispatch:
+  workflow_dispatch:   # full-suite mode, manual only now; b16-fast.yml runs on push
 
 jobs:
   windows-tests:
