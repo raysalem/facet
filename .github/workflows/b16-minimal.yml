@@ -1,0 +1,24 @@
+# Temporary (fork-only): B16 minimal repro, no pytest, no app. H9 race for 5 minutes per job.
+name: B16 minimal repro (Windows)
+on:
+  push:
+    branches: [b16-minimal]
+jobs:
+  minimal:
+    name: "minimal py${{ matrix.python }} ${{ matrix.copy }}"
+    runs-on: windows-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+        copy: [1, 2]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+          cache: "pip"
+      - run: pip install numpy pillow
+      - name: Race for 300 s
+        run: python .github/b16_minimal.py 300
