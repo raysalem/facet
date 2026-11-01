@@ -63,6 +63,13 @@ from db.schema import init_database  # noqa: E402
 from tests._sharding import SHARD_ENV, files_for_shard, parse_shard  # noqa: E402
 
 init_database(_TEST_DB_FILE.name)
+# init_database leaves the whole schema in the WAL (a 4 KB main file). The first app a
+# test starts then checkpoints it mid-test, and on Windows a connection opened before
+# that app intermittently prepared its first statement against an empty schema
+# ("no such table: photos", B16). Fold the WAL in now so every test starts from a
+# main file that already holds the schema.
+with contextlib.closing(sqlite3.connect(_TEST_DB_FILE.name)) as _conn:
+    _conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
 
 def pytest_collection_modifyitems(config, items):

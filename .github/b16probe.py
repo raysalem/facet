@@ -160,6 +160,14 @@ def pytest_runtest_logfinish(nodeid, location):
              f"  previous tests on this worker: {list(_recent)}")
 
 
+def pytest_collection_finish(session):
+    db = os.environ.get("DB_PATH")
+    if db:
+        sizes = {s or "db": (os.path.getsize(db + s) if os.path.exists(db + s) else None)
+                 for s in ("", "-wal", "-shm")}
+        _log(f"B16PROBE worker={_WORKER} sizes before first test: {sizes}")
+
+
 @pytest.hookimpl(trylast=True)
 def pytest_sessionfinish(session, exitstatus):
     _log(f"B16PROBE worker={_WORKER} session end, db broken={_state['broken']}")
