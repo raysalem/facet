@@ -11,6 +11,8 @@ Output goes to b16-probe/<worker>.log (uploaded as a workflow artifact).
 import os
 import shutil
 import sqlite3
+import threading
+import time
 import traceback
 from collections import deque
 
@@ -96,8 +98,24 @@ def _dump_failure(conn, sql, ex):
             p = db + suffix
             lines.append(f"  {p}: {os.path.getsize(p) if os.path.exists(p) else 'absent'}")
         lines.append(f"  fresh conn health: {_health(db) or 'ok'}")
+    now = time.perf_counter()
+    lines.append(f"  statement trace, last {len(_trace)} events across all connections "
+                 f"(ms before the failure; * = the failing connection {id(conn):#x}):")
+    for t, thread, cid, text in list(_trace):
+        mark = "*" if cid == id(conn) else " "
+        lines.append(f"  {mark} {1000 * (now - t):9.2f} ms  {thread:<28.28} {cid:#x}  {text}")
     lines.append(_thread_stacks())
     _log("\n".join(lines))
+
+
+# Round 4: a ring buffer of every statement every connection executes (passive:
+# sqlite3 trace callback, no extra queries), plus connection opens and closes.
+_trace = deque(maxlen=400)
+
+
+def _record(cid, text):
+    _trace.append((time.perf_counter(), threading.current_thread().name, cid,
+                   " ".join(str(text).split())[:220]))
 
 
 class _ProbeConnection(sqlite3.Connection):
@@ -106,8 +124,13 @@ class _ProbeConnection(sqlite3.Connection):
             return super().execute(sql, *args, **kwargs)
         except sqlite3.OperationalError as ex:
             if "no such table: photos" in str(ex):
+                _record(id(self), f"!! FAILED prepare: {str(sql)[:150]}")
                 _dump_failure(self, sql, ex)
             raise
+
+    def close(self):
+        _record(id(self), "-- CLOSE")
+        return super().close()
 
 
 _original_connect = sqlite3.connect
@@ -116,7 +139,15 @@ _original_connect = sqlite3.connect
 def _probe_connect(*args, **kwargs):
     if "factory" not in kwargs and len(args) < 6:
         kwargs["factory"] = _ProbeConnection
-    return _original_connect(*args, **kwargs)
+    conn = _original_connect(*args, **kwargs)
+    cid = id(conn)
+    target = args[0] if args else kwargs.get("database")
+    _record(cid, f"-- OPEN {os.path.basename(str(target))}")
+    try:
+        conn.set_trace_callback(lambda stmt, _cid=cid: _record(_cid, stmt))
+    except Exception:  # noqa: BLE001 - diagnostic only
+        pass
+    return conn
 
 
 sqlite3.connect = _probe_connect

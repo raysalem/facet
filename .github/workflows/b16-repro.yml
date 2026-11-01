@@ -10,18 +10,19 @@ on:
 
 jobs:
   windows-tests:
-    name: Windows repro ${{ matrix.copy }}
+    name: "Windows repro py${{ matrix.python }} copy ${{ matrix.copy }}"
     runs-on: windows-latest
     timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
-        copy: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+        python: ["3.12", "3.13"]
+        copy: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python }}
           cache: "pip"
       - name: Install ExifTool
         run: |
@@ -44,7 +45,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: b16-copy-${{ matrix.copy }}
+          name: b16-py${{ matrix.python }}-copy-${{ matrix.copy }}
           path: |
             pytest-verbose.log
             b16-probe/
