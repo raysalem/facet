@@ -64,6 +64,64 @@ for _mod, _name in [(os, "remove"), (os, "unlink"), (os, "replace"), (os, "renam
     _wrap(_mod, _name)
 
 
+def _thread_stacks():
+    import sys
+    import threading
+    names = {t.ident: t.name for t in threading.enumerate()}
+    out = []
+    for ident, frame in sys._current_frames().items():
+        out.append(f"--- thread {names.get(ident, '?')} ({ident})\n"
+                   + "".join(traceback.format_stack(frame, limit=15)))
+    return "\n".join(out)
+
+
+def _dump_failure(conn, sql, ex):
+    """At the moment a statement fails with "no such table": what did THIS connection see?"""
+    lines = [f"B16PROBE NO-SUCH-TABLE during {_state['current']}: {ex!r}",
+             f"  sql: {str(sql)[:200]}",
+             f"  sqlite {sqlite3.sqlite_version}"]
+    for pragma in ("database_list", "schema_version", "data_version", "journal_mode"):
+        try:
+            lines.append(f"  {pragma}: {conn.execute(f'PRAGMA {pragma}').fetchall()}")
+        except Exception as inner:  # noqa: BLE001
+            lines.append(f"  {pragma}: <{inner!r}>")
+    try:
+        names = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")]
+        lines.append(f"  this conn sees {len(names)} tables: {names[:15]}")
+    except Exception as inner:  # noqa: BLE001
+        lines.append(f"  sqlite_master: <{inner!r}>")
+    db = _db()
+    if db:
+        for suffix in ("", "-wal", "-shm"):
+            p = db + suffix
+            lines.append(f"  {p}: {os.path.getsize(p) if os.path.exists(p) else 'absent'}")
+        lines.append(f"  fresh conn health: {_health(db) or 'ok'}")
+    lines.append(_thread_stacks())
+    _log("\n".join(lines))
+
+
+class _ProbeConnection(sqlite3.Connection):
+    def execute(self, sql, *args, **kwargs):
+        try:
+            return super().execute(sql, *args, **kwargs)
+        except sqlite3.OperationalError as ex:
+            if "no such table: photos" in str(ex):
+                _dump_failure(self, sql, ex)
+            raise
+
+
+_original_connect = sqlite3.connect
+
+
+def _probe_connect(*args, **kwargs):
+    if "factory" not in kwargs and len(args) < 6:
+        kwargs["factory"] = _ProbeConnection
+    return _original_connect(*args, **kwargs)
+
+
+sqlite3.connect = _probe_connect
+
+
 def _health(path):
     if not os.path.exists(path):
         return "file missing"
@@ -92,7 +150,7 @@ def pytest_runtest_logfinish(nodeid, location):
         return
     if _state["db"] is None:
         _state["db"] = path
-        _log(f"B16PROBE worker={_WORKER} DB_PATH={path}")
+        _log(f"B16PROBE worker={_WORKER} DB_PATH={path} sqlite={sqlite3.sqlite_version}")
     elif path != _state["db"]:
         _log(f"B16PROBE DB_PATH changed after {nodeid}: {_state['db']} -> {path}")
     bad = _health(_state["db"])
