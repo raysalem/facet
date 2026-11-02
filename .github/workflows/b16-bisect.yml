@@ -4,7 +4,7 @@
 name: B16 bisect (Windows)
 on:
   push:
-    branches: [b16-repro]
+    branches: [b16-bisect-off]
 jobs:
   bisect:
     name: "subset ${{ matrix.subset }} #${{ matrix.copy }}"

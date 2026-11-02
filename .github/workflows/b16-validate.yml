@@ -1,0 +1,72 @@
+# Temporary (fork-only): verify the B16 fix (conftest ANALYZE sqlite_schema + test_culling_pairs cleanup).
+#   f9      - test_culling_pairs.py + the two jxl tests, looped 14 min (37 % hit rate before the fix)
+#   full    - the whole Windows suite exactly as ci.yml runs it (regressions; B16 ~13 %/run before)
+#   minimal - standalone race: F (no fix, expect hits) and FS (fix, expect none)
+name: B16 validate fix (Windows)
+on:
+  push:
+    branches: [b16-repro]
+jobs:
+  validate:
+    name: "${{ matrix.mode }} ${{ matrix.copy }}"
+    runs-on: windows-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {mode: f9, copy: 1}
+          - {mode: f9, copy: 2}
+          - {mode: f9, copy: 3}
+          - {mode: f9, copy: 4}
+          - {mode: f9, copy: 5}
+          - {mode: f9, copy: 6}
+          - {mode: f9, copy: 7}
+          - {mode: f9, copy: 8}
+          - {mode: f9, copy: 9}
+          - {mode: f9, copy: 10}
+          - {mode: full, copy: 1}
+          - {mode: full, copy: 2}
+          - {mode: full, copy: 3}
+          - {mode: full, copy: 4}
+          - {mode: full, copy: 5}
+          - {mode: full, copy: 6}
+          - {mode: full, copy: 7}
+          - {mode: full, copy: 8}
+          - {mode: minimal, copy: F}
+          - {mode: minimal, copy: FS}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install ExifTool
+        if: matrix.mode != 'minimal'
+        run: choco install exiftool --yes --no-progress
+      - name: Install test dependencies
+        run: pip install pytest pytest-asyncio pytest-cov fastapi[standard] httpx pyjwt mcp==2.3.0 websockets pillow pillow-heif numpy scipy scikit-learn opencv-python-headless tqdm aiosqlite sqlite-vec imagehash psutil watchdog send2trash tifffile imagecodecs lupa jsonschema==4.26.0 pytest-timeout==2.4.0 pytest-xdist==3.8.0
+      - name: f9 loop
+        if: matrix.mode == 'f9'
+        shell: bash
+        run: |
+          end=$((SECONDS + 840)); passes=0; hits=0
+          while [ $SECONDS -lt $end ]; do
+            passes=$((passes + 1))
+            python -m pytest -q -p no:cacheprovider --tb=line --timeout=600 @.github/bisect/F9.txt > pass.log 2>&1 || true
+            if grep -q "no such table: photos" pass.log; then hits=$((hits + 1)); fi
+            echo "pass $passes: $(tail -1 pass.log)"
+          done
+          echo "B16VALIDATE mode=f9 passes=$passes hits=$hits"
+      - name: full suite (as ci.yml)
+        if: matrix.mode == 'full'
+        shell: bash
+        run: |
+          python -m pytest -n 4 --durations=30 --tb=short -q -rfE --timeout=600 --deselect tests/test_zz_b16_stress.py > full.log 2>&1; rc=$?
+          tail -25 full.log
+          echo "B16VALIDATE mode=full rc=$rc b16=$(grep -c 'no such table: photos' full.log) $(tail -1 full.log)"
+          exit $rc
+      - name: minimal race
+        if: matrix.mode == 'minimal'
+        shell: bash
+        run: python .github/b16_minimal.py 240 ${{ matrix.copy }} || true
