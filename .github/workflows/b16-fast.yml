@@ -5,7 +5,7 @@ name: B16 fast repro (Windows)
 
 on:
   push:
-    branches: [b16-repro]
+    branches: [b16-fast-off]
   workflow_dispatch:
 
 jobs:

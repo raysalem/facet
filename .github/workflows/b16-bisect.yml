@@ -1,0 +1,57 @@
+# Temporary (fork-only): bisect the B16 trigger. Each job replays one subset
+# (.github/bisect/<subset>.txt, ending with the two test_jpegxl tests) in one process,
+# pass after pass, for ~14 minutes, and counts the passes that hit "no such table: photos".
+name: B16 bisect (Windows)
+on:
+  push:
+    branches: [b16-repro]
+jobs:
+  bisect:
+    name: "subset ${{ matrix.subset }} #${{ matrix.copy }}"
+    runs-on: windows-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {subset: A, copy: 1}
+          - {subset: A, copy: 2}
+          - {subset: A, copy: 3}
+          - {subset: A, copy: 4}
+          - {subset: A, copy: 5}
+          - {subset: A, copy: 6}
+          - {subset: A, copy: 7}
+          - {subset: A, copy: 8}
+          - {subset: A, copy: 9}
+          - {subset: B, copy: 1}
+          - {subset: B, copy: 2}
+          - {subset: B, copy: 3}
+          - {subset: B, copy: 4}
+          - {subset: B, copy: 5}
+          - {subset: B, copy: 6}
+          - {subset: B, copy: 7}
+          - {subset: B, copy: 8}
+          - {subset: B, copy: 9}
+          - {subset: C, copy: 1}
+          - {subset: C, copy: 2}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install ExifTool
+        run: choco install exiftool --yes --no-progress
+      - name: Install test dependencies
+        run: pip install pytest pytest-asyncio pytest-cov fastapi[standard] httpx pyjwt mcp==2.3.0 websockets pillow pillow-heif numpy scipy scikit-learn opencv-python-headless tqdm aiosqlite sqlite-vec imagehash psutil watchdog send2trash tifffile imagecodecs lupa jsonschema==4.26.0 pytest-timeout==2.4.0 pytest-xdist==3.8.0
+      - name: Replay subset ${{ matrix.subset }} for ~14 minutes
+        shell: bash
+        run: |
+          end=$((SECONDS + 840)); passes=0; hits=0
+          while [ $SECONDS -lt $end ]; do
+            passes=$((passes + 1))
+            python -m pytest -q -p no:cacheprovider --tb=line --timeout=600 @.github/bisect/${{ matrix.subset }}.txt > pass.log 2>&1 || true
+            if grep -q "no such table: photos" pass.log && grep -q "FAILED tests/test_jpegxl" pass.log; then hits=$((hits + 1)); fi
+            echo "pass $passes: $(tail -1 pass.log)"
+          done
+          echo "B16BISECT subset=${{ matrix.subset }} passes=$passes hits=$hits"

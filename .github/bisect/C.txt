@@ -1,0 +1,2 @@
+tests/test_jpegxl.py::test_native_lossless_jpegxl_alpha_and_discovery
+tests/test_jpegxl.py::test_browser_full_image_and_sharp_thumbnail_are_jpeg
