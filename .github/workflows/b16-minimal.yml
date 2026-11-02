@@ -5,14 +5,14 @@ on:
     branches: [b16-minimal]
 jobs:
   minimal:
-    name: "minimal py${{ matrix.python }} ${{ matrix.copy }}"
+    name: "minimal ${{ matrix.variant }} py${{ matrix.python }}"
     runs-on: windows-latest
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.12", "3.13"]
-        copy: [1, 2]
+        python: ["3.12"]
+        variant: [P, PX, PXE, PXE]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -21,4 +21,4 @@ jobs:
           cache: "pip"
       - run: pip install numpy pillow
       - name: Race for 300 s
-        run: python .github/b16_minimal.py 300
+        run: python .github/b16_minimal.py 300 ${{ matrix.variant }}
