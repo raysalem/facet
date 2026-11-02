@@ -1,0 +1,11 @@
+tests/test_cull_preview.py::TestCullPreviewValidation::test_unknown_style_400
+tests/test_cull_preview.py::TestCullPreviewValidation::test_unknown_path_404
+tests/test_cull_preview.py::TestCullPreviewValidation::test_cli_missing_503
+tests/test_cull_preview.py::TestCullPreviewAuth::test_regular_user_forbidden
+tests/test_cull_preview.py::TestCullPreviewRenderAndCache::test_success_renders_and_caches
+tests/test_cull_preview.py::TestCullPreviewRenderAndCache::test_second_call_hits_cache
+tests/test_cull_preview.py::TestCullPreviewRenderAndCache::test_cache_key_changes_with_mtime
+tests/test_cull_preview.py::TestCullPreviewCacheEviction::test_write_trims_oldest_over_budget
+tests/test_cull_preview.py::test_integration_real_cli_renders_bounded_jpeg
+tests/test_jpegxl.py::test_native_lossless_jpegxl_alpha_and_discovery
+tests/test_jpegxl.py::test_browser_full_image_and_sharp_thumbnail_are_jpeg

@@ -1,0 +1,6 @@
+tests/test_db_connection.py::test_probe_false_when_import_fails
+tests/test_db_connection.py::test_probe_false_when_extension_loading_unavailable
+tests/test_db_connection.py::test_probe_true_when_extension_loads
+tests/test_db_connection.py::test_load_sqlite_vec_makes_vec0_usable_on_a_healthy_build
+tests/test_jpegxl.py::test_native_lossless_jpegxl_alpha_and_discovery
+tests/test_jpegxl.py::test_browser_full_image_and_sharp_thumbnail_are_jpeg

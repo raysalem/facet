@@ -1,0 +1,6 @@
+tests/test_dead_config_keys.py::test_every_threshold_key_is_read
+tests/test_dead_config_keys.py::test_every_category_modifier_key_is_read
+tests/test_dead_config_keys.py::test_every_penalty_key_is_read
+tests/test_dead_config_keys.py::test_get_thresholds_is_gone
+tests/test_jpegxl.py::test_native_lossless_jpegxl_alpha_and_discovery
+tests/test_jpegxl.py::test_browser_full_image_and_sharp_thumbnail_are_jpeg

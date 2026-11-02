@@ -14,26 +14,26 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {subset: A, copy: 1}
-          - {subset: A, copy: 2}
-          - {subset: A, copy: 3}
-          - {subset: A, copy: 4}
-          - {subset: A, copy: 5}
-          - {subset: A, copy: 6}
-          - {subset: A, copy: 7}
-          - {subset: A, copy: 8}
-          - {subset: A, copy: 9}
-          - {subset: B, copy: 1}
-          - {subset: B, copy: 2}
-          - {subset: B, copy: 3}
-          - {subset: B, copy: 4}
-          - {subset: B, copy: 5}
-          - {subset: B, copy: 6}
-          - {subset: B, copy: 7}
-          - {subset: B, copy: 8}
-          - {subset: B, copy: 9}
-          - {subset: C, copy: 1}
-          - {subset: C, copy: 2}
+          - {subset: F1, copy: 1}
+          - {subset: F2, copy: 1}
+          - {subset: F3, copy: 1}
+          - {subset: F4, copy: 1}
+          - {subset: F5, copy: 1}
+          - {subset: F6, copy: 1}
+          - {subset: F7, copy: 1}
+          - {subset: F8, copy: 1}
+          - {subset: F9, copy: 1}
+          - {subset: F10, copy: 1}
+          - {subset: F11, copy: 1}
+          - {subset: F12, copy: 1}
+          - {subset: F13, copy: 1}
+          - {subset: F14, copy: 1}
+          - {subset: F15, copy: 1}
+          - {subset: F16, copy: 1}
+          - {subset: F17, copy: 1}
+          - {subset: F18, copy: 1}
+          - {subset: B1, copy: 1}
+          - {subset: B2, copy: 1}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7

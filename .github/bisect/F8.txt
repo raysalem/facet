@@ -1,0 +1,10 @@
+tests/test_culling_faces.py::test_batches_and_groups_by_path
+tests/test_culling_faces.py::test_low_eyes_open_flags_blink
+tests/test_culling_faces.py::test_persisted_values_win_over_recompute
+tests/test_culling_faces.py::test_null_rows_fall_back_to_landmark_compute
+tests/test_culling_faces.py::test_thresholds_come_from_config
+tests/test_culling_faces.py::test_profile_overrides_face_thresholds
+tests/test_culling_faces.py::test_empty_paths_returns_empty
+tests/test_culling_faces.py::test_path_not_visible_is_filtered
+tests/test_jpegxl.py::test_native_lossless_jpegxl_alpha_and_discovery
+tests/test_jpegxl.py::test_browser_full_image_and_sharp_thumbnail_are_jpeg
