@@ -41,6 +41,7 @@ export const makePhoto = (overrides: Partial<Photo> = {}): Photo => ({
   tags: null,
   tags_list: [],
   manual_tags: [],
+  album_tags: [],
   is_monochrome: null,
   is_silhouette: null,
   date_taken: null,

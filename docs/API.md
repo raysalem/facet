@@ -28,6 +28,10 @@ Developers: `cd client && npm run gen:api` regenerates the client types in `clie
 | `GET /api/photo` | Single photo details |
 | `PUT /api/photo/manual_tags` | Add a [manual tag](VIEWER.md#manual-tags) to one photo (edition-gated). Body `{path, tag}`. A tag equal to an AI tag: `200` with `skipped_existing: true`. Errors: `404` unknown/invisible path; `422` invalid tag or photo already at 50 tags |
 | `DELETE /api/photo/manual_tags` | Remove a manual tag from one photo (edition-gated). Body `{path, tag}` |
+| `PUT /api/album_tags` | Mark a tag as an [album tag](VIEWER.md#album-tags) (edition-gated, library-wide, idempotent). Body `{tag}`, normalized like a manual tag (`422` when invalid). Response `{success, tag, changed}` |
+| `DELETE /api/album_tags` | Unmark an album tag (edition-gated). Body `{tag}`. Photo rows are kept; the tag becomes a content tag again |
+| `GET /api/album_tags` | Every album tag with the number of visible photos carrying it, sorted by tag: `{tags: [{tag, count}]}`. A marked tag no photo carries is listed with `0` |
+| `GET /api/album_tags/facets` | Album tags inside one gallery view: takes the gallery's query string (album, folder, hide toggles...), ignores `tag`, and answers `{tags: [{tag, count}]}` (at most 200). Same `422` as the gallery for invalid parameters |
 | `GET /api/photo/objects?path=` | Objects marked on one photo: `{objects: [{id, label, box}]}`, `box` = `[x1, y1, x2, y2]` normalised to the upright frame. Empty for a photo the caller cannot see |
 | `POST /api/photo/objects` | Mark an object (edition-gated). Body `{path, label, box}`; the label is normalised like a manual tag; at most 50 per photo (409) |
 | `DELETE /api/photo/objects/{id}` | Remove a marked object (edition-gated) |

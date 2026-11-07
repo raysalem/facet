@@ -95,6 +95,22 @@ def load_manual_tags_map(conn, photo_paths):
     return result
 
 
+def load_album_tag_set(conn):
+    """The tags marked as album tags (``album_tags``); empty when the table is absent."""
+    if conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'album_tags'"
+    ).fetchone() is None:
+        return frozenset()
+    return frozenset(row[0] for row in conn.execute("SELECT tag FROM album_tags"))
+
+
+def split_album_tags(manual_tags, album_set):
+    """``(content, album)``: a photo's manual tags split by the album-tag registry."""
+    content = [t for t in manual_tags if t not in album_set]
+    album = [t for t in manual_tags if t in album_set]
+    return content, album
+
+
 def split_tag_string(tags):
     """Split a comma-joined ``photos.tags`` value into stripped, non-empty tags."""
     return [t.strip() for t in tags.split(',') if t.strip()] if tags else []

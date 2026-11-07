@@ -860,6 +860,10 @@ export class GalleryStore {
   readonly cameras = signal<FilterOption[]>([]);
   readonly lenses = signal<FilterOption[]>([]);
   readonly tags = signal<FilterOption[]>([]);
+  /** Album (organisation) tags, library-wide, for the tag picker's own group. */
+  readonly albumTags = signal<FilterOption[]>([]);
+  /** Bumped after a tag write, so views built from tags (album chips, tag picker) refetch. */
+  readonly tagsRevision = signal(0);
   readonly persons = signal<PersonOption[]>([]);
   readonly patterns = signal<FilterOption[]>([]);
   readonly colorTemps = signal<FilterOption[]>([]);
@@ -1908,7 +1912,7 @@ export class GalleryStore {
 
   /** Load all filter dropdown options in parallel */
   async loadFilterOptions(): Promise<void> {
-    const [camerasRes, lensesRes, tagsRes, personsRes, patternsRes, colorsRes] = await Promise.all([
+    const [camerasRes, lensesRes, tagsRes, personsRes, patternsRes, colorsRes, , albumTagsRes] = await Promise.all([
       this.fetchFilterOption<{cameras: [string, number][]}>('/filter_options/cameras').catch(() => ({cameras: []})),
       this.fetchFilterOption<{lenses: [string, number][]}>('/filter_options/lenses').catch(() => ({lenses: []})),
       this.fetchFilterOption<{tags: [string, number][]}>('/filter_options/tags').catch(() => ({tags: []})),
@@ -1918,7 +1922,9 @@ export class GalleryStore {
       this.fetchFilterOption<{temps: [string, number][]; hue_buckets: [string, number][]}>('/filter_options/colors')
         .catch(() => ({temps: [], hue_buckets: []})),
       this.loadMetricRanges(),
+      this.fetchFilterOption<{tags: {tag: string; count: number}[]}>('/album_tags').catch(() => ({tags: []})),
     ]);
+    this.albumTags.set((albumTagsRes?.tags ?? []).map(({tag, count}) => ({value: tag, count})));
     this.cameras.set((camerasRes.cameras ?? []).map(([value, count]: [string, number]) => ({value, count})));
     this.lenses.set((lensesRes.lenses ?? []).map(([value, count]: [string, number]) => ({value, count})));
     this.tags.set((tagsRes.tags ?? []).map(([value, count]: [string, number]) => ({value, count})));

@@ -4,6 +4,10 @@ All notable changes to Facet are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Album tags: organisation tags kept apart from content tags.** A manual tag can be marked as an album tag (**Edit tags** → **Album tag**), for tags that organise photos (event, part of an event, photographer) rather than describe them. The photo page leaves them out of its tag list; an album shows them as **Sets** and **By** filter chips with counts; the tag dropdown lists them in their own group. Photo rows are unchanged, so filters, search and sidecars behave as before. New routes `PUT`/`DELETE`/`GET /api/album_tags` and `GET /api/album_tags/facets`; new table `album_tags`. See [Album tags](docs/VIEWER.md#album-tags).
+
 ### Security
 
 - **Request bodies are capped at 10 MB before any handler reads them.** Login, proofing sessions and client error reports buffered the whole body before validation and rate limiting ran, so an unbounded body was a memory lever for any LAN peer. A declared size over the cap answers 413 at once and a chunked body is refused as soon as it crosses it. WebDAV uploads, the AI-edit import and the Lightroom state import keep their own, larger streaming caps.

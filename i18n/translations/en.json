@@ -2791,6 +2791,16 @@
     "error": "Could not update the tag. Check it and try again.",
     "already_present": "This tag is already on the photo."
   },
+  "album_tags": {
+    "group": "Album tags",
+    "content_group": "Content tags",
+    "chips_label": "Sets in this album",
+    "sets": "Sets",
+    "by": "By",
+    "all": "All",
+    "mark": "Album tag",
+    "mark_hint": "Organises albums (event, part, photographer). Not shown with the photo's content tags."
+  },
   "photo": {
     "category_override": {
       "menu_tooltip": "Scoring category",

@@ -4,6 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
@@ -26,7 +27,7 @@ type ManualTagAction = 'add' | 'delete';
 @Component({
   selector: 'app-manual-tags-dialog',
   standalone: true,
-  imports: [MatDialogModule, MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, TranslatePipe],
+  imports: [MatDialogModule, MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, MatCheckboxModule, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <h2 mat-dialog-title class="flex items-center gap-2">
@@ -40,6 +41,12 @@ type ManualTagAction = 'add' | 'delete';
         <input matInput maxlength="64" [value]="tag()" (input)="onInput($event)" (keydown.enter)="!saving() && apply('add')" />
         <mat-hint>{{ I18N.manual_tags.hint | translate }}</mat-hint>
       </mat-form-field>
+      <div class="mt-3">
+        <mat-checkbox data-testid="album-tag-toggle" [checked]="albumTag()" (change)="albumTag.set($event.checked)">
+          {{ I18N.album_tags.mark | translate }}
+        </mat-checkbox>
+        <p class="text-xs opacity-70 ml-10 -mt-1">{{ I18N.album_tags.mark_hint | translate }}</p>
+      </div>
       @if (failed()) {
         <p class="text-sm text-red-400 mt-3" role="alert">{{ I18N.manual_tags.error | translate }}</p>
       }
@@ -59,6 +66,8 @@ export class ManualTagsDialogComponent {
 
   readonly tag = signal('');
   readonly saving = signal(false);
+  /** Also mark the tag as an album tag (organisation), library-wide, after an add. */
+  readonly albumTag = signal(false);
   readonly failed = signal(false);
   /** Photos already written by chunks that succeeded before a later chunk failed. */
   private committed = 0;
@@ -94,6 +103,9 @@ export class ManualTagsDialogComponent {
           this.api.post<{ count: number }>('/photos/batch_manual_tags', { ...body, tag, action }));
         total += res.count;
         this.committed += res.count;
+      }
+      if (action === 'add' && this.albumTag()) {
+        await firstValueFrom(this.api.put<{ tag: string }>('/album_tags', { tag }));
       }
       this.dialogRef.close(total);
     } catch {

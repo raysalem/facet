@@ -2791,6 +2791,16 @@
     "error": "Impossible de modifier le mot-clé. Vérifiez-le et réessayez.",
     "already_present": "Ce tag est déjà sur la photo."
   },
+  "album_tags": {
+    "group": "Tags d'album",
+    "content_group": "Tags de contenu",
+    "chips_label": "Ensembles de cet album",
+    "sets": "Ensembles",
+    "by": "Par",
+    "all": "Tout",
+    "mark": "Tag d'album",
+    "mark_hint": "Organise les albums (événement, partie, photographe). Non affiché avec les tags de contenu de la photo."
+  },
   "photo": {
     "category_override": {
       "menu_tooltip": "Catégorie de notation",

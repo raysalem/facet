@@ -4,6 +4,63 @@
  */
 
 export interface paths {
+    "/api/album_tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Api List Album Tags
+         * @description Every album tag with the number of photos the caller can see that carry it.
+         *
+         *     A marked tag no photo carries any longer is still listed (count 0), so it can
+         *     be unmarked. Sorted by tag, which groups ``person/event/part`` paths.
+         */
+        get: operations["api_list_album_tags_api_album_tags_get"];
+        /**
+         * Api Mark Album Tag
+         * @description Mark a tag as an album tag (organisation, not content). Idempotent.
+         */
+        put: operations["api_mark_album_tag_api_album_tags_put"];
+        post?: never;
+        /**
+         * Api Unmark Album Tag
+         * @description Turn an album tag back into an ordinary (content) tag. The photo rows are kept.
+         */
+        delete: operations["api_unmark_album_tag_api_album_tags_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/album_tags/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Api Album Tag Facets
+         * @description Album tags inside one gallery view, with how many of its photos carry each.
+         *
+         *     Takes the gallery's own query string (album, folder, hide toggles...), so a
+         *     chip's count is what clicking it shows. A ``tag`` parameter is ignored: the
+         *     chips must stay visible while one of them is the active filter. A tag every
+         *     photo of the view carries (the event itself) is still returned; the client
+         *     decides whether to show it.
+         */
+        get: operations["api_album_tag_facets_api_album_tags_facets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/albums": {
         parameters: {
             query?: never;
@@ -5462,6 +5519,35 @@ export interface components {
             /** Scoring Context */
             scoring_context: string;
         };
+        /** AlbumTagCount */
+        AlbumTagCount: {
+            /** Count */
+            count: number;
+            /** Tag */
+            tag: string;
+        };
+        /** AlbumTagListResponse */
+        AlbumTagListResponse: {
+            /** Tags */
+            tags: components["schemas"]["AlbumTagCount"][];
+        };
+        /**
+         * AlbumTagRequest
+         * @description One tag to mark or unmark. Normalized server-side (422 when invalid).
+         */
+        AlbumTagRequest: {
+            /** Tag */
+            tag: string;
+        };
+        /** AlbumTagResponse */
+        AlbumTagResponse: {
+            /** Changed */
+            changed: boolean;
+            /** Success */
+            success: boolean;
+            /** Tag */
+            tag: string;
+        };
         /** AssignAllFacesRequest */
         AssignAllFacesRequest: {
             /** Person Id */
@@ -7835,6 +7921,11 @@ export interface components {
             aggregate?: number | null;
             /** Ai Edit Of */
             ai_edit_of?: string | null;
+            /**
+             * Album Tags
+             * @default []
+             */
+            album_tags?: string[];
             /** Bg Separation */
             bg_separation?: number | null;
             /** Burst Group Id */
@@ -9939,6 +10030,112 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    api_list_album_tags_api_album_tags_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlbumTagListResponse"];
+                };
+            };
+        };
+    };
+    api_mark_album_tag_api_album_tags_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlbumTagRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlbumTagResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    api_unmark_album_tag_api_album_tags_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlbumTagRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlbumTagResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    api_album_tag_facets_api_album_tags_facets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlbumTagListResponse"];
+                };
+            };
+        };
+    };
     list_albums_api_albums_get: {
         parameters: {
             query?: {

@@ -85,6 +85,8 @@ describe('GalleryComponent', () => {
       cameras: signal([]),
       lenses: signal([]),
       tags: signal([]),
+      albumTags: signal([]),
+      tagsRevision: signal(0),
       persons: signal([]),
       config: signal(null),
       activeFilterCount: signal(0),

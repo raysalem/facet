@@ -529,7 +529,7 @@ export function loadActiveTab(): SidebarTabId {
       </mat-expansion-panel>
 
       <!-- Content -->
-      @if (store.types().length || store.tags().length || store.patterns().length) {
+      @if (store.types().length || store.tags().length || store.albumTags().length || store.patterns().length) {
         <mat-expansion-panel class="!mb-1" [expanded]="sectionStates()['content'] !== false"
                              (opened)="onSectionToggle('content', true)"
                              (closed)="onSectionToggle('content', false)"
@@ -555,13 +555,26 @@ export function loadActiveTab(): SidebarTabId {
                 </mat-select>
               </mat-form-field>
             }
-            @if (store.tags().length) {
+            @if (store.tags().length || store.albumTags().length) {
               <mat-form-field subscriptSizing="dynamic" class="w-full">
                 <mat-label>{{ I18N.gallery.tag | translate }}</mat-label>
                 <mat-select [value]="store.filters().tag" (selectionChange)="store.updateFilter('tag', $event.value)">
                   <mat-option value="">{{ I18N.gallery.all | translate }}</mat-option>
-                  @for (t of store.tags(); track t.value) {
-                    <mat-option [value]="t.value">{{ t.value }} ({{ t.count }})</mat-option>
+                  @if (store.albumTags().length) {
+                    <mat-optgroup data-testid="album-tag-group" [label]="I18N.album_tags.group | translate">
+                      @for (t of store.albumTags(); track t.value) {
+                        <mat-option [value]="t.value">{{ t.value }} ({{ t.count }})</mat-option>
+                      }
+                    </mat-optgroup>
+                    <mat-optgroup [label]="I18N.album_tags.content_group | translate">
+                      @for (t of store.tags(); track t.value) {
+                        <mat-option [value]="t.value">{{ t.value }} ({{ t.count }})</mat-option>
+                      }
+                    </mat-optgroup>
+                  } @else {
+                    @for (t of store.tags(); track t.value) {
+                      <mat-option [value]="t.value">{{ t.value }} ({{ t.count }})</mat-option>
+                    }
                   }
                 </mat-select>
               </mat-form-field>
