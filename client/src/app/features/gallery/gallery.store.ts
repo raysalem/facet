@@ -79,6 +79,16 @@ function readStackCollapse(): boolean {
 
 // --- API response types ---
 
+/** The `tag` an album's saved filter carries, `''` when none (or unparseable). */
+function savedAlbumTag(smartFilterJson: string | null | undefined): string {
+  try {
+    const tag = (JSON.parse(smartFilterJson || '{}') as { tag?: unknown }).tag;
+    return typeof tag === 'string' ? tag : '';
+  } catch {
+    return '';
+  }
+}
+
 export interface HiddenSummary {
   total: number;
   blinks: number;
@@ -951,7 +961,10 @@ export class GalleryStore {
       const isEdition = untracked(() => this.auth.isEdition());
       if (!isEdition) return;
 
-      const json = smartAlbumFilterJson(f);
+      // An album-tag chip (church, lunch) is a view inside the album, not part of
+      // its definition: the album keeps whatever tag it was saved with.
+      const chipTag = !!f.tag && untracked(() => this.albumTags().some(t => t.value === f.tag));
+      const json = smartAlbumFilterJson(chipTag ? { ...f, tag: savedAlbumTag(album.smart_filter_json) } : f);
 
       untracked(() => {
         if (this.smartSaveTimer) clearTimeout(this.smartSaveTimer);
