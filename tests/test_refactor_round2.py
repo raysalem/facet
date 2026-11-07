@@ -55,6 +55,9 @@ _PHOTOS_SCHEMA = """
         photo_path TEXT NOT NULL, tag TEXT NOT NULL, source TEXT NOT NULL,
         created_by TEXT, created_at TEXT, PRIMARY KEY (photo_path, tag)
     );
+    CREATE TABLE album_tags (
+        tag TEXT PRIMARY KEY, created_by TEXT, created_at TEXT
+    );
 """
 
 _SAMPLE_PHOTO = {
