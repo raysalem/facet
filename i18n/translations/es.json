@@ -2794,12 +2794,10 @@
   "album_tags": {
     "group": "Etiquetas de álbum",
     "content_group": "Etiquetas de contenido",
-    "chips_label": "Partes de este álbum",
-    "sets": "Partes",
-    "by": "Por",
-    "all": "Todo",
     "mark": "Etiqueta de álbum",
     "label": "Etiqueta de álbum",
+    "set_label": "Parte",
+    "photographer_label": "Fotógrafo",
     "mark_hint": "Organiza los álbumes (evento, parte, fotógrafo). No se muestra con las etiquetas de contenido de la foto."
   },
   "photo": {

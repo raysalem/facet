@@ -72,7 +72,6 @@ import { MAX_REFRESH_PATHS, PhotoActionsService } from '../../core/services/phot
 import { CardActionsService } from './card-actions.service';
 import { SlideshowComponent } from './slideshow.component';
 import { GalleryFilterSidebarComponent } from './gallery-filter-sidebar.component';
-import { AlbumTagChipsComponent } from './album-tag-chips.component';
 import { GalleryPhotoMenuComponent, PhotoMenuAction, PhotoMenuActionEvent, isSheetAction } from './gallery-photo-menu.component';
 import type { SheetAction } from './gallery-actions-sheet.component';
 import { PhotoCardComponent } from '../../shared/components/photo-card/photo-card.component';
@@ -140,7 +139,6 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
     PhotoTooltipComponent,
     SlideshowComponent,
     GalleryFilterSidebarComponent,
-    AlbumTagChipsComponent,
     PhotoCardComponent,
     GalleryPhotoMenuComponent,
     PhotoSkeletonComponent,
@@ -347,11 +345,6 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
               }
             </div>
           }
-        }
-
-        <!-- Album sets and photographers (album tags), any album -->
-        @if (store.currentAlbum()) {
-          <app-album-tag-chips />
         }
 
         <!-- Photo grid / mosaic -->

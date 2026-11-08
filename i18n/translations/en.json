@@ -2794,12 +2794,10 @@
   "album_tags": {
     "group": "Album tags",
     "content_group": "Content tags",
-    "chips_label": "Sets in this album",
-    "sets": "Sets",
-    "by": "By",
-    "all": "All",
     "mark": "Album tag",
     "label": "Album tag",
+    "set_label": "Set",
+    "photographer_label": "Photographer",
     "mark_hint": "Organises albums (event, part, photographer). Not shown with the photo's content tags."
   },
   "photo": {

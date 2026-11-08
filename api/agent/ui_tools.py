@@ -88,7 +88,7 @@ CONTRACT_TO_CLIENT_KEY = {
 }
 # Store keys a smart album never persists (copy of util.ts SMART_ALBUM_EXCLUDE_KEYS; the client is checked against this).
 SMART_ALBUM_EXCLUDE_KEYS = frozenset({
-    "page", "per_page", "semanticQuery", "search_threshold", "album_id",
+    "page", "per_page", "semanticQuery", "search_threshold", "album_id", "album_set", "photographer",
     "similar_to", "similarity_mode", "min_similarity",
     "hide_details", "tooltip_mode", "panel_activation", "tile_fit", "hide_blinks", "hide_bursts",
     "hide_duplicates", "hide_brackets", "hide_panoramas", "hide_rejected",

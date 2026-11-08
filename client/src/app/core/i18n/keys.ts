@@ -2808,12 +2808,10 @@ export const I18N = {
   album_tags: {
     group: "album_tags.group",
     content_group: "album_tags.content_group",
-    chips_label: "album_tags.chips_label",
-    sets: "album_tags.sets",
-    by: "album_tags.by",
-    all: "album_tags.all",
     mark: "album_tags.mark",
     label: "album_tags.label",
+    set_label: "album_tags.set_label",
+    photographer_label: "album_tags.photographer_label",
     mark_hint: "album_tags.mark_hint",
   },
   photo: {

@@ -2794,12 +2794,10 @@
   "album_tags": {
     "group": "Tag album",
     "content_group": "Tag di contenuto",
-    "chips_label": "Parti di questo album",
-    "sets": "Parti",
-    "by": "Di",
-    "all": "Tutto",
     "mark": "Tag album",
     "label": "Tag album",
+    "set_label": "Parte",
+    "photographer_label": "Fotografo",
     "mark_hint": "Organizza gli album (evento, parte, fotografo). Non mostrato con i tag di contenuto della foto."
   },
   "photo": {

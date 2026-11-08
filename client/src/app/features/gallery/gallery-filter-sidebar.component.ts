@@ -19,6 +19,7 @@ import { toIsoDateString } from '../../shared/utils/date-format';
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
+import { AlbumTagFiltersComponent } from './album-tag-filters.component';
 import { GalleryStore } from './gallery.store';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { FilterDisplayPipe } from '../../shared/pipes/filter-display.pipe';
@@ -211,7 +212,7 @@ export interface SegmentRow {
 export const UNIT_PANEL: Record<string, string> = {
   person_id: 'persons', faces_need_names: 'persons',
   date_from: 'date', date_to: 'date',
-  type: 'content', tag: 'content', composition_pattern: 'content',
+  type: 'content', tag: 'content', album_set: 'content', photographer: 'content', composition_pattern: 'content',
   camera: 'equipment', lens: 'equipment',
   review_status: 'refine', favorites_only: 'refine', is_monochrome: 'refine', show_rejected: 'refine',
   blinks_only: 'refine', duplicates_only: 'refine', sequence_override: 'refine', manual_faces_need_review: 'refine',
@@ -263,6 +264,7 @@ export function loadActiveTab(): SidebarTabId {
   standalone: true,
   host: { class: 'flex flex-col h-full' },
   imports: [
+    AlbumTagFiltersComponent,
     MarkTonePipe,
     DecimalPipe,
     MetricSparklineComponent,
@@ -579,6 +581,7 @@ export function loadActiveTab(): SidebarTabId {
                 </mat-select>
               </mat-form-field>
             }
+            <app-album-tag-filters />
             @if (store.patterns().length) {
               <mat-form-field subscriptSizing="dynamic" class="w-full">
                 <mat-label>{{ I18N.gallery.composition_pattern | translate }}</mat-label>

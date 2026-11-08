@@ -47,8 +47,8 @@ export interface paths {
          * @description Album tags inside one gallery view, with how many of its photos carry each.
          *
          *     Takes the gallery's own query string (album, folder, hide toggles...), so a
-         *     chip's count is what clicking it shows. A ``tag`` parameter is ignored: the
-         *     chips must stay visible while one of them is the active filter. A tag every
+         *     pull-down option's count is what choosing it shows. An ``album_tags`` parameter
+         *     is ignored: every set and photographer stays listed while one is chosen. A tag every
          *     photo of the view carries (the event itself) is still returned; the client
          *     decides whether to show it.
          */

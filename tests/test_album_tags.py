@@ -135,8 +135,8 @@ class TestReading:
         assert tags["photographer[robin]"] == 2
         assert "cake" not in tags
 
-    def test_facets_follow_the_view_and_ignore_tag(self, marked, edition_client):
-        params = {"camera": CAMERA, "tag": "peter/communion/church"}
+    def test_facets_follow_the_view_and_ignore_album_tags(self, marked, edition_client):
+        params = {"camera": CAMERA, "album_tags": "peter/communion/church"}
         tags = {t["tag"]: t["count"] for t in edition_client.get(FACETS, params=params).json()["tags"]}
         assert tags == {
             "peter/communion": 3, "peter/communion/church": 2, "peter/communion/lunch": 1,
@@ -152,6 +152,29 @@ class TestReading:
         values = [t[0] for t in edition_client.get("/api/filter_options/tags").json()["tags"]]
         assert "cake" in values
         assert not set(ALBUM) & set(values)
+
+    def test_facets_follow_a_content_tag(self, marked, edition_client):
+        params = {"camera": CAMERA, "tag": "cake"}
+        tags = {t["tag"]: t["count"] for t in edition_client.get(FACETS, params=params).json()["tags"]}
+        assert tags == {"peter/communion": 1, "peter/communion/church": 1, "photographer[ray]": 1}
+
+    @pytest.mark.parametrize("album_tags, expected", [
+        ("peter/communion/church", [CHURCH_1, CHURCH_2]),
+        ("photographer[robin]", [CHURCH_2, LUNCH_1]),
+        ("peter/communion/church,photographer[robin]", [CHURCH_2]),
+        ("peter/communion/lunch,photographer[ray]", []),
+        (" peter/communion/church , ", [CHURCH_1, CHURCH_2]),
+    ])
+    def test_album_tags_must_all_match(self, marked, edition_client, album_tags, expected):
+        resp = edition_client.get("/api/photos", params={"camera": CAMERA, "album_tags": album_tags})
+        assert resp.status_code == 200
+        assert sorted(p["path"] for p in resp.json()["photos"]) == sorted(expected)
+
+    def test_album_tags_match_nothing_without_manual_tags(self, marked):
+        from api.routers.gallery import _add_album_tags_filter
+        where, params = [], []
+        _add_album_tags_filter(where, params, "peter/communion/church", conn=None, include_manual=False)
+        assert where == ["0"] and params == []
 
     def test_gallery_filter_still_matches_album_tag(self, marked, edition_client):
         resp = edition_client.get("/api/photos", params={"camera": CAMERA, "tag": "peter/communion/church"})

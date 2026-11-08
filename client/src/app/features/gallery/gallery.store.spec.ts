@@ -3652,15 +3652,16 @@ describe('GalleryStore smart-album auto-save', () => {
     expect(snackOpen).not.toHaveBeenCalled();
   });
 
-  it('never saves an album-tag chip into the album definition, but saves an ordinary tag', async () => {
-    store.albumTags.set([{ value: 'peter/communion/church', count: 69 }]);
+  it('never saves the Set or Photographer pull-down into the album definition, but saves a tag', async () => {
     store.currentAlbum.set({ ...smartAlbum, smart_filter_json: JSON.stringify({ path_prefix: '/p' }) });
     vi.useFakeTimers();
     try {
-      store.filters.set({ ...DEFAULT_FILTERS, path_prefix: '/p', tag: 'peter/communion/church' });
+      store.filters.set({ ...DEFAULT_FILTERS, path_prefix: '/p', album_set: 'peter/communion/church', photographer: 'photographer[robin]' });
       TestBed.tick();
       await vi.advanceTimersByTimeAsync(500);
-      expect(JSON.parse(albumUpdate.mock.calls.at(-1)![1].smart_filter_json).tag).toBeUndefined();
+      const saved = JSON.parse(albumUpdate.mock.calls.at(-1)![1].smart_filter_json);
+      expect(saved.album_set).toBeUndefined();
+      expect(saved.photographer).toBeUndefined();
       store.filters.set({ ...DEFAULT_FILTERS, path_prefix: '/p', tag: 'cake' });
       TestBed.tick();
       await vi.advanceTimersByTimeAsync(500);

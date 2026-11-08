@@ -28,6 +28,7 @@ import { I18nService } from './core/services/i18n.service';
 import { ThemeService } from './core/services/theme.service';
 import { PageHelpService } from './core/services/page-help.service';
 import { HeaderSlotService } from './core/services/header-slot.service';
+import { albumTagLabel } from './features/gallery/album-tag-groups.util';
 import { GalleryStore, GalleryFilters, PanelActivation, anyHideToggleActive } from './features/gallery/gallery.store';
 import { TILE_FITS } from './features/gallery/gallery-filters.util';
 import { StatsFiltersService } from './features/stats/stats-filters.service';
@@ -441,6 +442,8 @@ export class App implements OnInit {
       const isAlbumTag = this.store.albumTags().some(t => t.value === f.tag);
       chips.push({ id: 'tag', labelKey: isAlbumTag ? 'album_tags.label' : 'gallery.tag', value: f.tag, clearKeys: ['tag'] });
     }
+    if (f.album_set) chips.push({ id: 'album_set', labelKey: 'album_tags.set_label', value: albumTagLabel(f.album_set), clearKeys: ['album_set'] });
+    if (f.photographer) chips.push({ id: 'photographer', labelKey: 'album_tags.photographer_label', value: albumTagLabel(f.photographer), clearKeys: ['photographer'] });
     if (f.search) chips.push({ id: 'search', labelKey: 'gallery.search_chip', value: f.search, clearKeys: ['search'] });
     if (f.camera) chips.push({ id: 'camera', labelKey: 'gallery.camera', value: f.camera, clearKeys: ['camera'] });
     if (f.lens) chips.push({ id: 'lens', labelKey: 'gallery.lens', value: f.lens, clearKeys: ['lens'] });

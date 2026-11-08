@@ -2794,12 +2794,10 @@
   "album_tags": {
     "group": "相册标签",
     "content_group": "内容标签",
-    "chips_label": "此相册中的分组",
-    "sets": "分组",
-    "by": "拍摄者",
-    "all": "全部",
     "mark": "相册标签",
     "label": "相册标签",
+    "set_label": "部分",
+    "photographer_label": "摄影师",
     "mark_hint": "用于整理相册（活动、环节、摄影师）。不与照片的内容标签一起显示。"
   },
   "photo": {

@@ -7,7 +7,8 @@ way, so the gallery's tag filter, sidecar export and keyword import are
 unchanged; the ``album_tags`` registry only decides where a tag is shown:
 
 - the photo page leaves album tags out of its tag list (``Photo.album_tags``);
-- an album shows them as set chips with counts (``GET /api/album_tags/facets``);
+- an album lists them in two filter pull-downs, Set and Photographer, with counts
+  (``GET /api/album_tags/facets``; chosen through the gallery's ``album_tags``);
 - the gallery's tag picker lists them as their own group (``GET /api/album_tags``)
   instead of competing with AI tags for its top-N slots.
 
@@ -146,14 +147,14 @@ async def api_album_tag_facets(
     """Album tags inside one gallery view, with how many of its photos carry each.
 
     Takes the gallery's own query string (album, folder, hide toggles...), so a
-    chip's count is what clicking it shows. A ``tag`` parameter is ignored: the
-    chips must stay visible while one of them is the active filter. A tag every
+    pull-down option's count is what choosing it shows. An ``album_tags`` parameter
+    is ignored: every set and photographer stays listed while one is chosen. A tag every
     photo of the view carries (the event itself) is still returned; the client
     decides whether to show it.
     """
     from api.routers.gallery import _raise_422_for_invalid_gallery_params, gallery_scope_sql_async
 
-    qp = {k: v for k, v in request.query_params.items() if k != 'tag'}
+    qp = {k: v for k, v in request.query_params.items() if k != 'album_tags'}
     try:
         async with get_async_db() as conn:
             if not is_album_tags_available():
