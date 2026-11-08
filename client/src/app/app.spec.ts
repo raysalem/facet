@@ -44,6 +44,7 @@ function createApp(routerUrl = '/', extraProviders: Provider[] = []) {
     pinnedPaths: signal<string[] | null>(null),
     galleryMode: signal('grid'),
     showAllHidden: vi.fn(),
+    albumTags: signal<{ value: string; count: number }[]>([]),
   };
 
   const mockRouter = { url: routerUrl, events: NEVER, navigate: vi.fn(), parseUrl: (url: string) => new DefaultUrlSerializer().parse(url) };
@@ -260,6 +261,15 @@ describe('App', () => {
       const chip = (app as any).activeFilterChips().find((c: any) => c.id === 'tag');
       expect(chip).toBeDefined();
       expect(chip?.value).toBe('nature');
+    });
+
+    it('labels the tag chip Tag for a content tag and Album tag for an album tag', () => {
+      const { app, filtersSignal, mockStore } = createApp('/');
+      mockStore.albumTags.set([{ value: 'peter/communion/church', count: 48 }]);
+      filtersSignal.set({ ...DEFAULT_FILTERS, tag: 'nature' });
+      expect((app as any).activeFilterChips().find((c: any) => c.id === 'tag')?.labelKey).toBe('gallery.tag');
+      filtersSignal.set({ ...DEFAULT_FILTERS, tag: 'peter/communion/church' });
+      expect((app as any).activeFilterChips().find((c: any) => c.id === 'tag')?.labelKey).toBe('album_tags.label');
     });
 
     it('produces chip for active search filter', () => {

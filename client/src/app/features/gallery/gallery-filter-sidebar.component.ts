@@ -557,7 +557,7 @@ export function loadActiveTab(): SidebarTabId {
             }
             @if (store.tags().length || store.albumTags().length) {
               <mat-form-field subscriptSizing="dynamic" class="w-full">
-                <mat-label>{{ I18N.gallery.tag | translate }}</mat-label>
+                <mat-label>{{ (selectedIsAlbumTag() ? I18N.album_tags.label : I18N.gallery.tag) | translate }}</mat-label>
                 <mat-select [value]="store.filters().tag" (selectionChange)="store.updateFilter('tag', $event.value)">
                   <mat-option value="">{{ I18N.gallery.all | translate }}</mat-option>
                   @if (store.albumTags().length) {
@@ -1140,6 +1140,11 @@ export class GalleryFilterSidebarComponent {
     if (el) el.value = '';
   }
 
+  /** The chosen tag is an album tag, so the field reads "Album tag", not "Tag". */
+  readonly selectedIsAlbumTag = computed(() => {
+    const tag = this.store.filters().tag;
+    return !!tag && this.store.albumTags().some(t => t.value === tag);
+  });
   readonly currentFolderName = computed(() => folderDisplayName(this.store.filters().path_prefix));
 
   readonly sectionIcons = SECTION_ICONS;

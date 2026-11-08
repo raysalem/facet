@@ -2813,6 +2813,7 @@ export const I18N = {
     by: "album_tags.by",
     all: "album_tags.all",
     mark: "album_tags.mark",
+    label: "album_tags.label",
     mark_hint: "album_tags.mark_hint",
   },
   photo: {

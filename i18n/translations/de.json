@@ -2799,6 +2799,7 @@
     "by": "Von",
     "all": "Alle",
     "mark": "Album-Tag",
+    "label": "Album-Tag",
     "mark_hint": "Ordnet Alben (Ereignis, Teil, Fotograf). Wird nicht bei den Inhalts-Tags des Fotos angezeigt."
   },
   "photo": {

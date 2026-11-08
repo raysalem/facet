@@ -2799,6 +2799,7 @@
     "by": "Por",
     "all": "Tudo",
     "mark": "Tag de álbum",
+    "label": "Tag de álbum",
     "mark_hint": "Organiza álbuns (evento, parte, fotógrafo). Não aparece com as tags de conteúdo da foto."
   },
   "photo": {
