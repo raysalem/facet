@@ -95,7 +95,7 @@ export interface DrawnAnnotation {
 export const ANNOTATION_SETTINGS_KEY = 'facet_annotations:';
 export const ANNOTATIONS_ENABLED_KEY = 'facet_annotations_enabled';
 /** Label size as a fraction of the frame's longer edge, so it reads the same at any resolution. */
-export const ANNOTATION_LABEL_SCALE = 0.016;
+export const ANNOTATION_LABEL_SCALE = 0.013;
 /** Smallest marker radius, as a fraction of the longer edge, so a 1-pixel star is still visible. */
 export const ANNOTATION_MARKER_SCALE = 0.004;
 

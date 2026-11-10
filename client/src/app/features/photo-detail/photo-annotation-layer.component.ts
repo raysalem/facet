@@ -29,23 +29,20 @@ import { PhotoAnnotationsState } from './photo-annotations.state';
               (focus)="state.hovered.set(d.key)" (blur)="state.hovered.set(null)">
               <title>{{ d.tooltip }}</title>
               @if (d.shape === 'lines') {
-                <path [attr.d]="d.d" fill="none" class="stroke-black/60" stroke-width="3.5"
-                  stroke-linecap="round" vector-effect="non-scaling-stroke" />
-                <path [attr.d]="d.d" fill="none" [attr.class]="d.strokeClass" stroke-width="1.5"
+                <!-- Light touch: thin, semi-transparent figure lines so the sky stays the subject. -->
+                <path [attr.d]="d.d" fill="none" [attr.class]="d.strokeClass + ' opacity-50'" stroke-width="1"
                   stroke-linecap="round" vector-effect="non-scaling-stroke" />
               } @else {
                 <!-- Transparent fill so the whole marker answers hover, not just its thin ring. -->
                 <circle [attr.cx]="d.x" [attr.cy]="d.y" [attr.r]="d.r" fill="transparent"
-                  class="stroke-black/60" stroke-width="3.5" vector-effect="non-scaling-stroke" />
-                <circle [attr.cx]="d.x" [attr.cy]="d.y" [attr.r]="d.r" fill="none"
-                  [attr.class]="d.strokeClass"
-                  [attr.stroke-width]="state.hovered() === d.key ? 3 : 1.5" vector-effect="non-scaling-stroke" />
+                  [attr.class]="(d.shape === 'point' ? 'stroke-white' : d.strokeClass) + (state.hovered() === d.key ? ' opacity-90' : ' opacity-50')"
+                  [attr.stroke-width]="state.hovered() === d.key ? 1.5 : 1" vector-effect="non-scaling-stroke" />
               }
               @if (d.labelPlaced || state.hovered() === d.key) {
                 <text [attr.x]="d.labelX" [attr.y]="d.labelY" [attr.font-size]="v.fontSize"
-                  [attr.class]="d.fillClass + ' stroke-black/80 select-none'"
-                  [attr.stroke-width]="v.fontSize / 5" paint-order="stroke" stroke-linejoin="round"
-                  font-family="sans-serif" font-weight="600" aria-hidden="true">{{ state.hovered() === d.key ? d.tooltip : d.text }}</text>
+                  [attr.class]="d.fillClass + ' stroke-black/40 select-none' + (state.hovered() === d.key ? ' opacity-100' : ' opacity-75')"
+                  [attr.stroke-width]="v.fontSize / 12" paint-order="stroke" stroke-linejoin="round"
+                  font-family="sans-serif" font-weight="400" aria-hidden="true">{{ state.hovered() === d.key ? d.tooltip : d.text }}</text>
               }
             </g>
           }
