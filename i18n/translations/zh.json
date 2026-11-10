@@ -3334,5 +3334,13 @@
     "failed": "无法加载诊断，请重试或检查管理员权限。",
     "refresh": "刷新状态",
     "test": "测试连接"
+  },
+  "photo_annotations": {
+    "toggle_show": "标注：已隐藏（点击显示）",
+    "toggle_hide": "标注：已显示（点击隐藏）",
+    "shown_count": "显示 {shown} / {total}",
+    "show_scores": "显示分数",
+    "show_members": "显示成员",
+    "reset": "恢复插件默认设置"
   }
 }

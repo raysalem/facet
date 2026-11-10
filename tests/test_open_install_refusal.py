@@ -94,6 +94,7 @@ EXPECTED_EDITION_ROUTES = frozenset({
     ('DELETE', '/api/photo/manual_tags'),
     ('DELETE', '/api/photo/manual-faces/{face_id}'),
     ('DELETE', '/api/photo/objects/{object_id}'),
+    ('DELETE', '/api/photo/annotations'),
     ('DELETE', '/api/places/{place_id}'),
     ('GET', '/api/places'),
     ('GET', '/api/places/search'),

@@ -3334,5 +3334,13 @@
     "failed": "Diagnóstico no disponible. Reintenta o comprueba acceso de administrador.",
     "refresh": "Actualizar estado",
     "test": "Probar conexión"
+  },
+  "photo_annotations": {
+    "toggle_show": "Anotaciones: ocultas (clic para mostrar)",
+    "toggle_hide": "Anotaciones: visibles (clic para ocultar)",
+    "shown_count": "{shown} de {total} visibles",
+    "show_scores": "Mostrar puntuaciones",
+    "show_members": "Mostrar miembros",
+    "reset": "Restablecer los valores predeterminados del plugin"
   }
 }

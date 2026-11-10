@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, effect, OnInit, HostListener, DestroyRef, ElementRef, viewChild, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, computed, effect, untracked, OnInit, HostListener, DestroyRef, ElementRef, viewChild, ChangeDetectionStrategy } from '@angular/core';
 import { Location } from '@angular/common';
 import { ActivatedRoute, Router, NavigationStart } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
@@ -22,6 +22,9 @@ import { PhotoActionsService } from '../../core/services/photo-actions.service';
 import { PhotoDetailBase } from '../../shared/directives/photo-detail-base.directive';
 import { ZoomPanDirective } from '../../shared/directives/zoom-pan.directive';
 import { PhotoObjectLayerComponent } from './photo-object-layer.component';
+import { PhotoAnnotationLayerComponent } from './photo-annotation-layer.component';
+import { PhotoAnnotationPanelComponent } from './photo-annotation-panel.component';
+import { PhotoAnnotationsState } from './photo-annotations.state';
 import { FixedPipe } from '../../shared/pipes/fixed.pipe';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { ThumbnailUrlPipe } from '../../shared/pipes/thumbnail-url.pipe';
@@ -68,6 +71,8 @@ const SOCIAL_SOURCE_KEYS: Record<string, string> = {
     StackNavigatorComponent,
     ZoomPanDirective,
     PhotoObjectLayerComponent,
+    PhotoAnnotationLayerComponent,
+    PhotoAnnotationPanelComponent,
     MetricRankComponent,
     PhotoMetricsTabsComponent,
     PhotoFaceLayerComponent,
@@ -92,6 +97,8 @@ const SOCIAL_SOURCE_KEYS: Record<string, string> = {
     EvOffsetPipe,
     ComparisonCategoryExplainerComponent,
   ],
+  // One annotations state per photo page, shared by the overlay layer and its control panel.
+  providers: [PhotoAnnotationsState],
   template: `
     @if (photo(); as p) {
       <!-- Header bar -->
@@ -130,6 +137,15 @@ const SOCIAL_SOURCE_KEYS: Record<string, string> = {
           <button mat-icon-button class="max-md:!hidden" [matMenuTriggerFor]="categoryOverrideMenu"
             [matTooltip]="I18N.photo.category_override.menu_tooltip | translate" [attr.aria-label]="I18N.photo.category_override.menu_tooltip | translate">
             <mat-icon>category</mat-icon>
+          </button>
+        }
+
+        @if (annotations.available()) {
+          <button mat-icon-button (click)="annotations.toggle()" data-annotations-toggle
+            [attr.aria-pressed]="annotations.enabled()"
+            [matTooltip]="(annotations.enabled() ? I18N.photo_annotations.toggle_hide : I18N.photo_annotations.toggle_show) | translate"
+            [attr.aria-label]="(annotations.enabled() ? I18N.photo_annotations.toggle_hide : I18N.photo_annotations.toggle_show) | translate">
+            <mat-icon>{{ annotations.enabled() ? 'label' : 'label_off' }}</mat-icon>
           </button>
         }
 
@@ -283,10 +299,12 @@ const SOCIAL_SOURCE_KEYS: Record<string, string> = {
             [imageHeight]="p.image_height"
             [transform]="zoom.transform()"
             [revision]="objectsRevision()" />
+          <app-photo-annotation-layer [transform]="zoom.transform()" />
         </div>
 
         <!-- Info panel -->
         <div class="lg:w-[380px] lg:shrink-0 lg:overflow-y-auto p-4 space-y-4 text-sm text-[var(--mat-sys-on-surface)]">
+          <app-photo-annotation-panel />
           <!-- Filename + Date + Category + Aggregate -->
           <div class="mb-2">
             <div class="font-semibold text-lg">{{ p.filename }}</div>
@@ -615,6 +633,9 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   private readonly viewerOwner = this.auth.identity();
 
   readonly photo = signal<Photo | null>(null);
+  /** Plugin overlays for the open photo (a plate solve's labels), drawn by the annotation layer. */
+  protected readonly annotations = inject(PhotoAnnotationsState);
+  private readonly photoPath = computed(() => this.photo()?.path ?? null);
   /** Bumped when the mark dialog adds or removes an object, so the object layer re-reads. */
   protected readonly objectsRevision = signal(0);
   protected readonly photoMissing = signal(false);
@@ -782,6 +803,8 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
     });
     this.assistantChanges.batch$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(batch => void this.refreshAfterAssistant(batch));
     this.store.organizationRestored$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => void this.refreshAfterRestore());
+    // Keyed on the path, so a rating or tag change on the same photo does not re-read its annotations.
+    effect(() => { const path = this.photoPath(); untracked(() => void this.annotations.load(path)); });
   }
 
   /** An Organization history restore may have rewritten this photo; a newer local edit wins over the reply. */

@@ -4,6 +4,10 @@ All notable changes to Facet are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Photo annotations: a plugin-written overlay on the photo page.** A plugin stores labelled points, circles and line figures for a photo once (`photo_annotations`, written with `db.annotations.upsert_annotation`, payload v1 validated and capped at 2 MB), and the photo page draws them over the image, following zoom, pan and resizes. A toolbar button shows or hides the overlay; a panel filters it live in the browser by group, the plugin's score and each value it declares (for example a magnitude limit), with plain labels, scores on hover or focus or with **Show scores**, and overlapping lower-scored labels left out. Settings are remembered per plugin by the browser. `GET /api/photo/annotations` follows photo visibility; `DELETE` (edition) removes one plugin's rows. Rows survive rescans, follow path moves, are deleted with their photo and are merged into viewer database exports.
+
 ### Security
 
 - **Request bodies are capped at 10 MB before any handler reads them.** Login, proofing sessions and client error reports buffered the whole body before validation and rate limiting ran, so an unbounded body was a memory lever for any LAN peer. A declared size over the cap answers 413 at once and a chunked body is refused as soon as it crosses it. WebDAV uploads, the AI-edit import and the Lightroom state import keep their own, larger streaming caps.

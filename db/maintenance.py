@@ -949,6 +949,25 @@ def _incremental_update_viewer_db(source_db, output_path, thumbnail_size, verbos
                 count = dest_conn.execute("SELECT COUNT(*) FROM main.photo_objects").fetchone()[0]
                 logger.info("  Merged marked objects (%d rows)", count)
 
+    # --- Merge photo_annotations (plugin overlays; one row per photo and source) ---
+    # The scan side is where plugins write, so a source row replaces the destination's
+    # row of the same (photo, source) when it is at least as new (a plugin re-run lands on
+    # the viewer deployment); a row that exists only on the viewer side is kept. The photo
+    # guard keeps an orphan source row from tripping the FK.
+    if 'photo_annotations' in dest_tables and 'photo_annotations' in src_tables:
+        dest_conn.execute(
+            "INSERT INTO main.photo_annotations (photo_path, source, payload, created_at) "
+            "SELECT photo_path, source, payload, created_at FROM src.photo_annotations "
+            "WHERE photo_path IN (SELECT path FROM main.photos) "
+            "ON CONFLICT(photo_path, source) DO UPDATE SET "
+            "payload = excluded.payload, created_at = excluded.created_at "
+            "WHERE COALESCE(excluded.created_at, '') >= COALESCE(photo_annotations.created_at, '')"
+        )
+        dest_conn.commit()
+        if verbose:
+            count = dest_conn.execute("SELECT COUNT(*) FROM main.photo_annotations").fetchone()[0]
+            logger.info("  Merged photo annotations (%d rows)", count)
+
     # --- Merge photo_ai_edits (AI edit -> original links; additive only) ---
     # Same contract as photo_manual_tags. A row is keyed by edit_path, so an edit linked on the
     # viewer deployment survives a re-export and a source link is added when absent. The guard
