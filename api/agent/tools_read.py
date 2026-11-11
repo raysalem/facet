@@ -6,7 +6,7 @@ file names, paths and album/person names can all hold a prompt injection).
 """
 
 import operator
-from typing import Annotated, Any, Literal, Optional
+from typing import Annotated, Any, Literal, Optional, Union
 
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.types import CallToolResult
@@ -53,6 +53,15 @@ _FILTER_FIELDS['score_presence'] = (Optional[ScorePresence], Field(
 _FILTER_FIELDS['keyword_branch'] = (Optional[KeywordBranch], Field(
     default=None, description='Explicit hierarchy node UUID; matches assignments to it or descendants, never flat tag names.'))
 SearchFilters = create_model("SearchFilters", __config__=ConfigDict(extra="forbid"), **_FILTER_FIELDS)
+# One scan run's photos (search_photos only): the add-on after-import scope, the same selection as
+# ``GET /api/photos?scan_run=`` (api/addons/runs.py: the run's scanned_at window and directories).
+# The tab's filter sidebar has no field for it, so such a search is never shown in the tab.
+SCAN_RUN_PATTERN = r"^([0-9]{1,18}|[0-9a-f]{32})$"
+SearchPhotosFilters = create_model(
+    "SearchPhotosFilters", __base__=SearchFilters,
+    scan_run=(Optional[Union[Annotated[int, Field(ge=1)], Annotated[str, Field(pattern=SCAN_RUN_PATTERN)]]], Field(
+        default=None, description="Only the photos one scan run fully (re)saved: its run number (scan_runs.id) "
+                                  "or its 32-character job id. Never shown in the tab.")))
 
 # Every column the gallery routes serve is requestable, except the BLOBs (a guard: none is
 # listed today) and the two keys whose trimmed form is already in every row.
@@ -234,8 +243,11 @@ def register_read_tools(server: MCPServer, client: InternalClient, status_extra,
         async def handler(grant, resolved, settings):
             merged = _hide_defaults(
                 filters.model_dump(exclude_none=True) if filters is not None else {})
+            scan_run = merged.pop("scan_run", None)
             query = {key: query_value(value) for key, value in merged.items()}
             query.update(page=page, per_page=per_page)
+            if scan_run is not None:
+                query["scan_run"] = str(scan_run)
             if sort:
                 query["sort"] = sort
             if sort_direction:
@@ -244,13 +256,14 @@ def register_read_tools(server: MCPServer, client: InternalClient, status_extra,
                                          timeout=settings["call_timeout_s"])
             result = _list_result(upstream, tuple(fields or ()))
             if show:
+                patch_or_reason = (({}, relay.not_shown("unsupported_filters", keys=["scan_run"]))
+                                   if scan_run is not None else relay.search_patch(merged, sort, sort_direction))
                 await show_result(result, resolved, settings, tab_id, first_page=page == 1,
-                                  patch_or_reason=relay.search_patch(merged, sort, sort_direction),
-                                  timeout=settings["call_timeout_s"])
+                                  patch_or_reason=patch_or_reason, timeout=settings["call_timeout_s"])
             return result
         return await run_tool(ctx, "search_photos", handler)
 
-    search_photos.__annotations__["filters"] = Optional[SearchFilters]
+    search_photos.__annotations__["filters"] = Optional[SearchPhotosFilters]
     search_photos.__annotations__["fields"] = FIELDS_ANNOTATION
     search_photos.__annotations__["tab_id"] = Annotated[Optional[str], Field(pattern=TAB_ID_PATTERN)]
 

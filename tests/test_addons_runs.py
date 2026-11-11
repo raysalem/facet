@@ -165,10 +165,12 @@ class TestRunsRoute:
         assert body["addon_id"] == "astro" and body["run_id"] == library and body["photo_count"] == 6
         assert body["status"] == "completed"
         assert env.client.get(f"/api/addons/runs/{OTHER_JOB}", headers=astro).status_code == 404
-        # and pulls its scope through the photos route
-        names = sorted(p["filename"] for p in env.client.get(
-            f"/api/photos?scan_run={JOB}&per_page=100", headers=astro).json()["photos"])
-        assert len(names) == 6
+        # and pulls its scope over MCP (R-MCP): search_photos with scan_run; /api/photos is closed to it
+        assert env.client.get(f"/api/photos?scan_run={JOB}&per_page=100", headers=astro).status_code == 403
+        token = astro["Authorization"].split(" ", 1)[1]
+        for value in (JOB, library):
+            result = env.call(token, "search_photos", {"filters": {"scan_run": value}, "per_page": 100, "show": False})
+            assert result["ok"] and result["data"]["total"] == 6, (value, result)
 
     def test_person_needs_the_scan_gate(self, env):
         assert env.client.get(f"/api/addons/runs/{JOB}", headers=env.headers).status_code == 200

@@ -283,6 +283,7 @@ As ferramentas de escrita estão na mesma lista `/mcp` que as de leitura. Cada u
 | `album_remove_photos` | `edition` | Remove fotos de um álbum; as fotos não são tocadas | 1000 caminhos |
 | `assign_faces` | `edition` | Move rostos para uma pessoa; os de outra pessoa ficam como estão salvo `allow_reassign`, e o resultado lista o que foi ignorado | 50 ids de rosto |
 | `set_caption` | `edition` | Define a legenda de uma foto (semântica de conjunto; uma legenda inalterada volta como `already`) | 1 foto, 2000 caracteres |
+| `set_gps` | `edition` | Define a localização de uma pasta ou álbum inteiro; por padrão só fotos sem GPS (`overwrite` substitui o GPS da câmera); fica marcada como manual | 1000 fotos |
 | `export_metadata` | `edition` | Escreve sidecars XMP junto aos arquivos | 100 caminhos, ou `filters`, ou `target` |
 | `junk_list` | `readonly` | Lista os candidatos da limpeza de rejeitadas, opcionalmente de um só `kind`; `show: true` abre `/junk` nesse `kind` | 100 por página |
 | `junk_reject` | `edition` | Rejeita candidatos da limpeza (igual a `batch_set_rejected`) | 1000 caminhos, ou `target: "selection"` (só na página da galeria) |

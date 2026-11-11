@@ -87,6 +87,9 @@ async def call_tab(registry: TabRegistry, resolved: ResolvedGrant, settings: dic
     """
     if not settings["bridge"]:
         return err("no_tab", BRIDGE_DISABLED)
+    if getattr(resolved, "addon_id", None) is not None:
+        # An add-on never drives or reads the user's tab over MCP: its sidebar has the postMessage bridge.
+        return err("no_tab", "An add-on does not reach the user's tab over MCP")
     try:
         return await registry.call(
             resolved.principal, tool, payload, level=resolved.level, tab_id=tab_id,

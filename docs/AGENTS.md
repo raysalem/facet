@@ -283,6 +283,7 @@ Write tools are in the same `/mcp` list as the read tools. Each goes through the
 | `album_remove_photos` | `edition` | Remove photos from an album; the photos are untouched | 1000 paths |
 | `assign_faces` | `edition` | Move faces to a person; faces another person owns are left alone unless `allow_reassign` is set, and the result lists what was skipped | 50 face ids |
 | `set_caption` | `edition` | Set a photo's caption (set semantics; an unchanged caption comes back as `already`) | 1 photo, 2000 characters |
+| `set_gps` | `edition` | Set the location of a whole folder or album; by default only photos without GPS (`overwrite` replaces camera GPS); marked as set by hand | 1000 photos |
 | `export_metadata` | `edition` | Write XMP sidecars next to the files | 100 paths, or `filters`, or `target` |
 | `junk_list` | `readonly` | List junk-sweep candidates, optionally of one `kind`; `show: true` opens `/junk` on that kind | 100 per page |
 | `junk_reject` | `edition` | Reject junk-sweep candidates (same as `batch_set_rejected`) | 1000 paths, or `target: "selection"` (gallery page only) |

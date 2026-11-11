@@ -23,7 +23,7 @@ from api.agent import limits, nonce, tokens
 from api.agent.internal_client import err
 from api.agent.live_updates import CALL_CONTEXT
 from api.agent.tokens import bearer_token
-from api.agent.tools_common import TOOL_LEVELS, tool_refusal
+from api.agent.tools_common import TOOL_LEVELS, allowlist_refusal, tool_refusal
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ async def resolve_context(ctx: Any) -> tuple[Any, Any]:
     """``(grant, resolved)`` for a tool call's context, ``(None, None)`` when it is not valid."""
     session = cast(Request, ctx.request_context.request).scope.get(INPAGE_SCOPE_KEY)
     grant = session if session is not None else await asyncio.to_thread(
-        tokens.verify_request, bearer_token(ctx.headers), ctx.request_context.request)
+        tokens.verify_request, bearer_token(ctx.headers), ctx.request_context.request, tokens.MCP_KINDS)
     return grant, (await asyncio.to_thread(grant.resolve) if grant else None)
 
 
@@ -105,7 +105,9 @@ async def run_tool(ctx: Context, name: str, handler: Handler, *, write: bool = F
             token_id = grant.token_id
             actor = grant.rate_key
             per_min = settings["write_rate_per_min" if write else "rate_per_min"]
-            if (below := level_refusal(name, resolved, floor)) is not None:
+            if (outside := allowlist_refusal(name, resolved)) is not None:
+                envelope = outside
+            elif (below := level_refusal(name, resolved, floor)) is not None:
                 envelope = below
             elif (refusal := tool_refusal(name, resolved, settings, args)) is not None:
                 envelope = err(refusal[0], refusal[1])

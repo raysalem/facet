@@ -47,6 +47,9 @@ EXPORT_CAP = 100
 EXPORT_SIDECARS_SHOWN = 20
 # A sidecar export runs up to four ExifTool commands per photo; call_timeout_s would abort a legitimate batch.
 EXPORT_METADATA_TIMEOUT_S = 180
+# set_gps acts on every frame of its folder or album, whatever the viewer hides by default.
+GPS_SCOPE_ALL_FRAMES = {"hide_blinks": "0", "hide_bursts": "0", "hide_duplicates": "0", "hide_brackets": "0",
+                        "hide_panoramas": "0", "hide_rejected": "0", "collapse_stacks": "0"}
 # The levels each write tool needs; the matrix test walks this table.
 WRITE_TOOL_LEVELS: dict[str, str] = {
     "create_photo_stack": "edition", "update_photo_stack": "edition", "unstack_photos": "edition",
@@ -57,7 +60,7 @@ WRITE_TOOL_LEVELS: dict[str, str] = {
     "add_tags": "edition", "remove_tags": "edition",
     "junk_list": "readonly", "junk_reject": "edition", "junk_clear": "edition",
     "cull_apply": "edition", "delete_photos": "edition",
-    "assign_faces": "edition", "set_caption": "edition", "export_metadata": "edition",
+    "assign_faces": "edition", "set_caption": "edition", "set_gps": "edition", "export_metadata": "edition",
     "start_scan": "edition", "scan_status": "edition", "comparison_status": "edition",
     # Registered by tools_corrections / tools_report; listed here so one table holds every non-darkroom level.
     "override_sequence": "edition", "clear_sequence_override": "edition",
@@ -524,6 +527,50 @@ def register_write_tools(server: MCPServer, client: InternalClient, registry: Ta
         "caption is NOT re-embedded, so semantic caption search keeps matching the old text until a "
         "re-embed; and the incremental viewer-database export keeps an existing caption when the source "
         "one is empty, so a cleared caption may come back with a later export or scan.")
+
+    async def set_gps(
+        ctx: Context,
+        latitude: Annotated[float, Field(ge=-90, le=90)],
+        longitude: Annotated[float, Field(ge=-180, le=180)],
+        path_prefix: Annotated[Optional[str], Field(min_length=1, max_length=4096)] = None,
+        album_id: Annotated[Optional[int], Field(ge=1)] = None,
+        overwrite: bool = False,
+        dry_run: bool = False,
+    ) -> CallToolResult:
+        async def handler(grant, resolved, settings):
+            if (path_prefix is None) == (album_id is None):
+                return err("invalid_input", "Pass exactly one of path_prefix (a folder) or album_id (an album); "
+                                            "a location is never set photo by photo")
+            # Every photo of the folder or album: the viewer's hide toggles must not leave frames out.
+            filters = {**GPS_SCOPE_ALL_FRAMES, **({"path_prefix": path_prefix} if path_prefix is not None
+                                                  else {"album_id": str(album_id)})}
+            body = {"filters": filters, "gps_latitude": latitude, "gps_longitude": longitude,
+                    "only_missing": not overwrite}
+            timeout = settings["call_timeout_s"]
+            preview = await client.call(grant, "batch_gps.preview", json={**body, "preview": True}, timeout=timeout)
+            if not preview["ok"]:
+                return preview
+            counts = preview["data"] or {}
+            scope = {"path_prefix": path_prefix} if path_prefix is not None else {"album_id": album_id}
+            shaped = {"scope": scope, "latitude": latitude, "longitude": longitude, "overwrite": overwrite,
+                      "changed": counts.get("changed", 0), "skipped": counts.get("skipped", 0), "dry_run": dry_run}
+            if dry_run or not shaped["changed"]:
+                return ok(shaped)
+            applied = await client.call(grant, "batch_gps", json={**body, "preview_token": counts.get("preview_token")},
+                                        timeout=timeout)
+            if not applied["ok"]:
+                return applied
+            done = applied["data"] or {}
+            shaped.update(changed=done.get("changed", 0), skipped=done.get("skipped", 0))
+            return ok(shaped)
+        return await run_tool(ctx, "set_gps", handler, write=True)
+
+    add(set_gps, "set_gps",
+        "Set the location (decimal degrees, WGS84) of a whole folder (`path_prefix`) or a whole album (`album_id`): "
+        "exactly one of the two, never single photos. By default only photos with no GPS change; `overwrite: true` "
+        "also replaces camera GPS. Changed photos are marked as located by hand (`gps_manually_set`), so a rescan "
+        "keeps the location. `dry_run: true` only counts. Answers `changed` and `skipped`; at most 1000 photos "
+        "per call (`too_large` beyond).")
 
     async def export_metadata(
         ctx: Context, paths: Optional[list[str]] = None, filters: Optional[Any] = None,

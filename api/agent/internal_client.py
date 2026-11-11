@@ -99,6 +99,7 @@ ROUTE_ALLOWLIST: Mapping[str, RouteSpec] = MappingProxyType({
     "clear_junk": RouteSpec("POST", "/api/photo/clear_junk", "edition", write=True),
     "assign_faces": RouteSpec("POST", "/api/persons/{person_id}/assign_faces", "edition", write=True),
     "set_caption": RouteSpec("PUT", "/api/caption", "edition", write=True),
+    "batch_gps": RouteSpec("POST", "/api/photos/batch_gps", "edition", write=True),
     "export_metadata": RouteSpec("POST", "/api/export/sidecars", "edition", write=True),
     "create_album": RouteSpec("POST", "/api/albums", "edition", write=True),
     "album_add_photos": RouteSpec("POST", "/api/albums/{album_id}/photos", "edition", write=True),
@@ -140,6 +141,7 @@ ROUTE_ALLOWLIST: Mapping[str, RouteSpec] = MappingProxyType({
     # plain upstream error rather than ``outcome_unknown``.
     "cull_apply.preview": RouteSpec("POST", "/api/cull/apply", "edition"),
     "delete_photos.preview": RouteSpec("POST", "/api/photo/delete", "edition"),
+    "batch_gps.preview": RouteSpec("POST", "/api/photos/batch_gps", "edition"),
 })
 
 

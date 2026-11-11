@@ -2131,16 +2131,16 @@ Un module complémentaire (add-on) est un programme séparé (son propre dépôt
 
 Un manifeste est refusé en bloc, avec la raison affichée sur la page **Modules complémentaires** (menu utilisateur → Modules complémentaires), si : `id` ne correspond pas à `^[a-z0-9][a-z0-9._-]{0,63}$` ou diffère du nom de son dossier ; une clé, une permission ou un emplacement est inconnu ; `start` et `ui.url` sont tous deux présents (ou aucun) ; `start.argv[0]` n'est pas un chemin absolu vers un fichier existant ; `health` ou `ui.path` n'est pas un simple chemin ; ou `facet_api` n'est pas un entier que ce serveur parle (actuellement `1`). Un module sans `start` tourne ailleurs (par exemple un service Docker) et indique `"ui": {"url": "http://astro:5100/"}`.
 
-**Permissions et jetons.** Un module s'authentifie avec un jeton `fct_` de type `addon` (stocké sous forme de hachage SHA-256 dans la même table que les jetons d'agent). Le jeton agit au nom du compte qui l'a créé, au plus au niveau actuel de ce compte : un mot de passe changé ou un compte rétrogradé le coupe dès l'appel suivant. Chaque route qu'un jeton de module peut appeler figure ci-dessous ; toute autre route répond 403. Un jeton de module n'ouvre jamais `/mcp`, et un jeton d'agent n'obtient rien sur `/api`. Pour un module sans `start`, la page crée le jeton une fois (**Créer un jeton d'accès**) et l'affiche une fois ; **Révoquer les jetons** le révoque.
+**Permissions et jetons.** Un module s'authentifie avec un jeton `fct_` de type `addon` (stocké sous forme de hachage SHA-256 dans la même table que les jetons d'agent). Le jeton agit au nom du compte qui l'a créé, au plus au niveau actuel de ce compte : un mot de passe changé ou un compte rétrogradé le coupe dès l'appel suivant. Le module lit et écrit les données de Facet par le point MCP de Facet (`POST /mcp`, voir [Agents IA (MCP)](AGENTS.md)) comme un assistant, mais `tools/list` ne lui montre que les outils que ses permissions accordent (ci-dessous) et tout autre outil répond `forbidden_level`. Le niveau de chaque outil s'applique toujours, et aucun outil destructif n'est jamais accordé, quoi que dise `viewer.mcp.allow_destructive`. Sur `/api`, un jeton de module n'ouvre que les trois lectures du tableau ; toute autre route répond 403. Pour un module sans `start`, la page crée le jeton une fois (**Créer un jeton d'accès**) et l'affiche une fois ; **Révoquer les jetons** le révoque.
 
-| Permission | Routes |
+| Permission | MCP tools |
 |---|---|
-| `photos.read` | `GET /api/photos` (incl. `scan_run`), `GET /api/photo`, `GET /thumbnail`, `GET /image`, `GET /api/addons/runs/<job id>` |
-| `tags.write` | `POST /api/photos/batch_manual_tags`, `DELETE /api/photo/manual_tags` |
+| `photos.read` | `status`, `search_photos` (incl. `scan_run`), `get_photo`, `filter_options`, `list_albums`; plus `GET /thumbnail`, `GET /image`, `GET /api/addons/runs/<job id>` on `/api` |
+| `tags.write` | `add_tags`, `remove_tags` |
 | `annotations.write` | — |
-| `gps.write` | `PUT /api/photo/gps` |
+| `gps.write` | `set_gps` |
 
-Les deux routes `tags.write` sont un substitut temporaire en attendant les mots-clés propres aux plugins ; `annotations.write` ne correspond encore à aucune route.
+`add_tags` enregistre le module comme `created_by` des mots-clés qu'il écrit ; les mots-clés propres aux plugins (avec leur propre `source`) n'existent pas encore. `annotations.write` n'accorde encore aucun outil. `set_gps` définit le lieu de tout un dossier (`path_prefix`) ou album (`album_id`), jamais de photos isolées ; par défaut seules les photos sans GPS changent (`overwrite: true` remplace aussi le GPS de l'appareil).
 
 **Confiance.** Installer un manifeste revient à faire confiance à ce programme en tant qu'utilisateur système de Facet, comme pour un fichier dans `plugins/`. Les permissions cantonnent un module correct à sa tâche et limitent la portée d'un bogue ; elles ne contiennent pas un programme hostile exécuté sous le même utilisateur. Une vraie isolation exige un conteneur séparé sans le volume de la base.
 
@@ -2155,16 +2155,18 @@ Règles pour l'auteur du panneau : l'URL du document est `/addons/<id><ui.path>?
 ```text
 Facet → panel  {type: "context", v: 1, nonce, route, album_id, photo, selection: [≤ 500 paths],
                 scope: {kind: "view", query} | {kind: "selection"} | {kind: "import", run_id}}
-panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | "refresh" {paths} | "close", v: 1, nonce}
+panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | "refresh" {paths} | "open_map" {site: "earth" | "maps"} | "close", v: 1, nonce}
 ```
 
 Facet n'accepte un message que de la fenêtre du panneau avec son nonce, et seulement après `ready` (de nouveau après chaque rechargement). Les chemins que l'onglet ne peut pas afficher sont ignorés.
+
+`open_map` ouvre Google Earth ou Google Maps dans un nouvel onglet (le panneau ne peut pas ouvrir de fenêtre) ; Facet n'ouvre que ces deux adresses fixes, jamais une URL venant du panneau.
 
 ### Après l'import
 
 Un module avec l'emplacement `import_hook` peut être choisi dans la boîte de dialogue d'analyse sous **Après l'import, ouvrir :**. Facet enregistre seulement la demande (table `addon_runs`, par identifiant de tâche de l'analyse) ; l'analyseur n'en sait rien et rien ne démarre tout seul. Quand l'analyse se termine sans erreur, un onglet Facet ouvert propose **Import terminé. Ouvrir Astro pour N photos ?** ; si aucun onglet ne regardait, la page Modules complémentaires liste l'exécution sous *Imports en attente d'un module* avec un bouton **Ouvrir**.
 
-Le module lit ses photos avec `GET /api/photos?scan_run=<identifiant de tâche ou numéro d'exécution>` (combinable avec tous les autres filtres de la galerie et la pagination) et l'exécution avec `GET /api/addons/runs/<identifiant de tâche>` (`photos.read`, ses propres exécutions uniquement). Les photos d'une exécution sont celles qu'elle a entièrement (ré)enregistrées : `scanned_at` entre le début et la fin de l'exécution (ou maintenant, tant qu'elle tourne) et sous l'un de ses dossiers. Un passage qui ne met à jour que certaines colonnes ne marque pas les photos à nouveau.
+Le module lit ses photos par MCP avec `search_photos` et le filtre `scan_run` (identifiant de tâche ou numéro d'exécution ; combinable avec tous les autres filtres et la pagination) et l'exécution avec `GET /api/addons/runs/<identifiant de tâche>` (`photos.read`, ses propres exécutions uniquement). Les photos d'une exécution sont celles qu'elle a entièrement (ré)enregistrées : `scanned_at` entre le début et la fin de l'exécution (ou maintenant, tant qu'elle tourne) et sous l'un de ses dossiers. Un passage qui ne met à jour que certaines colonnes ne marque pas les photos à nouveau.
 
 ### Démarré par Facet
 

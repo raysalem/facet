@@ -116,7 +116,8 @@ class TestAllowlist:
     def test_allowlist_is_frozen_and_only_writes_demand_a_level(self):
         assert isinstance(ROUTE_ALLOWLIST, MappingProxyType)
         assert all(spec.min_level == "readonly" or spec.write or spec.template.endswith("/api/cull/apply")
-                   or spec.template.endswith("/api/photo/delete") or spec.template in self.EDITION_READS
+                   or spec.template.endswith("/api/photo/delete") or spec.template.endswith("/api/photos/batch_gps")
+                   or spec.template in self.EDITION_READS
                    for spec in ROUTE_ALLOWLIST.values())
         assert all(spec.min_level != "readonly" for spec in ROUTE_ALLOWLIST.values() if spec.write)
         assert not any(spec.template.startswith(("/api/admin", "/api/config", "/api/scan",

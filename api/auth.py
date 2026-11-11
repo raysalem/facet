@@ -396,7 +396,7 @@ class CurrentUser:
         if agent:
             trusted_local_editing = (payload.get('mcp_local') is True and payload.get('sub') is None
                                      and payload.get('edition') is True and _trusted_local_editing_enabled())
-        return cls(
+        user = cls(
             user_id=payload.get('sub'),
             role=payload.get('role', 'user'),
             display_name=payload.get('display_name', ''),
@@ -404,6 +404,13 @@ class CurrentUser:
             agent=agent,
             trusted_local_editing=trusted_local_editing,
         )
+        addon_id = payload.get('mcp_addon') if agent else None
+        if isinstance(addon_id, str) and addon_id:
+            # An add-on's MCP call (server-signed claim, ResolvedGrant.jwt_claims): the route sees the add-on.
+            # Its permissions were already enforced by the tool allowlist, so the scope carries none here.
+            from api.addons.auth import AddonScope
+            user.addon = AddonScope(addon_id, frozenset())
+        return user
 
     @property
     def is_agent_request(self):

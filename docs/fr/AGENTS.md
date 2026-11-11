@@ -283,6 +283,7 @@ Les outils d'écriture figurent dans la même liste `/mcp` que les outils de lec
 | `album_remove_photos` | `edition` | Retire des photos d'un album ; les photos ne sont pas touchées | 1000 chemins |
 | `assign_faces` | `edition` | Déplace des visages vers une personne ; ceux qu'une autre personne possède sont laissés tels quels sauf `allow_reassign`, et le résultat liste ce qui a été ignoré | 50 ids de visage |
 | `set_caption` | `edition` | Définit la légende d'une photo (sémantique d'ensemble ; une légende inchangée revient en `already`) | 1 photo, 2000 caractères |
+| `set_gps` | `edition` | Définit le lieu de tout un dossier ou album ; par défaut seulement les photos sans GPS (`overwrite` remplace le GPS de l'appareil) ; marqué comme saisi à la main | 1000 photos |
 | `export_metadata` | `edition` | Écrit des sidecars XMP à côté des fichiers | 100 chemins, ou `filters`, ou `target` |
 | `junk_list` | `readonly` | Liste les candidates du tri des ratés, éventuellement d'un seul `kind`; `show: true` ouvre `/junk` sur ce `kind` | 100 par page |
 | `junk_reject` | `edition` | Rejette les candidates du tri des ratés (comme `batch_set_rejected`) | 1000 chemins, ou `target: "selection"` (page galerie uniquement) |

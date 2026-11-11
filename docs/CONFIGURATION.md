@@ -2131,16 +2131,16 @@ An add-on is a separate program (its own repository and virtual environment) tha
 
 A manifest is refused as a whole, with the reason shown on the **Add-ons** page (user menu → Add-ons), when: `id` does not match `^[a-z0-9][a-z0-9._-]{0,63}$` or differs from its folder name; a key, permission or slot is unknown; `start` and `ui.url` are both present (or neither); `start.argv[0]` is not an absolute path to an existing file; `health` or `ui.path` is not a plain path; or `facet_api` is not an integer this server speaks (currently `1`). An add-on without `start` runs elsewhere (for example a Docker service) and sets `"ui": {"url": "http://astro:5100/"}` instead.
 
-**Permissions and tokens.** An add-on authenticates with an `fct_` token of kind `addon` (stored as a SHA-256 hash in the same table as agent tokens). The token acts as the account that minted it, at most at that account's live level, so a changed password or a demoted account cuts it off on the next call. Every route an add-on token may call is listed below; any other route answers 403. An add-on token never opens `/mcp`, and an agent token gains nothing on `/api`. For an add-on without `start`, the Add-ons page mints the token once (**Create access token**) and shows it once; **Revoke tokens** revokes it.
+**Permissions and tokens.** An add-on authenticates with an `fct_` token of kind `addon` (stored as a SHA-256 hash in the same table as agent tokens). The token acts as the account that minted it, at most at that account's live level, so a changed password or a demoted account cuts it off on the next call. The add-on reads and writes Facet data over Facet's MCP endpoint (`POST /mcp`, see [AI agents (MCP)](AGENTS.md)), like an assistant, but `tools/list` shows it only the tools its permissions grant (below) and any other tool answers `forbidden_level`. Each tool's own level still applies, and no destructive tool is ever granted, whatever `viewer.mcp.allow_destructive` says. On `/api` an add-on token opens only the three reads in the table; any other route answers 403. For an add-on without `start`, the Add-ons page mints the token once (**Create access token**) and shows it once; **Revoke tokens** revokes it.
 
-| Permission | Routes |
+| Permission | MCP tools |
 |---|---|
-| `photos.read` | `GET /api/photos` (incl. `scan_run`), `GET /api/photo`, `GET /thumbnail`, `GET /image`, `GET /api/addons/runs/<job id>` |
-| `tags.write` | `POST /api/photos/batch_manual_tags`, `DELETE /api/photo/manual_tags` |
+| `photos.read` | `status`, `search_photos` (incl. `scan_run`), `get_photo`, `filter_options`, `list_albums`; plus `GET /thumbnail`, `GET /image`, `GET /api/addons/runs/<job id>` on `/api` |
+| `tags.write` | `add_tags`, `remove_tags` |
 | `annotations.write` | — |
-| `gps.write` | `PUT /api/photo/gps` |
+| `gps.write` | `set_gps` |
 
-The two `tags.write` routes are a temporary stand-in until plugin-owned tags exist; `annotations.write` maps to no route yet.
+`add_tags` records the add-on as `created_by` of the tags it writes; plugin-owned tags (their own `source`) do not exist yet. `annotations.write` grants no tool yet. `set_gps` sets the location of a whole folder (`path_prefix`) or album (`album_id`), never of single photos; by default only photos without GPS change (`overwrite: true` replaces camera GPS too).
 
 **Trust.** Installing a manifest trusts that program as the operating-system user Facet runs as, the same trust as a file in `plugins/`. Permissions keep a well-behaved add-on to its job and bound what a bug can reach; they cannot contain a hostile program running as the same user. Real isolation needs the add-on in its own container without the database volume.
 
@@ -2155,16 +2155,18 @@ Rules for the panel's author: the document URL is `/addons/<id><ui.path>?nonce=�
 ```text
 Facet → panel  {type: "context", v: 1, nonce, route, album_id, photo, selection: [≤ 500 paths],
                 scope: {kind: "view", query} | {kind: "selection"} | {kind: "import", run_id}}
-panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | "refresh" {paths} | "close", v: 1, nonce}
+panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | "refresh" {paths} | "open_map" {site: "earth" | "maps"} | "close", v: 1, nonce}
 ```
 
 Facet accepts a message only from the panel's own window with its nonce, and only after `ready` (again after every reload of the frame). Paths outside what the tab can show are ignored.
+
+`open_map` opens Google Earth or Google Maps in a new tab (the panel cannot open popups); Facet opens only those two fixed addresses, never a URL from the panel.
 
 ### After import
 
 An add-on with the `import_hook` slot can be picked in the scan dialog under **After import, open:**. Facet only records the request (in the `addon_runs` table, keyed by the scan's job id); the scanner is not told, and nothing starts by itself. When the scan finishes cleanly, an open Facet tab offers **Import done. Open Astro for N photos?**; if no tab was watching, the Add-ons page lists the run under *Imports waiting for an add-on* with an **Open** button.
 
-The add-on reads its photos with `GET /api/photos?scan_run=<job id or run number>` (it combines with every other gallery filter and with paging) and the run itself with `GET /api/addons/runs/<job id>` (`photos.read`, its own runs only). A run's photos are the ones it fully (re)saved: `scanned_at` between the run's start and end (or now, while it runs) and under one of the run's directories. A pass that only updates some columns does not mark photos again.
+The add-on reads its photos over MCP with `search_photos` and the filter `scan_run` (a job id or run number; it combines with every other filter and with paging) and the run itself with `GET /api/addons/runs/<job id>` (`photos.read`, its own runs only). A run's photos are the ones it fully (re)saved: `scanned_at` between the run's start and end (or now, while it runs) and under one of the run's directories. A pass that only updates some columns does not mark photos again.
 
 ### Started by Facet
 

@@ -47,6 +47,11 @@ def _normalized(tag):
 
 
 def _created_by(user):
+    # An add-on's write (over /mcp) is recorded as the add-on's, so undo and purge stay per add-on.
+    # FORK-ONLY until upstream PR-3 gives add-ons source='plugin' rows of their own.
+    addon = getattr(user, 'addon', None)
+    if addon is not None:
+        return addon.id
     return user.user_id if user and is_multi_user_enabled() else None
 
 

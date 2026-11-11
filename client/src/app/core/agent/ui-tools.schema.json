@@ -297,10 +297,14 @@
     },
     {
       "id": "write_metadata",
-      "summary": "Set a photo's caption or write XMP sidecars next to the files",
+      "summary": "Set a photo's caption or location, or write XMP sidecars next to the files",
       "tools": [
         {
           "name": "set_caption",
+          "required_level": "edition"
+        },
+        {
+          "name": "set_gps",
           "required_level": "edition"
         },
         {

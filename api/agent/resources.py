@@ -129,6 +129,8 @@ def _limit(value: Any) -> tuple[Any, bool]:
 
 def list_resources(resolved: tokens.ResolvedGrant, settings: dict) -> ListResourcesResult:
     """The resources whose tools this key is offered, by the filter ``tools/list`` and ``prompts/list`` use."""
+    if getattr(resolved, "allowed_tools", None) is not None:
+        return ListResourcesResult(resources=[])  # an add-on's data channel is its allowed tools only
     seen = prompts.visible_tools(resolved, settings)
     return ListResourcesResult(resources=[
         Resource(uri=spec.uri, name=spec.name, description=spec.description, mime_type=MIME, _meta=UNTRUSTED_META)
@@ -139,9 +141,9 @@ async def read_resource(request: Any, uri: str, client: Optional[InternalClient]
     """Gate (bearer, rate limit, audit) like a prompt, then run the reader as the caller."""
     resolved = await prompts.authorize(request, uri)
     spec = RESOURCES.get(str(uri))
-    if spec is None or client is None:
+    if spec is None or client is None or getattr(resolved, "allowed_tools", None) is not None:
         raise MCPError(INVALID_PARAMS, f"Unknown resource: {str(uri)[:64]}", data={"uri": str(uri)[:64]})
-    grant = await asyncio.to_thread(tokens.verify_request, bearer_token(request.headers), request)
+    grant = await asyncio.to_thread(tokens.verify_request, bearer_token(request.headers), request, tokens.MCP_KINDS)
     settings = request.scope[SETTINGS_SCOPE_KEY]
     # A read is gated on the permission LEVEL of the tools it needs, not on the tool profile: the profile only
     # trims what tools/list offers, and refusing facet://persons under "core" would be a regression.

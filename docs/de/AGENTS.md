@@ -283,6 +283,7 @@ Schreibwerkzeuge stehen in derselben `/mcp`-Liste wie die Lesewerkzeuge. Jedes l
 | `album_remove_photos` | `edition` | Entfernt Fotos aus einem Album; die Fotos selbst bleiben unberührt | 1000 Pfade |
 | `assign_faces` | `edition` | Verschiebt Gesichter zu einer Person; Gesichter einer anderen Person bleiben unberührt, außer `allow_reassign` ist gesetzt, und das Ergebnis listet das Übersprungene | 50 Gesichts-IDs |
 | `set_caption` | `edition` | Setzt die Bildunterschrift eines Fotos (Set-Semantik; eine unveränderte kommt als `already` zurück) | 1 Foto, 2000 Zeichen |
+| `set_gps` | `edition` | Setzt den Ort eines ganzen Ordners oder Albums; standardmäßig nur Fotos ohne GPS (`overwrite` ersetzt Kamera-GPS); gilt als von Hand gesetzt | 1000 Fotos |
 | `export_metadata` | `edition` | Schreibt XMP-Sidecars neben die Dateien | 100 Pfade, oder `filters`, oder `target` |
 | `junk_list` | `readonly` | Listet Kandidaten der Ausschuss-Suche, optional nur einer `kind`; `show: true` öffnet `/junk` für diese `kind` | 100 pro Seite |
 | `junk_reject` | `edition` | Lehnt Ausschuss-Kandidaten ab (wie `batch_set_rejected`) | 1000 Pfade, oder `target: "selection"` (nur auf der Galerieseite) |

@@ -34,7 +34,18 @@ export type PanelRequest =
   | { type: 'show_photos'; paths: string[] }
   | { type: 'open_photo'; path: string }
   | { type: 'refresh'; paths: string[] }
+  | { type: 'open_map'; site: MapSite }
   | { type: 'close' };
+
+/**
+ * `open_map`: the panel asks Facet to open a map site in a new tab (the sandbox forbids popups). Only these
+ * fixed URLs ever open; the panel names a key, never a URL, so it cannot steer the tab anywhere else.
+ */
+export const MAP_SITES = {
+  earth: 'https://earth.google.com/web/',
+  maps: 'https://www.google.com/maps/',
+} as const;
+export type MapSite = keyof typeof MAP_SITES;
 
 /** A string list of 1..`max` non-empty strings, or null. */
 function pathList(value: unknown, max: number): string[] | null {
@@ -59,6 +70,11 @@ export function readPanelMessage(event: Pick<MessageEvent, 'source' | 'data'>, f
     case 'refresh': {
       const paths = pathList(data['paths'], MAX_PANEL_PATHS);
       return paths ? { type: data['type'], paths } : null;
+    }
+    case 'open_map': {
+      const site = data['site'];
+      return typeof site === 'string' && Object.prototype.hasOwnProperty.call(MAP_SITES, site)
+        ? { type: 'open_map', site: site as MapSite } : null;
     }
     case 'open_photo':
       return typeof data['path'] === 'string' && data['path'].length > 0 && data['path'].length <= 4096

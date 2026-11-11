@@ -9,7 +9,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AddonPanelService } from '../../../core/addons/addon-panel.service';
-import { buildContext, readPanelMessage, type PanelRequest } from '../../../core/addons/addon-bridge';
+import { MAP_SITES, buildContext, readPanelMessage, type PanelRequest } from '../../../core/addons/addon-bridge';
 import { GalleryStore } from '../../../features/gallery/gallery.store';
 import { WebMcpToolRegistry } from '../../../core/agent/webmcp-registry.service';
 import { AssistantChangesService } from '../../../core/agent/assistant-changes.service';
@@ -138,6 +138,10 @@ export class AddonSidebarComponent {
       case 'open_photo':
         await this.tools.load();
         await this.tools.execute('ui_open_photo', { path: request.path });
+        return;
+      case 'open_map':
+        // A fixed URL picked by key (never one from the panel); no opener, no referrer.
+        window.open(MAP_SITES[request.site], '_blank', 'noopener,noreferrer');
         return;
     }
   }

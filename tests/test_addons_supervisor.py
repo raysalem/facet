@@ -195,9 +195,9 @@ class TestGate:
             if row.get("addon_id") == "good" and not row["revoked"]:
                 child_token = row
         assert child_token is not None  # the launch token exists...
-        # ...but no route that starts add-ons is in ADDON_ROUTE_SCOPES.
-        from api.addons.auth import addon_route_scopes
-        names = {fn.__name__ for (_, fn) in addon_route_scopes()}
+        # ...but no route that starts add-ons is open to an add-on token.
+        from api.addons.auth import addon_api_routes
+        names = {fn.__name__ for (_, fn) in addon_api_routes()}
         assert not names & {"start_addon", "stop_addon", "mint_token", "open_panel", "list_addons"}
 
 

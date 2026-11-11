@@ -36,7 +36,7 @@ from api.agent.internal_client import InternalClient, err, validation_issues
 from api.agent.live_updates import WriteSink, make_emitter
 from api.agent.bridge import TabRegistry, same_origin
 from api.agent.runtime import SETTINGS_SCOPE_KEY, bearer_token, level_refusal, resolve_context, to_result
-from api.agent.tools_common import TOOL_LEVELS, tool_visible
+from api.agent.tools_common import TOOL_LEVELS, allowlist_refusal, tool_visible
 from api.agent.tools_corrections import register_correction_tools
 from api.agent.tools_culling import register_culling_tools
 from api.agent.tools_report import register_report_tools
@@ -144,7 +144,8 @@ class AgentMCPServer(MCPServer):
         if context is not None:
             # The floor first: a tool above the key's level must not reveal its argument names or shapes.
             _, resolved = await resolve_context(context)
-            below = level_refusal(name, resolved) if resolved is not None else None
+            # An add-on's allowlist first: a tool outside it is refused like one above the level.
+            below = (allowlist_refusal(name, resolved) or level_refusal(name, resolved)) if resolved is not None else None
             if below is not None:
                 return to_result(below)
         known = set((tool.parameters or {}).get("properties", {}))
@@ -232,6 +233,8 @@ def _reject(status: int, detail: str, headers: dict | None = None) -> JSONRespon
 class AgentAuthMiddleware:
     """Gate in front of the SDK app.
 
+    Agent tokens and add-on tokens (``kind='addon'``, R-MCP) are both accepted; an add-on token whose
+    add-on is not enabled -> 403, and its tools stop at its allowlist (``ADDON_PERMISSION_TOOLS``).
     Flag off -> 404. A request carrying an ``Origin`` header (a browser) that is not
     same-origin -> 403: MCP clients send none. A missing or unknown bearer -> 401
     with a challenge; once an address has failed too often, a further FAILED
@@ -266,7 +269,12 @@ class AgentAuthMiddleware:
         client = scope.get("client")
         ip = client[0] if client else "unknown"
         presented = bearer_token(headers)
-        grant = await asyncio.to_thread(tokens.verify_request, presented, Request(scope)) if presented else None
+        grant = (await asyncio.to_thread(tokens.verify_request, presented, Request(scope), tokens.MCP_KINDS)
+                 if presented else None)
+        if grant is not None and grant.kind == tokens.KIND_ADDON:
+            from api.addons.auth import addon_scope
+            if await asyncio.to_thread(addon_scope, grant) is None:
+                return _reject(403, "Add-on is not enabled")
         resolved = await asyncio.to_thread(grant.resolve) if grant else None
         if resolved is None:
             if limits.auth_blocked(ip):

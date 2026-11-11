@@ -2128,16 +2128,16 @@ Webhook 选项：`url`（必填）、`events`（事件名列表）、`min_score`
 
 出现以下情况时整个清单会被拒绝，原因显示在**附加组件**页面（用户菜单 → 附加组件）：`id` 不符合 `^[a-z0-9][a-z0-9._-]{0,63}$` 或与文件夹名不同；键、权限或插槽未知；同时存在（或都不存在）`start` 和 `ui.url`；`start.argv[0]` 不是指向现有文件的绝对路径；`health` 或 `ui.path` 不是普通路径；或 `facet_api` 不是本服务器支持的整数（目前为 `1`）。没有 `start` 的附加组件在其他地方运行（例如 Docker 服务），改为设置 `"ui": {"url": "http://astro:5100/"}`。
 
-**权限与令牌。** 附加组件使用类型为 `addon` 的 `fct_` 令牌进行身份验证（以 SHA-256 哈希存储在与代理令牌相同的表中）。令牌以创建它的账户身份操作，最高不超过该账户当前的级别；更改密码或降级账户会在下一次调用时将其切断。下表列出了附加组件令牌可以调用的全部路由，其他路由一律返回 403。附加组件令牌永远无法打开 `/mcp`，代理令牌在 `/api` 上也得不到任何权限。对于没有 `start` 的附加组件，该页面只创建一次令牌（**创建访问令牌**）并只显示一次；**撤销令牌**可将其撤销。
+**权限与令牌。** 附加组件使用类型为 `addon` 的 `fct_` 令牌进行身份验证（以 SHA-256 哈希存储在与代理令牌相同的表中）。令牌以创建它的账户身份操作，最高不超过该账户当前的级别；更改密码或降级账户会在下一次调用时将其切断。附加组件像助手一样通过 Facet 的 MCP 端点（`POST /mcp`，见 [AI 智能体（MCP）](AGENTS.md)）读写 Facet 数据，但 `tools/list` 只向它显示其权限授予的工具（见下表），调用其他工具一律返回 `forbidden_level`。每个工具自身的级别仍然适用，且无论 `viewer.mcp.allow_destructive` 如何设置，都不会授予任何破坏性工具。在 `/api` 上，附加组件令牌只能打开表中的三个读取路由，其他路由一律返回 403。对于没有 `start` 的附加组件，该页面只创建一次令牌（**创建访问令牌**）并只显示一次；**撤销令牌**可将其撤销。
 
-| Permission | Routes |
+| Permission | MCP tools |
 |---|---|
-| `photos.read` | `GET /api/photos` (incl. `scan_run`), `GET /api/photo`, `GET /thumbnail`, `GET /image`, `GET /api/addons/runs/<job id>` |
-| `tags.write` | `POST /api/photos/batch_manual_tags`, `DELETE /api/photo/manual_tags` |
+| `photos.read` | `status`, `search_photos` (incl. `scan_run`), `get_photo`, `filter_options`, `list_albums`; plus `GET /thumbnail`, `GET /image`, `GET /api/addons/runs/<job id>` on `/api` |
+| `tags.write` | `add_tags`, `remove_tags` |
 | `annotations.write` | — |
-| `gps.write` | `PUT /api/photo/gps` |
+| `gps.write` | `set_gps` |
 
-两个 `tags.write` 路由是在插件专属标签出现之前的临时替代；`annotations.write` 目前不对应任何路由。
+`add_tags` 将附加组件记录为其所写标签的 `created_by`；插件专属标签（带自己的 `source`）尚不存在。`annotations.write` 目前不授予任何工具。`set_gps` 为整个文件夹（`path_prefix`）或相册（`album_id`）设置位置，从不针对单张照片；默认只修改没有 GPS 的照片（`overwrite: true` 也会替换相机 GPS）。
 
 **信任。** 安装清单意味着以运行 Facet 的操作系统用户身份信任该程序，与 `plugins/` 中的文件相同。权限让正常的附加组件只做自己的事，并限制错误的影响范围；但无法约束以同一用户运行的恶意程序。真正的隔离需要把附加组件放在不挂载数据库卷的独立容器中。
 
@@ -2152,16 +2152,18 @@ Webhook 选项：`url`（必填）、`events`（事件名列表）、`min_score`
 ```text
 Facet → panel  {type: "context", v: 1, nonce, route, album_id, photo, selection: [≤ 500 paths],
                 scope: {kind: "view", query} | {kind: "selection"} | {kind: "import", run_id}}
-panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | "refresh" {paths} | "close", v: 1, nonce}
+panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | "refresh" {paths} | "open_map" {site: "earth" | "maps"} | "close", v: 1, nonce}
 ```
 
 Facet 只接受来自面板自身窗口且带有其 nonce 的消息，并且只在 `ready` 之后（每次重新加载框架后都需要重新 `ready`）。标签页无法显示的路径会被忽略。
+
+`open_map` 在新标签页中打开 Google Earth 或 Google Maps（面板无法打开弹出窗口）；Facet 只打开这两个固定地址，从不打开来自面板的 URL。
 
 ### 导入之后
 
 带有 `import_hook` 插槽的附加组件可在扫描对话框的**导入后打开：**中选择。Facet 只记录这个请求（`addon_runs` 表，以扫描的作业 ID 为键）；扫描程序对此一无所知，也不会自动启动任何东西。扫描无错完成后，打开的 Facet 标签页会提示**导入完成。要为 N 张照片打开 Astro 吗？**；如果当时没有标签页在关注，附加组件页面会在*等待附加组件处理的导入*下列出该次运行，并提供**打开**按钮。
 
-附加组件通过 `GET /api/photos?scan_run=<作业 ID 或运行编号>` 读取其照片（可与其他所有图库筛选条件及分页组合），通过 `GET /api/addons/runs/<作业 ID>` 读取运行信息（`photos.read`，仅限自己的运行）。一次运行的照片是它完整（重新）保存的照片：`scanned_at` 位于运行的开始与结束之间（运行中则为当前时间之前），且位于该运行的某个文件夹下。只更新部分列的处理过程不会再次标记照片。
+附加组件通过 MCP 使用 `search_photos` 和筛选条件 `scan_run`（作业 ID 或运行编号；可与其他所有筛选条件及分页组合）读取其照片，通过 `GET /api/addons/runs/<作业 ID>` 读取运行信息（`photos.read`，仅限自己的运行）。一次运行的照片是它完整（重新）保存的照片：`scanned_at` 位于运行的开始与结束之间（运行中则为当前时间之前），且位于该运行的某个文件夹下。只更新部分列的处理过程不会再次标记照片。
 
 ### 由 Facet 启动
 

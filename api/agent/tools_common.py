@@ -98,9 +98,30 @@ def tool_refusal(name: str, resolved: Any, settings: dict,
     return None
 
 
+def outside_allowlist(name: str, resolved: Any) -> bool:
+    """True when ``resolved`` is an add-on grant whose permissions do not reach ``name`` (api/addons/auth.py)."""
+    allowed = getattr(resolved, "allowed_tools", None)
+    return allowed is not None and name not in allowed
+
+
+def allowlist_refusal(name: str, resolved: Any) -> Optional[dict]:
+    """The ``forbidden_level`` envelope for an add-on calling a tool outside its permissions, else None."""
+    if not outside_allowlist(name, resolved):
+        return None
+    return {"ok": False, "error": "forbidden_level",
+            "message": f"This add-on's permissions do not include {name[:64]}"}
+
+
+def _reachable(resolved: Any) -> dict[str, str]:
+    """``TOOL_LEVELS`` limited to an add-on's allowlist (all of it for any other grant)."""
+    return {name: floor for name, floor in TOOL_LEVELS.items() if not outside_allowlist(name, resolved)}
+
+
 def tool_visible(name: str, resolved: Any, settings: dict) -> bool:
-    """Whether ``tools/list`` offers ``name``: the level, the requirement predicate, then the profile."""
+    """Whether ``tools/list`` offers ``name``: the add-on allowlist, the level, the requirement predicate, then the profile."""
     from api.agent import tokens
+    if outside_allowlist(name, resolved):
+        return False
     if tokens.level_rank(resolved.level) < tokens.level_rank(TOOL_LEVELS[name]):
         return False
     if tool_refusal(name, resolved, settings) is not None:
@@ -112,7 +133,7 @@ def unavailable_tools(resolved: Any, settings: dict) -> frozenset[str]:
     """Tools the grant's level reaches but a requirement predicate refuses (a switch is off)."""
     from api.agent import tokens
     rank = tokens.level_rank(resolved.level)
-    return frozenset(name for name, floor in TOOL_LEVELS.items()
+    return frozenset(name for name, floor in _reachable(resolved).items()
                      if tokens.level_rank(floor) <= rank and tool_refusal(name, resolved, settings) is not None)
 
 
@@ -124,7 +145,7 @@ def hidden_tools(resolved: Any, settings: dict) -> dict:
     """
     from api.agent import tokens
     rank = tokens.level_rank(resolved.level)
-    above = [name for name, floor in TOOL_LEVELS.items() if tokens.level_rank(floor) > rank]
+    above = [name for name, floor in _reachable(resolved).items() if tokens.level_rank(floor) > rank]
     needs = max((tokens.effective_requirement(TOOL_LEVELS[n]) for n in above), key=tokens.level_rank, default=None)
     out: dict[str, Any] = {"count": len(above), "needs": needs}
     if above:

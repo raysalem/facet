@@ -2144,16 +2144,16 @@ Ein Add-on ist ein eigenständiges Programm (eigenes Repository, eigene virtuell
 
 Ein Manifest wird als Ganzes abgelehnt, mit dem Grund auf der Seite **Add-ons** (Benutzermenü → Add-ons), wenn: `id` nicht `^[a-z0-9][a-z0-9._-]{0,63}$` entspricht oder vom Ordnernamen abweicht; ein Schlüssel, eine Berechtigung oder ein Slot unbekannt ist; `start` und `ui.url` beide (oder keines von beiden) vorhanden sind; `start.argv[0]` kein absoluter Pfad zu einer vorhandenen Datei ist; `health` oder `ui.path` kein einfacher Pfad ist; oder `facet_api` keine Ganzzahl ist, die dieser Server spricht (derzeit `1`). Ein Add-on ohne `start` läuft anderswo (etwa als Docker-Dienst) und setzt stattdessen `"ui": {"url": "http://astro:5100/"}`.
 
-**Berechtigungen und Tokens.** Ein Add-on meldet sich mit einem `fct_`-Token der Art `addon` an (als SHA-256-Hash in derselben Tabelle wie Agent-Tokens gespeichert). Das Token handelt als das Konto, das es erstellt hat, höchstens mit dessen aktueller Stufe; ein geändertes Passwort oder ein herabgestuftes Konto sperrt es beim nächsten Aufruf. Jede Route, die ein Add-on-Token aufrufen darf, steht unten; jede andere antwortet mit 403. Ein Add-on-Token öffnet nie `/mcp`, und ein Agent-Token gewinnt auf `/api` nichts. Für ein Add-on ohne `start` erstellt die Seite Add-ons das Token einmal (**Zugriffstoken erstellen**) und zeigt es einmal an; **Tokens widerrufen** widerruft es.
+**Berechtigungen und Tokens.** Ein Add-on meldet sich mit einem `fct_`-Token der Art `addon` an (als SHA-256-Hash in derselben Tabelle wie Agent-Tokens gespeichert). Das Token handelt als das Konto, das es erstellt hat, höchstens mit dessen aktueller Stufe; ein geändertes Passwort oder ein herabgestuftes Konto sperrt es beim nächsten Aufruf. Das Add-on liest und schreibt Facet-Daten über Facets MCP-Endpunkt (`POST /mcp`, siehe [KI-Agenten (MCP)](AGENTS.md)) wie ein Assistent, doch `tools/list` zeigt ihm nur die Werkzeuge, die seine Berechtigungen gewähren (unten); jedes andere Werkzeug antwortet mit `forbidden_level`. Die Stufe jedes Werkzeugs gilt weiterhin, und ein zerstörerisches Werkzeug wird nie gewährt, was auch immer `viewer.mcp.allow_destructive` sagt. Auf `/api` öffnet ein Add-on-Token nur die drei Lesezugriffe der Tabelle; jede andere Route antwortet mit 403. Für ein Add-on ohne `start` erstellt die Seite Add-ons das Token einmal (**Zugriffstoken erstellen**) und zeigt es einmal an; **Tokens widerrufen** widerruft es.
 
-| Permission | Routes |
+| Permission | MCP tools |
 |---|---|
-| `photos.read` | `GET /api/photos` (incl. `scan_run`), `GET /api/photo`, `GET /thumbnail`, `GET /image`, `GET /api/addons/runs/<job id>` |
-| `tags.write` | `POST /api/photos/batch_manual_tags`, `DELETE /api/photo/manual_tags` |
+| `photos.read` | `status`, `search_photos` (incl. `scan_run`), `get_photo`, `filter_options`, `list_albums`; plus `GET /thumbnail`, `GET /image`, `GET /api/addons/runs/<job id>` on `/api` |
+| `tags.write` | `add_tags`, `remove_tags` |
 | `annotations.write` | — |
-| `gps.write` | `PUT /api/photo/gps` |
+| `gps.write` | `set_gps` |
 
-Die beiden `tags.write`-Routen sind ein vorübergehender Ersatz, bis es Plugin-eigene Schlagwörter gibt; `annotations.write` ist noch keiner Route zugeordnet.
+`add_tags` vermerkt das Add-on als `created_by` der Schlagwörter, die es schreibt; Plugin-eigene Schlagwörter (mit eigener `source`) gibt es noch nicht. `annotations.write` gewährt noch kein Werkzeug. `set_gps` setzt den Ort eines ganzen Ordners (`path_prefix`) oder Albums (`album_id`), nie einzelner Fotos; standardmäßig ändern sich nur Fotos ohne GPS (`overwrite: true` ersetzt auch Kamera-GPS).
 
 **Vertrauen.** Ein installiertes Manifest vertraut dem Programm als dem Betriebssystembenutzer, unter dem Facet läuft, wie bei einer Datei in `plugins/`. Berechtigungen halten ein korrektes Add-on bei seiner Aufgabe und begrenzen, was ein Fehler erreicht; ein feindseliges Programm desselben Benutzers halten sie nicht auf. Echte Isolation erfordert einen eigenen Container ohne das Datenbank-Volume.
 
@@ -2168,16 +2168,18 @@ Regeln für die Seite: Die Dokument-URL ist `/addons/<id><ui.path>?nonce=…`; d
 ```text
 Facet → panel  {type: "context", v: 1, nonce, route, album_id, photo, selection: [≤ 500 paths],
                 scope: {kind: "view", query} | {kind: "selection"} | {kind: "import", run_id}}
-panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | "refresh" {paths} | "close", v: 1, nonce}
+panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | "refresh" {paths} | "open_map" {site: "earth" | "maps"} | "close", v: 1, nonce}
 ```
 
 Facet nimmt eine Nachricht nur vom Fenster des Bereichs mit dessen Nonce an, und erst nach `ready` (nach jedem Neuladen erneut). Pfade, die der Tab nicht zeigen kann, werden ignoriert.
+
+`open_map` öffnet Google Earth oder Google Maps in einem neuen Tab (das Panel kann keine Popups öffnen); Facet öffnet nur diese zwei festen Adressen, nie eine URL aus dem Panel.
 
 ### Nach dem Import
 
 Ein Add-on mit dem Slot `import_hook` lässt sich im Scan-Dialog unter **Nach dem Import öffnen:** auswählen. Facet speichert nur die Anfrage (Tabelle `addon_runs`, nach der Job-ID des Scans); der Scanner erfährt nichts davon, und nichts startet von selbst. Endet der Scan ohne Fehler, bietet ein offener Facet-Tab **Import abgeschlossen. Astro für N Fotos öffnen?** an; hat kein Tab zugesehen, führt die Seite Add-ons den Lauf unter *Importe, die auf ein Add-on warten* mit der Schaltfläche **Öffnen**.
 
-Das Add-on liest seine Fotos mit `GET /api/photos?scan_run=<Job-ID oder Laufnummer>` (kombinierbar mit allen anderen Galeriefiltern und dem Blättern) und den Lauf mit `GET /api/addons/runs/<Job-ID>` (`photos.read`, nur eigene Läufe). Die Fotos eines Laufs sind die, die er vollständig (neu) gespeichert hat: `scanned_at` zwischen Start und Ende des Laufs (oder jetzt, solange er läuft) und unter einem seiner Ordner. Ein Durchgang, der nur einzelne Spalten aktualisiert, markiert Fotos nicht erneut.
+Das Add-on liest seine Fotos über MCP mit `search_photos` und dem Filter `scan_run` (Job-ID oder Laufnummer; kombinierbar mit allen anderen Filtern und dem Blättern) und den Lauf mit `GET /api/addons/runs/<Job-ID>` (`photos.read`, nur eigene Läufe). Die Fotos eines Laufs sind die, die er vollständig (neu) gespeichert hat: `scanned_at` zwischen Start und Ende des Laufs (oder jetzt, solange er läuft) und unter einem seiner Ordner. Ein Durchgang, der nur einzelne Spalten aktualisiert, markiert Fotos nicht erneut.
 
 ### Von Facet gestartet
 

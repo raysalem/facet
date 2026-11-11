@@ -2123,16 +2123,16 @@ Um complemento (add-on) é um programa separado (repositório e ambiente virtual
 
 Um manifesto é recusado por inteiro, com o motivo na página **Complementos** (menu do utilizador → Complementos), quando: `id` não corresponde a `^[a-z0-9][a-z0-9._-]{0,63}$` ou difere do nome da pasta; uma chave, permissão ou ranhura é desconhecida; `start` e `ui.url` estão ambos presentes (ou nenhum); `start.argv[0]` não é um caminho absoluto para um ficheiro existente; `health` ou `ui.path` não é um caminho simples; ou `facet_api` não é um inteiro que este servidor fale (atualmente `1`). Um complemento sem `start` corre noutro lado (por exemplo um serviço Docker) e define `"ui": {"url": "http://astro:5100/"}`.
 
-**Permissões e tokens.** Um complemento autentica-se com um token `fct_` do tipo `addon` (guardado como hash SHA-256 na mesma tabela dos tokens de agente). O token age como a conta que o criou, no máximo ao nível atual dessa conta; uma palavra-passe alterada ou uma conta despromovida corta-o na chamada seguinte. Abaixo estão todas as rotas que pode chamar; qualquer outra responde 403. Um token de complemento nunca abre `/mcp`, e um token de agente não ganha nada em `/api`. Para um complemento sem `start`, a página cria o token uma vez (**Criar token de acesso**) e mostra-o uma vez; **Revogar tokens** revoga-o.
+**Permissões e tokens.** Um complemento autentica-se com um token `fct_` do tipo `addon` (guardado como hash SHA-256 na mesma tabela dos tokens de agente). O token age como a conta que o criou, no máximo ao nível atual dessa conta; uma palavra-passe alterada ou uma conta despromovida corta-o na chamada seguinte. O complemento lê e escreve dados do Facet pelo ponto MCP do Facet (`POST /mcp`, ver [Agentes de IA (MCP)](AGENTS.md)) como um assistente, mas `tools/list` só lhe mostra as ferramentas que as suas permissões concedem (abaixo) e qualquer outra responde `forbidden_level`. O nível de cada ferramenta continua a aplicar-se e nunca é concedida uma ferramenta destrutiva, diga o que disser `viewer.mcp.allow_destructive`. Em `/api` um token de complemento só abre as três leituras da tabela; qualquer outra rota responde 403. Para um complemento sem `start`, a página cria o token uma vez (**Criar token de acesso**) e mostra-o uma vez; **Revogar tokens** revoga-o.
 
-| Permission | Routes |
+| Permission | MCP tools |
 |---|---|
-| `photos.read` | `GET /api/photos` (incl. `scan_run`), `GET /api/photo`, `GET /thumbnail`, `GET /image`, `GET /api/addons/runs/<job id>` |
-| `tags.write` | `POST /api/photos/batch_manual_tags`, `DELETE /api/photo/manual_tags` |
+| `photos.read` | `status`, `search_photos` (incl. `scan_run`), `get_photo`, `filter_options`, `list_albums`; plus `GET /thumbnail`, `GET /image`, `GET /api/addons/runs/<job id>` on `/api` |
+| `tags.write` | `add_tags`, `remove_tags` |
 | `annotations.write` | — |
-| `gps.write` | `PUT /api/photo/gps` |
+| `gps.write` | `set_gps` |
 
-As duas rotas `tags.write` são um substituto temporário até existirem etiquetas próprias de plugins; `annotations.write` ainda não corresponde a nenhuma rota.
+`add_tags` regista o complemento como `created_by` das etiquetas que escreve; ainda não existem etiquetas próprias de plugins (com `source` próprio). `annotations.write` ainda não concede nenhuma ferramenta. `set_gps` define a localização de uma pasta (`path_prefix`) ou álbum (`album_id`) inteiros, nunca de fotos soltas; por padrão só mudam as fotos sem GPS (`overwrite: true` substitui também o GPS da câmera).
 
 **Confiança.** Instalar um manifesto é confiar nesse programa como o utilizador do sistema com que o Facet corre, tal como um ficheiro em `plugins/`. As permissões mantêm um complemento correto na sua tarefa e limitam o alcance de um erro; não contêm um programa hostil a correr como o mesmo utilizador. O isolamento real exige um contentor próprio sem o volume da base de dados.
 
@@ -2147,16 +2147,18 @@ Regras para o autor do painel: o URL do documento é `/addons/<id><ui.path>?nonc
 ```text
 Facet → panel  {type: "context", v: 1, nonce, route, album_id, photo, selection: [≤ 500 paths],
                 scope: {kind: "view", query} | {kind: "selection"} | {kind: "import", run_id}}
-panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | "refresh" {paths} | "close", v: 1, nonce}
+panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | "refresh" {paths} | "open_map" {site: "earth" | "maps"} | "close", v: 1, nonce}
 ```
 
 O Facet só aceita uma mensagem da janela do painel com o seu nonce, e só depois de `ready` (novamente após cada recarregamento). Os caminhos que o separador não consegue mostrar são ignorados.
+
+`open_map` abre o Google Earth ou o Google Maps num novo separador (o painel não pode abrir pop-ups); o Facet só abre esses dois endereços fixos, nunca um URL vindo do painel.
 
 ### Após importar
 
 Um complemento com a ranhura `import_hook` pode ser escolhido no diálogo de análise em **Após importar, abrir:**. O Facet só regista o pedido (tabela `addon_runs`, pelo id de tarefa da análise); o analisador não é avisado e nada arranca sozinho. Quando a análise termina sem erros, um separador do Facet aberto propõe **Importação concluída. Abrir Astro para N fotos?**; se nenhum separador estava a acompanhar, a página Complementos lista a execução em *Importações à espera de um complemento* com um botão **Abrir**.
 
-O complemento lê as suas fotos com `GET /api/photos?scan_run=<id de tarefa ou número de execução>` (combinável com todos os outros filtros da galeria e com a paginação) e a execução com `GET /api/addons/runs/<id de tarefa>` (`photos.read`, só as suas execuções). As fotos de uma execução são as que ela guardou (de novo) por inteiro: `scanned_at` entre o início e o fim da execução (ou agora, enquanto decorre) e dentro de uma das suas pastas. Uma passagem que só atualiza algumas colunas não volta a marcar as fotos.
+O complemento lê as suas fotos por MCP com `search_photos` e o filtro `scan_run` (id de tarefa ou número de execução; combinável com todos os outros filtros e com a paginação) e a execução com `GET /api/addons/runs/<id de tarefa>` (`photos.read`, só as suas execuções). As fotos de uma execução são as que ela guardou (de novo) por inteiro: `scanned_at` entre o início e o fim da execução (ou agora, enquanto decorre) e dentro de uma das suas pastas. Uma passagem que só atualiza algumas colunas não volta a marcar as fotos.
 
 ### Iniciado pelo Facet
 

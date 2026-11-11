@@ -2135,16 +2135,16 @@ Un componente aggiuntivo (add-on) è un programma separato (repository e ambient
 
 Un manifesto viene rifiutato per intero, con il motivo sulla pagina **Componenti aggiuntivi** (menu utente → Componenti aggiuntivi), quando: `id` non corrisponde a `^[a-z0-9][a-z0-9._-]{0,63}$` o differisce dal nome della cartella; una chiave, un permesso o uno slot è sconosciuto; `start` e `ui.url` sono entrambi presenti (o nessuno); `start.argv[0]` non è un percorso assoluto di un file esistente; `health` o `ui.path` non è un percorso semplice; oppure `facet_api` non è un intero supportato dal server (ora `1`). Un componente senza `start` gira altrove (per esempio un servizio Docker) e imposta `"ui": {"url": "http://astro:5100/"}`.
 
-**Permessi e token.** Un componente si autentica con un token `fct_` di tipo `addon` (salvato come hash SHA-256 nella stessa tabella dei token degli agenti). Il token agisce come l'account che lo ha creato, al massimo al livello attuale di quell'account; una password cambiata o un account declassato lo blocca alla chiamata successiva. Sotto sono elencate tutte le rotte che può chiamare; ogni altra risponde 403. Un token di componente non apre mai `/mcp`, e un token di agente non ottiene nulla su `/api`. Per un componente senza `start`, la pagina crea il token una volta (**Crea token di accesso**) e lo mostra una volta; **Revoca i token** lo revoca.
+**Permessi e token.** Un componente si autentica con un token `fct_` di tipo `addon` (salvato come hash SHA-256 nella stessa tabella dei token degli agenti). Il token agisce come l'account che lo ha creato, al massimo al livello attuale di quell'account; una password cambiata o un account declassato lo blocca alla chiamata successiva. Il componente legge e scrive i dati di Facet tramite l'endpoint MCP di Facet (`POST /mcp`, vedi [Agenti IA (MCP)](AGENTS.md)) come un assistente, ma `tools/list` gli mostra solo gli strumenti concessi dai suoi permessi (sotto) e ogni altro strumento risponde `forbidden_level`. Il livello di ogni strumento resta valido e nessuno strumento distruttivo viene mai concesso, qualunque cosa dica `viewer.mcp.allow_destructive`. Su `/api` un token di componente apre solo le tre letture della tabella; ogni altra rotta risponde 403. Per un componente senza `start`, la pagina crea il token una volta (**Crea token di accesso**) e lo mostra una volta; **Revoca i token** lo revoca.
 
-| Permission | Routes |
+| Permission | MCP tools |
 |---|---|
-| `photos.read` | `GET /api/photos` (incl. `scan_run`), `GET /api/photo`, `GET /thumbnail`, `GET /image`, `GET /api/addons/runs/<job id>` |
-| `tags.write` | `POST /api/photos/batch_manual_tags`, `DELETE /api/photo/manual_tags` |
+| `photos.read` | `status`, `search_photos` (incl. `scan_run`), `get_photo`, `filter_options`, `list_albums`; plus `GET /thumbnail`, `GET /image`, `GET /api/addons/runs/<job id>` on `/api` |
+| `tags.write` | `add_tags`, `remove_tags` |
 | `annotations.write` | — |
-| `gps.write` | `PUT /api/photo/gps` |
+| `gps.write` | `set_gps` |
 
-Le due rotte `tags.write` sono un sostituto temporaneo finché non esisteranno tag propri dei plugin; `annotations.write` non corrisponde ancora a nessuna rotta.
+`add_tags` registra il componente come `created_by` dei tag che scrive; i tag propri dei plugin (con un proprio `source`) non esistono ancora. `annotations.write` non concede ancora nessuno strumento. `set_gps` imposta la posizione di un'intera cartella (`path_prefix`) o album (`album_id`), mai di singole foto; di default cambiano solo le foto senza GPS (`overwrite: true` sostituisce anche il GPS della fotocamera).
 
 **Fiducia.** Installare un manifesto significa fidarsi di quel programma come dell'utente di sistema con cui gira Facet, come per un file in `plugins/`. I permessi tengono un componente corretto nel suo compito e limitano ciò che un errore può raggiungere; non contengono un programma ostile eseguito con lo stesso utente. Un vero isolamento richiede un container separato senza il volume del database.
 
@@ -2159,16 +2159,18 @@ Regole per l'autore del pannello: l'URL del documento è `/addons/<id><ui.path>?
 ```text
 Facet → panel  {type: "context", v: 1, nonce, route, album_id, photo, selection: [≤ 500 paths],
                 scope: {kind: "view", query} | {kind: "selection"} | {kind: "import", run_id}}
-panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | "refresh" {paths} | "close", v: 1, nonce}
+panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | "refresh" {paths} | "open_map" {site: "earth" | "maps"} | "close", v: 1, nonce}
 ```
 
 Facet accetta un messaggio solo dalla finestra del pannello con il suo nonce, e solo dopo `ready` (di nuovo dopo ogni ricaricamento). I percorsi che la scheda non può mostrare vengono ignorati.
+
+`open_map` apre Google Earth o Google Maps in una nuova scheda (il pannello non può aprire popup); Facet apre solo quei due indirizzi fissi, mai un URL dal pannello.
 
 ### Dopo l'importazione
 
 Un componente con lo slot `import_hook` si può scegliere nella finestra di scansione in **Dopo l'importazione, apri:**. Facet registra solo la richiesta (tabella `addon_runs`, per id del processo di scansione); lo scanner non ne sa nulla e niente parte da solo. Quando la scansione termina senza errori, una scheda di Facet aperta propone **Importazione completata. Aprire Astro per N foto?**; se nessuna scheda la seguiva, la pagina Componenti aggiuntivi elenca l'esecuzione in *Importazioni in attesa di un componente* con un pulsante **Apri**.
 
-Il componente legge le sue foto con `GET /api/photos?scan_run=<id del processo o numero di esecuzione>` (combinabile con tutti gli altri filtri della galleria e con la paginazione) e l'esecuzione con `GET /api/addons/runs/<id del processo>` (`photos.read`, solo le proprie esecuzioni). Le foto di un'esecuzione sono quelle che ha salvato (di nuovo) per intero: `scanned_at` tra inizio e fine dell'esecuzione (o adesso, mentre è in corso) e sotto una delle sue cartelle. Un passaggio che aggiorna solo alcune colonne non contrassegna di nuovo le foto.
+Il componente legge le sue foto via MCP con `search_photos` e il filtro `scan_run` (id del processo o numero di esecuzione; combinabile con tutti gli altri filtri e con la paginazione) e l'esecuzione con `GET /api/addons/runs/<id del processo>` (`photos.read`, solo le proprie esecuzioni). Le foto di un'esecuzione sono quelle che ha salvato (di nuovo) per intero: `scanned_at` tra inizio e fine dell'esecuzione (o adesso, mentre è in corso) e sotto una delle sue cartelle. Un passaggio che aggiorna solo alcune colonne non contrassegna di nuovo le foto.
 
 ### Avviato da Facet
 

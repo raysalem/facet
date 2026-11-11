@@ -31,7 +31,7 @@ COUNT_KEYS = ("count", "affected", "moved", "trashed", "copied", "rejected", "cl
 PHOTO_EFFECT_TOOLS = frozenset({
     "create_photo_stack", "update_photo_stack", "unstack_photos", "undo_photo_stack",
     "set_rating", "toggle_favorite", "toggle_rejected", "batch_favorite", "batch_reject", "batch_rating",
-    "batch_manual_tags", "clear_junk", "set_caption", "album_add_photos", "album_remove_photos",
+    "batch_manual_tags", "clear_junk", "set_caption", "batch_gps", "album_add_photos", "album_remove_photos",
     "cull_apply", "delete_photos", "override_sequence", "clear_sequence_override", "override_category",
     "clear_category_override", "assign_faces", "culling.auto", "culling.confirm",
 })

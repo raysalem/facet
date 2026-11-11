@@ -283,6 +283,7 @@ curl -s -X POST http://localhost:5000/api/mcp/tokens -H "Authorization: Bearer $
 | `album_remove_photos` | `edition` | 从相册移除照片；照片本身不受影响 | 1000 个路径 |
 | `assign_faces` | `edition` | 将人脸移到某个人物;属于其他人物的人脸保持不变,除非设置 `allow_reassign`,结果会列出被跳过的内容 | 50 个人脸 id |
 | `set_caption` | `edition` | 设置照片的说明文字(集合语义;未变化的说明文字返回 `already`) | 1 张照片,2000 个字符 |
+| `set_gps` | `edition` | 设置整个文件夹或相册的位置;默认只改没有 GPS 的照片(`overwrite` 替换相机 GPS);标记为手动设置 | 1000 张照片 |
 | `export_metadata` | `edition` | 在文件旁写入 XMP 附属文件 | 100 个路径,或 `filters`,或 `target` |
 | `junk_list` | `readonly` | 列出废片清理的候选，可只列某一种 `kind`;`show: true` 会在 `/junk` 上打开该 `kind` | 每页 100 条 |
 | `junk_reject` | `edition` | 淘汰废片清理的候选（与 `batch_set_rejected` 相同） | 1000 个路径,或 `target: "selection"`(仅限图库页面) |

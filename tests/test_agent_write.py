@@ -101,6 +101,7 @@ class TestGrantMatrix:
         "cull_apply": {"action": "copy_keeps", "paths": [P[0]]}, "delete_photos": {"paths": [P[0]]},
         "assign_faces": {"person_id": 999999, "face_ids": [1]},
         "set_caption": {"path": P[0], "caption": "x"}, "export_metadata": {"paths": [P[0]]},
+        "set_gps": {"path_prefix": AGENT_DIR + "nope-folder/", "latitude": 1.0, "longitude": 2.0},
         "override_sequence": {"paths": [AGENT_DIR + "nope1.jpg", AGENT_DIR + "nope2.jpg"], "kind": "panorama"},
         "clear_sequence_override": {"paths": [AGENT_DIR + "nope1.jpg"]},
         "override_category": {"path": AGENT_DIR + "nope1.jpg", "category": "portrait"},

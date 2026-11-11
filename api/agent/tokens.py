@@ -55,10 +55,13 @@ GENERATION_LENGTH = 16
 
 PUBLIC_COLUMNS = ("id", "user_id", "name", "token_prefix", "level", "created_at",
                   "last_used_at", "revoked", "revoked_at", "kind", "addon_id")
-# ``kind`` separates an MCP agent's token (``/mcp`` only) from an add-on's (``/api`` only, under its
-# scopes: api/addons/auth.py). Same prefix, same table, same verifier; the kind is never inferred.
+# ``kind`` separates an MCP agent's token from an add-on's. Both open ``/mcp``; an add-on token sees only
+# the tools its permissions allow (``ADDON_PERMISSION_TOOLS``, api/addons/auth.py) and is refused on ``/api``
+# but for a few listed reads. Same prefix, same table, same verifier; the kind is never inferred.
 KIND_AGENT = "agent"
 KIND_ADDON = "addon"
+# The token kinds ``/mcp`` accepts (every MCP verifier passes it; the default of :func:`verify` stays agent-only).
+MCP_KINDS = (KIND_AGENT, KIND_ADDON)
 
 _last_touched: dict[int, float] = {}
 _touch_lock = threading.Lock()
@@ -195,8 +198,8 @@ def mint(principal: str, name: str, level: str, minted_level: str = "readonly",
 def verify(plaintext: Optional[str], kinds: tuple[str, ...] = (KIND_AGENT,)) -> Optional["TokenGrant"]:
     """The grant behind ``plaintext``, or None when unknown, malformed, revoked or of another kind.
 
-    ``kinds`` defaults to agent tokens only, so an add-on's token can never open ``/mcp``; the
-    add-on verifier (api/addons/auth.py) asks for ``("addon",)``.
+    ``kinds`` defaults to agent tokens only. The ``/mcp`` verifiers ask for :data:`MCP_KINDS`; the
+    ``/api`` add-on verifier (api/addons/auth.py) asks for ``("addon",)``.
 
     Liveness against the owner's credentials is NOT decided here -- that is
     :meth:`TokenGrant.resolve`, which runs on every call. The grant is never local or trusted-local:
@@ -286,6 +289,10 @@ class ResolvedGrant:
     # An open-install edition grant held through ``viewer.edition_password`` from a local /mcp request.
     # Unlike ``trusted_local`` it waives nothing (scanning still needs show_scan_button).
     local_edition: bool = False
+    # An add-on's grant (``kind='addon'``): its id and the tools its permissions allow. ``allowed_tools`` None
+    # = no allowlist (an agent or a session); a set = ``tools/list`` and ``tools/call`` stop at it.
+    addon_id: Optional[str] = None
+    allowed_tools: Optional[frozenset] = None
 
     def jwt_claims(self) -> Optional[dict]:
         """Claims for the 60-second internal JWT, or None on an open install.
@@ -302,7 +309,16 @@ class ResolvedGrant:
         Role and ``edition`` MATCH the effective level: ``CurrentUser.is_edition``
         is derived from the ROLE, so a read-only token of an admin must not carry
         ``admin`` through, or it would reach edition routes on the role alone.
+
+        An add-on grant adds ``mcp_addon`` (its id): the route then knows the write is the add-on's
+        (``created_by`` of a manual tag) and refuses it the add-on management routes.
         """
+        claims = self._base_claims()
+        if claims is not None and self.addon_id is not None:
+            claims["mcp_addon"] = self.addon_id
+        return claims
+
+    def _base_claims(self) -> Optional[dict]:
         if self.anonymous:
             if self.level == "edition" and self.trusted_local:
                 return {"role": self.role, "display_name": "", "edition": True, "mcp": True,
@@ -452,7 +468,21 @@ class TokenGrant:
         return None
 
     def resolve(self) -> Optional[ResolvedGrant]:
-        """Effective grant against the live config, or None when the token is dead."""
+        """Effective grant against the live config, or None when the token is dead.
+
+        An add-on token is also dead while its add-on is not enabled (``addons.enabled`` off, manifest
+        gone); otherwise it carries the add-on id and its tool allowlist, re-read here on every call.
+        """
+        resolved = self._resolve_principal()
+        if resolved is None or self.kind != KIND_ADDON:
+            return resolved
+        from api.addons.auth import addon_scope, allowed_tools
+        scope = addon_scope(self)
+        if scope is None:
+            return None
+        return replace(resolved, addon_id=scope.id, allowed_tools=allowed_tools(scope))
+
+    def _resolve_principal(self) -> Optional[ResolvedGrant]:
         mode = install_mode()
         if mode == "unreadable":
             return None

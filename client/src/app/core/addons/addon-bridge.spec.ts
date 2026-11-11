@@ -1,4 +1,4 @@
-import { MAX_CONTEXT_PATHS, albumIdOf, buildContext, photoOf, readPanelMessage, routeOf } from './addon-bridge';
+import { MAP_SITES, MAX_CONTEXT_PATHS, albumIdOf, buildContext, photoOf, readPanelMessage, routeOf } from './addon-bridge';
 
 describe('add-on bridge v1', () => {
   const frame = {} as Window;
@@ -28,6 +28,21 @@ describe('add-on bridge v1', () => {
     expect(readPanelMessage(msg({ ...base, type: 'show_photos', paths: [1] }), frame, 'n')).toBeNull();
     expect(readPanelMessage(msg({ ...base, type: 'open_photo' }), frame, 'n')).toBeNull();
     expect(readPanelMessage(msg({ ...base, type: 'delete_everything' }), frame, 'n')).toBeNull();
+  });
+
+  it('opens only the two fixed map sites, by key', () => {
+    const base = { v: 1, nonce: 'n' };
+    expect(readPanelMessage(msg({ ...base, type: 'open_map', site: 'earth' }), frame, 'n'))
+      .toEqual({ type: 'open_map', site: 'earth' });
+    expect(readPanelMessage(msg({ ...base, type: 'open_map', site: 'maps' }), frame, 'n'))
+      .toEqual({ type: 'open_map', site: 'maps' });
+    for (const site of ['https://evil.example/', 'toString', '__proto__', '', 1, undefined]) {
+      expect(readPanelMessage(msg({ ...base, type: 'open_map', site }), frame, 'n')).toBeNull();
+    }
+    expect(readPanelMessage(msg({ ...base, type: 'open_map', site: 'maps', url: 'https://x/' }), frame, 'n'))
+      .toEqual({ type: 'open_map', site: 'maps' });
+    expect(Object.values(MAP_SITES).every(u => u.startsWith('https://earth.google.com/') || u.startsWith('https://www.google.com/maps/')))
+      .toBe(true);
   });
 
   it('reads the route, album and photo out of the router URL', () => {
