@@ -2166,6 +2166,16 @@ An add-on with the `import_hook` slot can be picked in the scan dialog under **A
 
 The add-on reads its photos with `GET /api/photos?scan_run=<job id or run number>` (it combines with every other gallery filter and with paging) and the run itself with `GET /api/addons/runs/<job id>` (`photos.read`, its own runs only). A run's photos are the ones it fully (re)saved: `scanned_at` between the run's start and end (or now, while it runs) and under one of the run's directories. A pass that only updates some columns does not mark photos again.
 
+### Started by Facet
+
+An add-on with a `start` block is started by Facet: **Start** on the Add-ons page, or simply **Open** (which starts it first). Starting and stopping need the same rights as starting a scan (multi-user: superadmin; single user: the edition password), plus `addons.enabled`. The request carries only the scope: the program, its arguments and its environment come from the manifest and from Facet.
+
+- Facet runs `start.argv` without a shell, in the manifest's folder, with an environment built from scratch: `PATH`, `SYSTEMROOT`, `USERPROFILE`/`HOME`, `LOCALAPPDATA`, `TEMP`/`TMP`, `LANG`, `FACET_URL`, `FACET_TOKEN`, `FACET_ADDON_ID`, `FACET_LAUNCH_SECRET` (+ `FACET_PORT` when `port` is a number). Nothing else of Facet's environment is passed on.
+- With `"port": "auto"` the add-on binds a free port and prints exactly one line, `FACET_ADDON_PORT=<n>`, on stdout; everything else goes to stderr. Both land in `<facet data>/logs/addons/<id>.log` (**Log** on the Add-ons page).
+- Ready check: Facet calls `<health>?c=<random>` and expects `{"addon": "<id>", "ack": "<hex HMAC-SHA256 of c keyed by FACET_LAUNCH_SECRET>"}` within 30 seconds; until then nothing is forwarded to it. Every request Facet forwards carries `X-Facet-Launch: <secret>`, which the add-on must require, so another program on the same port cannot pose as it. If it does not start, the sidebar says so and shows the last log lines.
+- `FACET_TOKEN` is minted for that launch as the account that pressed Start and revoked when the add-on stops or exits.
+- **Stop**, or Facet exiting, ends the add-on: terminate, wait 5 seconds, kill; on Linux/macOS the whole process group. On Windows the add-on and every process it started run in a job object, so they all end together, also if Facet itself is killed. A crashed add-on is not restarted; the page shows its exit code and the next **Open** starts it again.
+
 ## Capsules
 
 Curated slideshows grouped by theme, generated from your library and cached for `freshness_hours`.

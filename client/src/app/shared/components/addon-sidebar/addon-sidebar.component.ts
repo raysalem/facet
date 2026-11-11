@@ -47,10 +47,18 @@ import { i18nKeys } from '../../../core/i18n/keys';
           <mat-icon>close</mat-icon>
         </button>
       </header>
-      <iframe #frame class="block flex-1 w-full min-h-0 border-0 bg-[var(--mat-sys-surface)]"
-              [class.pointer-events-none]="resizing()"
-              [src]="src()" sandbox="allow-scripts" referrerpolicy="no-referrer"
-              [title]="open.addon.name" (load)="onFrameLoad()"></iframe>
+      @if (open.failure; as failure) {
+        <div class="flex-1 min-h-0 overflow-auto p-3" role="alert" data-addon-failure>
+          <p class="m-0 mb-2 text-sm font-medium">{{ I18N.addons.not_started | translate: { name: open.addon.name } }}</p>
+          @if (failure.error) { <p class="m-0 mb-2 text-sm">{{ failure.error }}</p> }
+          <pre class="m-0 text-xs font-mono whitespace-pre-wrap opacity-80 bg-[var(--mat-sys-surface-container)] rounded p-2">{{ failure.log }}</pre>
+        </div>
+      } @else {
+        <iframe #frame class="block flex-1 w-full min-h-0 border-0 bg-[var(--mat-sys-surface)]"
+                [class.pointer-events-none]="resizing()"
+                [src]="src()" sandbox="allow-scripts" referrerpolicy="no-referrer"
+                [title]="open.addon.name" (load)="onFrameLoad()"></iframe>
+      }
     }
   `,
 })
@@ -76,7 +84,7 @@ export class AddonSidebarComponent {
   /** The proxy URL is the one resource this component frames; the service checked its shape. */
   protected readonly src = computed(() => {
     const open = this.panel();
-    return open ? this.sanitizer.bypassSecurityTrustResourceUrl(open.src) : null;
+    return open?.src ? this.sanitizer.bypassSecurityTrustResourceUrl(open.src) : null;
   });
 
   private readonly selection = computed(() =>

@@ -2166,6 +2166,16 @@ Un module avec l'emplacement `import_hook` peut être choisi dans la boîte de d
 
 Le module lit ses photos avec `GET /api/photos?scan_run=<identifiant de tâche ou numéro d'exécution>` (combinable avec tous les autres filtres de la galerie et la pagination) et l'exécution avec `GET /api/addons/runs/<identifiant de tâche>` (`photos.read`, ses propres exécutions uniquement). Les photos d'une exécution sont celles qu'elle a entièrement (ré)enregistrées : `scanned_at` entre le début et la fin de l'exécution (ou maintenant, tant qu'elle tourne) et sous l'un de ses dossiers. Un passage qui ne met à jour que certaines colonnes ne marque pas les photos à nouveau.
 
+### Démarré par Facet
+
+Un module avec un bloc `start` est démarré par Facet : **Démarrer** sur la page Modules complémentaires, ou simplement **Ouvrir** (qui le démarre d'abord). Démarrer et arrêter exigent les mêmes droits que lancer une analyse (multi-utilisateur : superadmin ; utilisateur unique : le mot de passe d'édition), ainsi que `addons.enabled`. La requête ne porte que la portée : le programme, ses arguments et son environnement viennent du manifeste et de Facet.
+
+- Facet exécute `start.argv` sans shell, dans le dossier du manifeste, avec un environnement construit de zéro : `PATH`, `SYSTEMROOT`, `USERPROFILE`/`HOME`, `LOCALAPPDATA`, `TEMP`/`TMP`, `LANG`, `FACET_URL`, `FACET_TOKEN`, `FACET_ADDON_ID`, `FACET_LAUNCH_SECRET` (+ `FACET_PORT` when `port` is a number). Rien d'autre de l'environnement de Facet n'est transmis.
+- Avec `"port": "auto"`, le module ouvre un port libre et écrit exactement une ligne, `FACET_ADDON_PORT=<n>`, sur stdout ; tout le reste va sur stderr. Les deux arrivent dans `<facet data>/logs/addons/<id>.log` (**Journal** sur la page).
+- Contrôle de disponibilité : Facet appelle `<health>?c=<aléatoire>` et attend `{"addon": "<id>", "ack": "<HMAC-SHA256 hexadécimal de c avec FACET_LAUNCH_SECRET>"}` dans les 30 secondes ; jusque-là rien ne lui est transmis. Chaque requête transmise porte `X-Facet-Launch: <secret>`, que le module doit exiger, pour qu'aucun autre programme sur le même port ne se fasse passer pour lui. S'il ne démarre pas, le panneau latéral l'indique avec les dernières lignes du journal.
+- `FACET_TOKEN` est créé pour ce lancement au nom du compte qui a cliqué sur Démarrer, et révoqué quand le module s'arrête ou se termine.
+- **Arrêter**, ou la fermeture de Facet, met fin au module : terminate, attente de 5 secondes, kill ; sous Linux/macOS tout le groupe de processus. Sous Windows, le module et tous les processus qu'il lance tournent dans un objet job et s'arrêtent ensemble, même si Facet lui-même est tué. Un module planté n'est pas relancé ; la page affiche son code de sortie et le prochain **Ouvrir** le redémarre.
+
 ## Capsules
 
 Diaporamas organisés par thème, générés à partir de votre bibliothèque et mis en cache pendant `freshness_hours`.

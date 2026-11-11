@@ -8,12 +8,16 @@ import type { components } from '../api/schema';
 import type { PanelScope } from './addon-bridge';
 
 export type AddonOpened = components['schemas']['AddonOpened'];
+export type AddonStarted = components['schemas']['AddonStarted'];
+type PanelAddon = Pick<Addon, 'id' | 'name' | 'icon'> & Partial<Pick<Addon, 'mode'>>;
 
 export interface OpenPanel {
-  addon: Pick<Addon, 'id' | 'name' | 'icon'>;
+  addon: PanelAddon;
   nonce: string;
   src: string;
   scope: PanelScope;
+  /** A supervised add-on that did not start: the sidebar shows why and the last log lines. */
+  failure?: { error: string | null; log: string };
 }
 
 const WIDTH_KEY = 'facet_addon_panel_width';
@@ -42,8 +46,9 @@ export class AddonPanelService {
   readonly openError = signal<string | null>(null);
   readonly width = signal(readWidth());
 
-  async open(addon: Pick<Addon, 'id' | 'name' | 'icon'>, scope: PanelScope): Promise<boolean> {
+  async open(addon: PanelAddon, scope: PanelScope): Promise<boolean> {
     this.openError.set(null);
+    if (addon.mode === 'supervised') return this.startAndOpen(addon, scope);
     try {
       const opened = await firstValueFrom(this.api.post<AddonOpened>(
         `/addons/${encodeURIComponent(addon.id)}/open`, { scope }));
@@ -56,6 +61,29 @@ export class AddonPanelService {
     }
   }
 
+  /** A supervised add-on: start it if needed (Facet runs it), then open its panel in one call. */
+  private async startAndOpen(addon: PanelAddon, scope: PanelScope): Promise<boolean> {
+    try {
+      const started = await firstValueFrom(this.api.post<AddonStarted>(
+        `/addons/${encodeURIComponent(addon.id)}/start`, { scope }));
+      if (!started.opened) throw new Error('No panel was opened');
+      this.adopt(addon, started.opened);
+      return true;
+    } catch (err) {
+      const detail = err instanceof HttpErrorResponse ? err.error?.detail : null;
+      if (detail && typeof detail === 'object' && 'status' in detail) {
+        // It did not start: show that in the sidebar, with the log tail the server sent.
+        this.closeQuietly();
+        this.panel.set({ addon, nonce: '', src: '', scope,
+          failure: { error: typeof detail.error === 'string' ? detail.error : null,
+            log: Array.isArray(detail.log_tail) ? detail.log_tail.filter((l: unknown) => typeof l === 'string').join('\n') : '' } });
+        return false;
+      }
+      this.openError.set(typeof detail === 'string' ? detail : addon.name);
+      return false;
+    }
+  }
+
   /** The scope "opened by hand": the selection when there is one, else the gallery's current view. */
   currentScope(): PanelScope {
     if (this.gallery.selectionScope() === 'paths' && this.gallery.selectedPaths().size > 0) return { kind: 'selection' };
@@ -63,12 +91,12 @@ export class AddonPanelService {
     return { kind: 'view', query: new URLSearchParams(filters).toString().slice(0, 2048) };
   }
 
-  openForCurrentView(addon: Pick<Addon, 'id' | 'name' | 'icon'>): Promise<boolean> {
+  openForCurrentView(addon: PanelAddon): Promise<boolean> {
     return this.open(addon, this.currentScope());
   }
 
   /** Show a panel the server already opened (the supervisor's start returns one). */
-  adopt(addon: Pick<Addon, 'id' | 'name' | 'icon'>, opened: AddonOpened): void {
+  adopt(addon: PanelAddon, opened: AddonOpened): void {
     // Only ever frame the add-on proxy: the src comes from our own server, but check its shape anyway.
     if (!opened.src.startsWith(`/addons/${addon.id}/`)) throw new Error('Unexpected add-on panel source');
     this.closeQuietly();
@@ -88,7 +116,7 @@ export class AddonPanelService {
 
   private closeQuietly(): void {
     const current = this.panel();
-    if (!current) return;
+    if (!current || !current.nonce) return;
     void firstValueFrom(this.api.post(`/addons/${encodeURIComponent(current.addon.id)}/close`, { nonce: current.nonce }))
       .catch(() => undefined);
   }

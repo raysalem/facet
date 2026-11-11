@@ -2158,6 +2158,16 @@ Um complemento com a ranhura `import_hook` pode ser escolhido no diálogo de an�
 
 O complemento lê as suas fotos com `GET /api/photos?scan_run=<id de tarefa ou número de execução>` (combinável com todos os outros filtros da galeria e com a paginação) e a execução com `GET /api/addons/runs/<id de tarefa>` (`photos.read`, só as suas execuções). As fotos de uma execução são as que ela guardou (de novo) por inteiro: `scanned_at` entre o início e o fim da execução (ou agora, enquanto decorre) e dentro de uma das suas pastas. Uma passagem que só atualiza algumas colunas não volta a marcar as fotos.
 
+### Iniciado pelo Facet
+
+Um complemento com um bloco `start` é iniciado pelo Facet: **Iniciar** na página Complementos, ou simplesmente **Abrir** (que o inicia primeiro). Iniciar e parar exigem os mesmos direitos que iniciar uma análise (multiutilizador: superadmin; utilizador único: a palavra-passe de edição), mais `addons.enabled`. O pedido leva apenas o âmbito: o programa, os argumentos e o ambiente vêm do manifesto e do Facet.
+
+- O Facet executa `start.argv` sem shell, na pasta do manifesto, com um ambiente construído de raiz: `PATH`, `SYSTEMROOT`, `USERPROFILE`/`HOME`, `LOCALAPPDATA`, `TEMP`/`TMP`, `LANG`, `FACET_URL`, `FACET_TOKEN`, `FACET_ADDON_ID`, `FACET_LAUNCH_SECRET` (+ `FACET_PORT` when `port` is a number). Nada mais do ambiente do Facet é passado.
+- Com `"port": "auto"` o complemento abre uma porta livre e escreve exatamente uma linha, `FACET_ADDON_PORT=<n>`, no stdout; tudo o resto vai para o stderr. Ambos vão para `<facet data>/logs/addons/<id>.log` (**Registo** na página).
+- Verificação de prontidão: o Facet chama `<health>?c=<aleatório>` e espera `{"addon": "<id>", "ack": "<HMAC-SHA256 hexadecimal de c com FACET_LAUNCH_SECRET>"}` em 30 segundos; até lá nada lhe é reencaminhado. Cada pedido reencaminhado leva `X-Facet-Launch: <secret>`, que o complemento deve exigir, para que nenhum outro programa na mesma porta se faça passar por ele. Se não arrancar, o painel lateral indica-o com as últimas linhas do registo.
+- `FACET_TOKEN` é criado para esse arranque em nome da conta que carregou em Iniciar e revogado quando o complemento para ou termina.
+- **Parar**, ou o fecho do Facet, termina o complemento: terminate, espera de 5 segundos, kill; em Linux/macOS todo o grupo de processos. No Windows o complemento e todos os processos que inicia correm num objeto job e terminam juntos, mesmo que o próprio Facet seja morto. Um complemento que falhou não é reiniciado; a página mostra o código de saída e o próximo **Abrir** volta a iniciá-lo.
+
 ## Capsules
 
 Diaporamas (slideshows) curados e agrupados por tema, gerados a partir da sua biblioteca e armazenados em cache por `freshness_hours`.

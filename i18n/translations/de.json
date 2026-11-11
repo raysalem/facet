@@ -4221,7 +4221,11 @@
     },
     "status": {
       "external": "Extern",
-      "stopped": "Gestoppt"
+      "stopped": "Gestoppt",
+      "starting": "Startet",
+      "running": "Läuft",
+      "exited": "Beendet",
+      "failed": "Start fehlgeschlagen"
     },
     "token": {
       "create": "Zugriffstoken erstellen",
@@ -4243,6 +4247,12 @@
     "after_import_none": "Nichts",
     "import_done": "Import abgeschlossen. {name} für {count} Fotos öffnen?",
     "pending_title": "Importe, die auf ein Add-on warten",
-    "pending_run": "Ausstehend: Lauf #{run} · {count} Fotos"
+    "pending_run": "Ausstehend: Lauf #{run} · {count} Fotos",
+    "start": "Starten",
+    "stop": "Stoppen",
+    "log": "Protokoll",
+    "log_empty": "Das Protokoll ist leer.",
+    "exit_code": "Exit-Code {code}",
+    "not_started": "{name} ist nicht gestartet"
   }
 }

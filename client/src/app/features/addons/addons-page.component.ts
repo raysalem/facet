@@ -58,12 +58,35 @@ import { i18nKeys } from '../../core/i18n/keys';
                 <li class="text-xs rounded px-2 py-0.5 bg-[var(--mat-sys-surface-container)]">{{ ('addons.permission.' + permission) | translate }}</li>
               }
             </ul>
-            @if (addon.slots | includes: 'sidebar') {
-              <div class="flex flex-wrap items-center gap-2 mt-3">
-                <button mat-flat-button data-addon-open (click)="open(addon)">
+            <div class="flex flex-wrap items-center gap-2 mt-3">
+              @if (addon.slots | includes: 'sidebar') {
+                <button mat-flat-button data-addon-open [disabled]="busy() === addon.id" (click)="open(addon)">
                   <mat-icon>open_in_new</mat-icon>{{ I18N.addons.open | translate }}
                 </button>
-              </div>
+              }
+              @if (addon.mode === 'supervised') {
+                @if (addon.status === 'running' || addon.status === 'starting') {
+                  <button mat-stroked-button data-addon-stop [disabled]="busy() === addon.id" (click)="stop(addon.id)">
+                    <mat-icon>stop</mat-icon>{{ I18N.addons.stop | translate }}
+                  </button>
+                } @else {
+                  <button mat-stroked-button data-addon-start [disabled]="busy() === addon.id" (click)="start(addon.id)">
+                    <mat-icon>play_arrow</mat-icon>{{ I18N.addons.start | translate }}
+                  </button>
+                }
+                @if (addon.exit_code !== null && addon.exit_code !== undefined && addon.status !== 'running') {
+                  <span class="text-xs" data-addon-exit>{{ I18N.addons.exit_code | translate: { code: addon.exit_code } }}</span>
+                }
+              }
+            </div>
+            @if (addon.error) {
+              <p role="alert" class="text-sm text-red-400 mt-2 mb-0" data-addon-error>{{ addon.error }}</p>
+            }
+            @if (addon.mode === 'supervised') {
+              <details class="mt-2" [open]="addon.status === 'failed'" (toggle)="toggleLog(addon.id, $event)" data-addon-log>
+                <summary class="cursor-pointer text-sm">{{ I18N.addons.log | translate }}</summary>
+                <pre class="mt-1 mb-0 text-xs font-mono whitespace-pre-wrap max-h-64 overflow-y-auto opacity-80 bg-[var(--mat-sys-surface-container)] rounded p-2">{{ logs()[addon.id] || (I18N.addons.log_empty | translate) }}</pre>
+              </details>
             }
             @if (addon.mode === 'external') {
               <div class="flex flex-wrap items-center gap-2 mt-3">
@@ -125,6 +148,9 @@ export class AddonsPageComponent implements OnInit {
   protected readonly mintError = signal(false);
   protected readonly panels = inject(AddonPanelService);
   private readonly imports = inject(AddonImportNotifier);
+  /** The add-on a Start/Stop/Open is in flight for. */
+  protected readonly busy = signal<string | null>(null);
+  protected readonly logs = signal<Record<string, string>>({});
 
   ngOnInit(): void {
     void this.addons.load();
@@ -136,7 +162,44 @@ export class AddonsPageComponent implements OnInit {
 
   /** Open the add-on's sidebar for the gallery's current view or selection. */
   protected async open(addon: Addon): Promise<void> {
-    await this.panels.openForCurrentView(addon);
+    this.busy.set(addon.id);
+    try {
+      await this.panels.openForCurrentView(addon);
+    } finally {
+      this.busy.set(null);
+      if (addon.mode === 'supervised') void this.addons.load();
+    }
+  }
+
+  protected async start(id: string): Promise<void> {
+    await this.run(id, () => this.addons.start(id));
+  }
+
+  protected async stop(id: string): Promise<void> {
+    await this.run(id, () => this.addons.stop(id));
+  }
+
+  private async run(id: string, action: () => Promise<void>): Promise<void> {
+    this.busy.set(id);
+    try {
+      await action();
+    } catch {
+      // The refreshed list carries the reason (status, error, exit code).
+    } finally {
+      this.busy.set(null);
+      await this.reloadLog(id);
+    }
+  }
+
+  protected toggleLog(id: string, event: Event): void {
+    if ((event.target as HTMLDetailsElement).open) void this.reloadLog(id);
+  }
+
+  private async reloadLog(id: string): Promise<void> {
+    try {
+      const lines = await this.addons.log(id);
+      this.logs.update(current => ({ ...current, [id]: lines.join('\n') }));
+    } catch { /* the page still shows status and error */ }
   }
 
   /** Open an after-import run that nobody opened yet (the browser was closed when it finished). */

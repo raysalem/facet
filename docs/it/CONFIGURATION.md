@@ -2170,6 +2170,16 @@ Un componente con lo slot `import_hook` si può scegliere nella finestra di scan
 
 Il componente legge le sue foto con `GET /api/photos?scan_run=<id del processo o numero di esecuzione>` (combinabile con tutti gli altri filtri della galleria e con la paginazione) e l'esecuzione con `GET /api/addons/runs/<id del processo>` (`photos.read`, solo le proprie esecuzioni). Le foto di un'esecuzione sono quelle che ha salvato (di nuovo) per intero: `scanned_at` tra inizio e fine dell'esecuzione (o adesso, mentre è in corso) e sotto una delle sue cartelle. Un passaggio che aggiorna solo alcune colonne non contrassegna di nuovo le foto.
 
+### Avviato da Facet
+
+Un componente con un blocco `start` viene avviato da Facet: **Avvia** nella pagina Componenti aggiuntivi, o semplicemente **Apri** (che prima lo avvia). Avviare e fermare richiedono gli stessi diritti dell'avvio di una scansione (multiutente: superadmin; utente singolo: la password di modifica), più `addons.enabled`. La richiesta porta solo l'ambito: programma, argomenti e ambiente vengono dal manifesto e da Facet.
+
+- Facet esegue `start.argv` senza shell, nella cartella del manifesto, con un ambiente costruito da zero: `PATH`, `SYSTEMROOT`, `USERPROFILE`/`HOME`, `LOCALAPPDATA`, `TEMP`/`TMP`, `LANG`, `FACET_URL`, `FACET_TOKEN`, `FACET_ADDON_ID`, `FACET_LAUNCH_SECRET` (+ `FACET_PORT` when `port` is a number). Nient'altro dell'ambiente di Facet viene passato.
+- Con `"port": "auto"` il componente apre una porta libera e stampa esattamente una riga, `FACET_ADDON_PORT=<n>`, su stdout; tutto il resto va su stderr. Entrambi finiscono in `<facet data>/logs/addons/<id>.log` (**Registro** nella pagina).
+- Controllo di disponibilità: Facet chiama `<health>?c=<casuale>` e attende `{"addon": "<id>", "ack": "<HMAC-SHA256 esadecimale di c con FACET_LAUNCH_SECRET>"}` entro 30 secondi; fino ad allora non gli viene inoltrato nulla. Ogni richiesta inoltrata porta `X-Facet-Launch: <secret>`, che il componente deve richiedere, così nessun altro programma sulla stessa porta può spacciarsi per lui. Se non si avvia, il pannello laterale lo segnala con le ultime righe del registro.
+- `FACET_TOKEN` viene creato per quell'avvio a nome dell'account che ha premuto Avvia e revocato quando il componente si ferma o termina.
+- **Ferma**, o la chiusura di Facet, termina il componente: terminate, attesa di 5 secondi, kill; su Linux/macOS l'intero gruppo di processi. Su Windows il componente e tutti i processi che avvia girano in un oggetto job e terminano insieme, anche se Facet stesso viene ucciso. Un componente andato in crash non viene riavviato; la pagina mostra il codice di uscita e il successivo **Apri** lo riavvia.
+
 ## Capsules
 
 Diaporame curati raggruppati per tema, generati dalla tua libreria e memorizzati in cache per `freshness_hours`.

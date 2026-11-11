@@ -2179,6 +2179,16 @@ Ein Add-on mit dem Slot `import_hook` lässt sich im Scan-Dialog unter **Nach de
 
 Das Add-on liest seine Fotos mit `GET /api/photos?scan_run=<Job-ID oder Laufnummer>` (kombinierbar mit allen anderen Galeriefiltern und dem Blättern) und den Lauf mit `GET /api/addons/runs/<Job-ID>` (`photos.read`, nur eigene Läufe). Die Fotos eines Laufs sind die, die er vollständig (neu) gespeichert hat: `scanned_at` zwischen Start und Ende des Laufs (oder jetzt, solange er läuft) und unter einem seiner Ordner. Ein Durchgang, der nur einzelne Spalten aktualisiert, markiert Fotos nicht erneut.
 
+### Von Facet gestartet
+
+Ein Add-on mit `start`-Block wird von Facet gestartet: **Starten** auf der Seite Add-ons oder einfach **Öffnen** (startet es vorher). Starten und Stoppen erfordern dieselben Rechte wie ein Scan (Mehrbenutzer: Superadmin; Einzelbenutzer: das Bearbeitungspasswort) sowie `addons.enabled`. Die Anfrage trägt nur den Bereich: Programm, Argumente und Umgebung kommen aus dem Manifest und von Facet.
+
+- Facet führt `start.argv` ohne Shell im Ordner des Manifests aus, mit einer neu aufgebauten Umgebung: `PATH`, `SYSTEMROOT`, `USERPROFILE`/`HOME`, `LOCALAPPDATA`, `TEMP`/`TMP`, `LANG`, `FACET_URL`, `FACET_TOKEN`, `FACET_ADDON_ID`, `FACET_LAUNCH_SECRET` (+ `FACET_PORT` when `port` is a number). Sonst wird nichts aus Facets Umgebung weitergegeben.
+- Mit `"port": "auto"` bindet das Add-on einen freien Port und gibt auf stdout genau eine Zeile `FACET_ADDON_PORT=<n>` aus; alles andere geht nach stderr. Beides landet in `<facet data>/logs/addons/<id>.log` (**Protokoll** auf der Seite Add-ons).
+- Bereitschaftsprüfung: Facet ruft `<health>?c=<zufällig>` auf und erwartet binnen 30 Sekunden `{"addon": "<id>", "ack": "<hex HMAC-SHA256 von c mit FACET_LAUNCH_SECRET>"}`; bis dahin wird nichts weitergeleitet. Jede weitergeleitete Anfrage trägt `X-Facet-Launch: <secret>`, das das Add-on verlangen muss, damit sich kein anderes Programm auf demselben Port als es ausgeben kann. Startet es nicht, zeigt die Seitenleiste das mit den letzten Protokollzeilen an.
+- `FACET_TOKEN` wird für diesen Start im Namen des Kontos erstellt, das Starten gedrückt hat, und widerrufen, wenn das Add-on stoppt oder endet.
+- **Stoppen** oder das Beenden von Facet beendet das Add-on: terminate, 5 Sekunden warten, kill; unter Linux/macOS die ganze Prozessgruppe. Unter Windows laufen das Add-on und alle seine Prozesse in einem Job-Objekt und enden gemeinsam, auch wenn Facet selbst abgeschossen wird. Ein abgestürztes Add-on wird nicht neu gestartet; die Seite zeigt den Exit-Code, und das nächste **Öffnen** startet es wieder.
+
 ## Capsules
 
 Kuratierte Foto-Diaschauen (Slideshows), nach Thema gruppiert, aus Ihrer Bibliothek erzeugt und für `freshness_hours` zwischengespeichert.

@@ -4236,6 +4236,10 @@ export const I18N = {
     status: {
       external: "addons.status.external",
       stopped: "addons.status.stopped",
+      starting: "addons.status.starting",
+      running: "addons.status.running",
+      exited: "addons.status.exited",
+      failed: "addons.status.failed",
     },
     token: {
       create: "addons.token.create",
@@ -4258,6 +4262,12 @@ export const I18N = {
     import_done: "addons.import_done",
     pending_title: "addons.pending_title",
     pending_run: "addons.pending_run",
+    start: "addons.start",
+    stop: "addons.stop",
+    log: "addons.log",
+    log_empty: "addons.log_empty",
+    exit_code: "addons.exit_code",
+    not_started: "addons.not_started",
   },
 } as const;
 

@@ -4221,7 +4221,11 @@
     },
     "status": {
       "external": "Esterno",
-      "stopped": "Fermo"
+      "stopped": "Fermo",
+      "starting": "Avvio",
+      "running": "In esecuzione",
+      "exited": "Terminato",
+      "failed": "Avvio non riuscito"
     },
     "token": {
       "create": "Crea token di accesso",
@@ -4243,6 +4247,12 @@
     "after_import_none": "Niente",
     "import_done": "Importazione completata. Aprire {name} per {count} foto?",
     "pending_title": "Importazioni in attesa di un componente",
-    "pending_run": "In attesa: esecuzione n. {run} · {count} foto"
+    "pending_run": "In attesa: esecuzione n. {run} · {count} foto",
+    "start": "Avvia",
+    "stop": "Ferma",
+    "log": "Registro",
+    "log_empty": "Il registro è vuoto.",
+    "exit_code": "Codice di uscita {code}",
+    "not_started": "{name} non si è avviato"
   }
 }

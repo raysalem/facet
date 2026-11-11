@@ -4221,7 +4221,11 @@
     },
     "status": {
       "external": "外部",
-      "stopped": "已停止"
+      "stopped": "已停止",
+      "starting": "正在启动",
+      "running": "运行中",
+      "exited": "已退出",
+      "failed": "启动失败"
     },
     "token": {
       "create": "创建访问令牌",
@@ -4243,6 +4247,12 @@
     "after_import_none": "无",
     "import_done": "导入完成。要为 {count} 张照片打开 {name} 吗？",
     "pending_title": "等待附加组件处理的导入",
-    "pending_run": "待处理：第 {run} 次运行 · {count} 张照片"
+    "pending_run": "待处理：第 {run} 次运行 · {count} 张照片",
+    "start": "启动",
+    "stop": "停止",
+    "log": "日志",
+    "log_empty": "日志为空。",
+    "exit_code": "退出代码 {code}",
+    "not_started": "{name} 未能启动"
   }
 }

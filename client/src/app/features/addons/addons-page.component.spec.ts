@@ -31,6 +31,9 @@ describe('Add-ons page', () => {
   let openForCurrentView: ReturnType<typeof vi.fn>;
   const openError = signal<string | null>(null);
   let openRun: ReturnType<typeof vi.fn>;
+  let start: ReturnType<typeof vi.fn>;
+  let stop: ReturnType<typeof vi.fn>;
+  let log: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     list.set(null); loadError.set(false);
@@ -40,8 +43,11 @@ describe('Add-ons page', () => {
     openForCurrentView = vi.fn(async () => true);
     openError.set(null);
     openRun = vi.fn(async () => true);
+    start = vi.fn(async () => undefined);
+    stop = vi.fn(async () => undefined);
+    log = vi.fn(async () => ['line one', 'line two']);
     TestBed.configureTestingModule({ imports: [AddonsPageComponent], providers: [
-      { provide: AddonsService, useValue: { list, loadError, load, mintToken, revokeTokens } },
+      { provide: AddonsService, useValue: { list, loadError, load, mintToken, revokeTokens, start, stop, log } },
       { provide: AddonPanelService, useValue: { openForCurrentView, openError } },
       { provide: AddonImportNotifier, useValue: { openRun } },
       { provide: I18nService, useValue: { t: (key: string, params?: Record<string, unknown>) => key + (params ? ' ' + Object.values(params).join(' ') : ''), translations: signal({}), currentLang: signal('en') } },
@@ -96,6 +102,34 @@ describe('Add-ons page', () => {
     (row.querySelector('[data-pending-open]') as HTMLButtonElement).click();
     await settle();
     expect(openRun).toHaveBeenCalledWith(expect.objectContaining({ id: 'astro' }), 'f'.repeat(32));
+  });
+
+  it('starts and stops a supervised add-on and shows its log', async () => {
+    await settle();
+    expect(root.querySelector('[data-addon="astro"] [data-addon-start]')).toBeNull();
+    (root.querySelector('[data-addon="local"] [data-addon-start]') as HTMLButtonElement).click();
+    await vi.waitFor(() => expect(log).toHaveBeenCalledWith('local'));
+    expect(start).toHaveBeenCalledWith('local');
+    fixture.detectChanges();
+    expect(root.querySelector('[data-addon="local"] [data-addon-log] pre')?.textContent).toContain('line one\nline two');
+    const running = listing();
+    running.addons[1] = { ...running.addons[1], status: 'running' };
+    list.set(running);
+    fixture.detectChanges();
+    (root.querySelector('[data-addon="local"] [data-addon-stop]') as HTMLButtonElement).click();
+    await settle();
+    expect(stop).toHaveBeenCalledWith('local');
+  });
+
+  it('shows why a supervised add-on failed and its exit code', async () => {
+    await settle();
+    const failed = listing();
+    failed.addons[1] = { ...failed.addons[1], status: 'failed', exit_code: 2, error: 'did not answer its health check in time' };
+    list.set(failed);
+    fixture.detectChanges();
+    expect(root.querySelector('[data-addon="local"] [data-addon-error]')?.textContent).toContain('health check');
+    expect(root.querySelector('[data-addon="local"] [data-addon-exit]')?.textContent).toContain('addons.exit_code 2');
+    expect((root.querySelector('[data-addon="local"] [data-addon-log]') as HTMLDetailsElement).open).toBe(true);
   });
 
   it('says so when nothing is installed', async () => {

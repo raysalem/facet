@@ -4221,7 +4221,11 @@
     },
     "status": {
       "external": "Externo",
-      "stopped": "Detenido"
+      "stopped": "Detenido",
+      "starting": "Iniciando",
+      "running": "En ejecución",
+      "exited": "Finalizado",
+      "failed": "Error al iniciar"
     },
     "token": {
       "create": "Crear token de acceso",
@@ -4243,6 +4247,12 @@
     "after_import_none": "Nada",
     "import_done": "Importación terminada. ¿Abrir {name} para {count} fotos?",
     "pending_title": "Importaciones a la espera de un complemento",
-    "pending_run": "Pendiente: ejecución n.º {run} · {count} fotos"
+    "pending_run": "Pendiente: ejecución n.º {run} · {count} fotos",
+    "start": "Iniciar",
+    "stop": "Detener",
+    "log": "Registro",
+    "log_empty": "El registro está vacío.",
+    "exit_code": "Código de salida {code}",
+    "not_started": "{name} no se inició"
   }
 }

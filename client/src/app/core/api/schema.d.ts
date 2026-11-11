@@ -66,6 +66,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/addons/{addon_id}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Addon Log
+         * @description The tail of ``<facet data>/logs/addons/<id>.log``.
+         */
+        get: operations["addon_log_api_addons__addon_id__log_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/addons/{addon_id}/open": {
         parameters: {
             query?: never;
@@ -80,6 +100,49 @@ export interface paths {
          * @description Open the add-on's sidebar for ``scope``: a fresh per-open nonce and the iframe ``src``.
          */
         post: operations["open_panel_api_addons__addon_id__open_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/addons/{addon_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Addon
+         * @description Start a supervised add-on (or keep the running one) and, with ``scope``, open its panel.
+         *
+         *     Takes ``{scope}`` only: the program, its arguments and its environment come from the manifest
+         *     on disk and from Facet, never from the request.
+         */
+        post: operations["start_addon_api_addons__addon_id__start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/addons/{addon_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop Addon
+         * @description Stop a supervised add-on: its process tree ends, its launch token is revoked, its panels close.
+         */
+        post: operations["stop_addon_api_addons__addon_id__stop_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6168,6 +6231,10 @@ export interface components {
         };
         /** AddonItem */
         AddonItem: {
+            /** Error */
+            error?: string | null;
+            /** Exit Code */
+            exit_code?: number | null;
             /** Facet Api */
             facet_api: number;
             /** Icon */
@@ -6179,6 +6246,8 @@ export interface components {
              * @default 0
              */
             live_tokens?: number;
+            /** Log Tail */
+            log_tail?: string[] | null;
             /**
              * Mode
              * @enum {string}
@@ -6210,6 +6279,13 @@ export interface components {
             pending_runs?: components["schemas"]["AddonRun"][];
             /** Refused */
             refused: components["schemas"]["RefusedManifest"][];
+        };
+        /** AddonLog */
+        AddonLog: {
+            /** Addon Id */
+            addon_id: string;
+            /** Lines */
+            lines: string[];
         };
         /**
          * AddonOpenRequest
@@ -6260,6 +6336,35 @@ export interface components {
             started_at?: string | null;
             /** Status */
             status?: string | null;
+        };
+        /**
+         * AddonStartRequest
+         * @description ``scope`` as for ``/open``; when given, the started add-on's panel is opened for it.
+         */
+        AddonStartRequest: {
+            /** Scope */
+            scope?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** AddonStarted */
+        AddonStarted: {
+            /** Addon Id */
+            addon_id: string;
+            /** Error */
+            error?: string | null;
+            /** Log Tail */
+            log_tail?: string[] | null;
+            opened?: components["schemas"]["AddonOpened"] | null;
+            /** Status */
+            status: string;
+        };
+        /** AddonStopped */
+        AddonStopped: {
+            /** Addon Id */
+            addon_id: string;
+            /** Stopped */
+            stopped: boolean;
         };
         /**
          * AddonTokenCreated
@@ -12374,6 +12479,46 @@ export interface operations {
             };
         };
     };
+    addon_log_api_addons__addon_id__log_get: {
+        parameters: {
+            query?: {
+                lines?: number;
+            };
+            header?: never;
+            path: {
+                addon_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddonLog"];
+                };
+            };
+            /** @description Unknown add-on, or add-ons are disabled. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     open_panel_api_addons__addon_id__open_post: {
         parameters: {
             query?: never;
@@ -12418,6 +12563,105 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    start_addon_api_addons__addon_id__start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                addon_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddonStartRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddonStarted"];
+                };
+            };
+            /** @description Unknown add-on, or add-ons are disabled. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not a supervised add-on. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The scope failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The add-on did not start; the body carries the reason and the log tail. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    stop_addon_api_addons__addon_id__stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                addon_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddonStopped"];
+                };
+            };
+            /** @description Unknown add-on, or add-ons are disabled. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not a supervised add-on. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

@@ -10,9 +10,9 @@ and, for minting, a human session (an agent or add-on credential can never mint 
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from api.addons import manifest, panels, proxy, runs
+from api.addons import manifest, panels, proxy, runs, supervisor
 from api.addons.auth import register_routes
 from api.addons.auth import live_addon_tokens, mint_addon_token, revoke_addon_tokens
 from api.auth import (
@@ -21,7 +21,7 @@ from api.auth import (
 )
 from api.config import is_multi_user_enabled
 from api.models.addons import (
-    AddonClosed, AddonCloseRequest, AddonList, AddonRun, AddonOpened, AddonOpenRequest, AddonTokenCreated,
+    AddonClosed, AddonCloseRequest, AddonList, AddonLog, AddonRun, AddonStarted, AddonStartRequest, AddonStopped, AddonOpened, AddonOpenRequest, AddonTokenCreated,
     AddonTokensRevoked,
 )
 
@@ -168,3 +168,68 @@ register_routes(lambda: {("GET", get_addon_run): "photos.read"})
 panels.IMPORT_RUN_CHECKS.append(runs.is_run_of)
 panels.IMPORT_OPENED.append(runs.mark_opened)
 LIST_EXTRAS.append(lambda: {"pending_runs": runs.pending_runs()})
+
+
+def facet_url(request: Request) -> str:
+    """Where a supervised add-on on this machine reaches Facet: loopback on the port this server listens on."""
+    server = request.scope.get("server") or ("127.0.0.1", 5000)
+    host, port = server[0], server[1]
+    if host in ("0.0.0.0", "::", "", "localhost", "::1") or host is None:
+        host = "127.0.0.1"
+    return f"http://{host}:{port}"
+
+
+def supervised_or_409(addon_id: str) -> manifest.Addon:
+    addon = addon_or_404(addon_id)
+    if not addon.supervised:
+        raise HTTPException(status_code=409, detail="This add-on is not started by Facet (no start block)")
+    return addon
+
+
+@router.post(
+    "/{addon_id}/start",
+    response_model=AddonStarted,
+    responses={404: {"description": "Unknown add-on, or add-ons are disabled."},
+               409: {"description": "Not a supervised add-on."},
+               422: {"description": "The scope failed validation."},
+               502: {"description": "The add-on did not start; the body carries the reason and the log tail."}},
+)
+def start_addon(addon_id: str, body: AddonStartRequest, request: Request,
+                user: CurrentUser = Depends(require_addon_operator)):
+    """Start a supervised add-on (or keep the running one) and, with ``scope``, open its panel.
+
+    Takes ``{scope}`` only: the program, its arguments and its environment come from the manifest
+    on disk and from Facet, never from the request.
+    """
+    addon = supervised_or_409(addon_id)
+    scope = panels.validate_scope(addon.id, body.scope) if body.scope is not None else None
+    inst = supervisor.start(addon, user, facet_url(request))
+    if inst.status != "running":
+        raise HTTPException(status_code=502, detail={
+            "addon_id": addon.id, "status": inst.status, "error": inst.error,
+            "log_tail": supervisor.log_tail(addon.id)})
+    opened = open_addon_panel(addon, scope) if scope is not None and "sidebar" in addon.slots else None
+    return {"addon_id": addon.id, "status": inst.status, "opened": opened}
+
+
+@router.post("/{addon_id}/stop", response_model=AddonStopped,
+             responses={404: {"description": "Unknown add-on, or add-ons are disabled."},
+                        409: {"description": "Not a supervised add-on."}})
+def stop_addon(addon_id: str, _user: CurrentUser = Depends(require_addon_operator)):
+    """Stop a supervised add-on: its process tree ends, its launch token is revoked, its panels close."""
+    addon = supervised_or_409(addon_id)
+    return {"addon_id": addon.id, "stopped": supervisor.stop(addon.id)}
+
+
+@router.get("/{addon_id}/log", response_model=AddonLog,
+            responses={404: {"description": "Unknown add-on, or add-ons are disabled."}})
+def addon_log(addon_id: str, lines: int = Query(200, ge=1, le=1000),
+              _user: CurrentUser = Depends(require_addon_operator)):
+    """The tail of ``<facet data>/logs/addons/<id>.log``."""
+    addon = addon_or_404(addon_id)
+    return {"addon_id": addon.id, "lines": supervisor.log_tail(addon.id, lines)}
+
+
+# The supervisor plugs into the shared surfaces: live status on the list, and the proxy's upstream.
+STATUS_PROVIDERS.append(supervisor.status)
+proxy.UPSTREAMS.insert(0, supervisor.upstream)

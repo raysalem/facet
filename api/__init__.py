@@ -4,6 +4,7 @@ FastAPI application factory for the Facet API server.
 Replaces Flask viewer — serves JSON API + Angular static files.
 """
 
+import asyncio
 import logging
 import math
 import os
@@ -565,6 +566,9 @@ async def lifespan(app: FastAPI):
     _plugin_mgr = get_plugin_manager()
     if _plugin_mgr is not None:
         _plugin_mgr.shutdown()
+    # Stop every add-on this server started (their tokens are revoked with them).
+    from api.addons import supervisor as addon_supervisor
+    await asyncio.to_thread(addon_supervisor.stop_all)
     from api.addons import proxy as addon_proxy
     await addon_proxy.aclose()
 

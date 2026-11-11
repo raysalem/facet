@@ -4221,7 +4221,11 @@
     },
     "status": {
       "external": "Externe",
-      "stopped": "Arrêté"
+      "stopped": "Arrêté",
+      "starting": "Démarrage",
+      "running": "En cours",
+      "exited": "Terminé",
+      "failed": "Échec du démarrage"
     },
     "token": {
       "create": "Créer un jeton d'accès",
@@ -4243,6 +4247,12 @@
     "after_import_none": "Rien",
     "import_done": "Import terminé. Ouvrir {name} pour {count} photos ?",
     "pending_title": "Imports en attente d'un module",
-    "pending_run": "En attente : exécution n° {run} · {count} photos"
+    "pending_run": "En attente : exécution n° {run} · {count} photos",
+    "start": "Démarrer",
+    "stop": "Arrêter",
+    "log": "Journal",
+    "log_empty": "Le journal est vide.",
+    "exit_code": "Code de sortie {code}",
+    "not_started": "{name} n'a pas démarré"
   }
 }

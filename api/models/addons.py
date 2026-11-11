@@ -15,9 +15,13 @@ class AddonItem(BaseModel):
     permissions: list[str]
     mode: Literal["supervised", "external"]
     ui_path: str
-    # external | stopped (supervised add-ons get live states with the supervisor)
+    # external | stopped | starting | running | exited | failed
     status: str
     live_tokens: int = 0
+    # Supervised add-ons: the last exit code, why a start failed, and the log tail after a failure.
+    exit_code: Optional[int] = None
+    error: Optional[str] = None
+    log_tail: Optional[list[str]] = None
 
 
 class RefusedManifest(BaseModel):
@@ -81,3 +85,27 @@ class AddonCloseRequest(BaseModel):
 
 class AddonClosed(BaseModel):
     closed: bool
+
+
+class AddonStartRequest(BaseModel):
+    """``scope`` as for ``/open``; when given, the started add-on's panel is opened for it."""
+
+    scope: Optional[dict[str, Any]] = None
+
+
+class AddonStarted(BaseModel):
+    addon_id: str
+    status: str
+    error: Optional[str] = None
+    log_tail: Optional[list[str]] = None
+    opened: Optional[AddonOpened] = None
+
+
+class AddonStopped(BaseModel):
+    addon_id: str
+    stopped: bool
+
+
+class AddonLog(BaseModel):
+    addon_id: str
+    lines: list[str]

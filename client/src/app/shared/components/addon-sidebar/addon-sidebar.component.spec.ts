@@ -75,6 +75,17 @@ describe('add-on sidebar host', () => {
     expect(close).not.toHaveBeenCalled();
   });
 
+  it("shows a supervised add-on that didn't start, with its log, and no frame", () => {
+    panel.set({ addon: { id: 'astro', name: 'Astro', icon: 'star' }, nonce: '', src: '', scope: { kind: 'view' },
+      failure: { error: 'did not answer its health check in time', log: 'boom\ntrace' } });
+    fixture.detectChanges();
+    expect(root.querySelector('iframe')).toBeNull();
+    const failure = root.querySelector('[data-addon-failure]')!;
+    expect(failure.textContent).toContain('addons.not_started');
+    expect(failure.textContent).toContain('health check');
+    expect(failure.querySelector('pre')?.textContent).toBe('boom\ntrace');
+  });
+
   it('routes verified panel requests to the existing handlers', async () => {
     send({ type: 'ready', v: 1, nonce: 'nonce-1' });
     send({ type: 'show_photos', v: 1, nonce: 'nonce-1', paths: ['/p/a.jpg'] });

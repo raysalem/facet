@@ -8,4 +8,6 @@ without touching the others:
 * :mod:`api.addons.panels` -- per-open nonces and validated sidebar scopes.
 * :mod:`api.addons.proxy` -- the ``/addons/{id}/{path}`` reverse proxy for the sandboxed sidebar.
 * :mod:`api.addons.runs` -- the ``addon_runs`` side table and the ``scan_run`` photo scope.
+* :mod:`api.addons.supervisor` -- starting and stopping supervised add-on processes
+  (:mod:`api.addons.winjob`, fork-only: the Windows job object that ends the whole process tree).
 """

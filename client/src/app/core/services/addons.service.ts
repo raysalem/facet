@@ -8,6 +8,7 @@ import type { components } from '../api/schema';
 export type AddonList = components['schemas']['AddonList'];
 export type Addon = components['schemas']['AddonItem'];
 export type AddonTokenCreated = components['schemas']['AddonTokenCreated'];
+export type AddonLog = components['schemas']['AddonLog'];
 
 /**
  * The client side of the add-on boundary (docs/CONFIGURATION.md, Add-ons): the installed manifests as the server
@@ -45,6 +46,27 @@ export class AddonsService {
     const created = await firstValueFrom(this.api.post<AddonTokenCreated>(`/addons/${encodeURIComponent(id)}/token`));
     void this.load();
     return created;
+  }
+
+  /** Start a supervised add-on (no panel); the list then shows its live status. */
+  async start(id: string): Promise<void> {
+    try {
+      await firstValueFrom(this.api.post(`/addons/${encodeURIComponent(id)}/start`, {}));
+    } finally {
+      await this.load();
+    }
+  }
+
+  async stop(id: string): Promise<void> {
+    try {
+      await firstValueFrom(this.api.post(`/addons/${encodeURIComponent(id)}/stop`));
+    } finally {
+      await this.load();
+    }
+  }
+
+  async log(id: string): Promise<string[]> {
+    return (await firstValueFrom(this.api.get<AddonLog>(`/addons/${encodeURIComponent(id)}/log`))).lines;
   }
 
   async revokeTokens(id: string): Promise<void> {

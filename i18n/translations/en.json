@@ -4221,7 +4221,11 @@
     },
     "status": {
       "external": "External",
-      "stopped": "Stopped"
+      "stopped": "Stopped",
+      "starting": "Starting",
+      "running": "Running",
+      "exited": "Exited",
+      "failed": "Failed to start"
     },
     "token": {
       "create": "Create access token",
@@ -4243,6 +4247,12 @@
     "after_import_none": "Nothing",
     "import_done": "Import done. Open {name} for {count} photos?",
     "pending_title": "Imports waiting for an add-on",
-    "pending_run": "Pending: run #{run} · {count} photos"
+    "pending_run": "Pending: run #{run} · {count} photos",
+    "start": "Start",
+    "stop": "Stop",
+    "log": "Log",
+    "log_empty": "The log is empty.",
+    "exit_code": "Exit code {code}",
+    "not_started": "{name} didn't start"
   }
 }

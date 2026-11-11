@@ -2163,6 +2163,16 @@ Facet 只接受来自面板自身窗口且带有其 nonce 的消息，并且只�
 
 附加组件通过 `GET /api/photos?scan_run=<作业 ID 或运行编号>` 读取其照片（可与其他所有图库筛选条件及分页组合），通过 `GET /api/addons/runs/<作业 ID>` 读取运行信息（`photos.read`，仅限自己的运行）。一次运行的照片是它完整（重新）保存的照片：`scanned_at` 位于运行的开始与结束之间（运行中则为当前时间之前），且位于该运行的某个文件夹下。只更新部分列的处理过程不会再次标记照片。
 
+### 由 Facet 启动
+
+带有 `start` 块的附加组件由 Facet 启动：在附加组件页面点击**启动**，或直接点击**打开**（会先启动它）。启动和停止需要与启动扫描相同的权限（多用户：超级管理员；单用户：编辑密码），并且需要 `addons.enabled`。请求只携带作用范围：程序、参数和环境都来自清单和 Facet。
+
+- Facet 在不使用 shell 的情况下、在清单所在文件夹中运行 `start.argv`，环境从零构建：`PATH`, `SYSTEMROOT`, `USERPROFILE`/`HOME`, `LOCALAPPDATA`, `TEMP`/`TMP`, `LANG`, `FACET_URL`, `FACET_TOKEN`, `FACET_ADDON_ID`, `FACET_LAUNCH_SECRET` (+ `FACET_PORT` when `port` is a number)。Facet 环境中的其他内容一概不传递。
+- 使用 `"port": "auto"` 时，附加组件绑定一个空闲端口，并在 stdout 上只输出一行 `FACET_ADDON_PORT=<n>`；其余内容都写到 stderr。两者都写入 `<facet data>/logs/addons/<id>.log`（附加组件页面上的**日志**）。
+- 就绪检查：Facet 调用 `<health>?c=<随机值>`，并期望在 30 秒内得到 `{"addon": "<id>", "ack": "<以 FACET_LAUNCH_SECRET 为密钥对 c 计算的十六进制 HMAC-SHA256>"}`；在此之前不会向它转发任何请求。每个转发的请求都带有 `X-Facet-Launch: <secret>`，附加组件必须校验它，这样同一端口上的其他程序无法冒充它。如果未能启动，侧边栏会显示原因和最后几行日志。
+- `FACET_TOKEN` 为本次启动以点击“启动”的账户身份创建，并在附加组件停止或退出时撤销。
+- **停止**或 Facet 退出时会结束附加组件：terminate，等待 5 秒，kill；在 Linux/macOS 上结束整个进程组。在 Windows 上，附加组件及其启动的所有进程都在一个作业对象中，会一起结束，即使 Facet 本身被强制终止也是如此。崩溃的附加组件不会自动重启；页面会显示其退出代码，下一次**打开**会再次启动它。
+
 ## 照片胶囊
 
 按主题分组的精选幻灯片，由你的照片库生成，并缓存 `freshness_hours` 小时。
