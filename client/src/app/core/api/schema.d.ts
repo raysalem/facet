@@ -24,6 +24,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/addons/runs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Addon Run
+         * @description One after-import run: its add-on, scan state and photo count.
+         *
+         *     An add-on token (``photos.read``) sees only its own runs; a person needs the scan gate.
+         */
+        get: operations["get_addon_run_api_addons_runs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/addons/{addon_id}/close": {
         parameters: {
             query?: never;
@@ -6181,6 +6203,11 @@ export interface components {
             addons: components["schemas"]["AddonItem"][];
             /** Addons Dir */
             addons_dir: string;
+            /**
+             * Pending Runs
+             * @default []
+             */
+            pending_runs?: components["schemas"]["AddonRun"][];
             /** Refused */
             refused: components["schemas"]["RefusedManifest"][];
         };
@@ -6206,6 +6233,33 @@ export interface components {
             };
             /** Src */
             src: string;
+        };
+        /**
+         * AddonRun
+         * @description An after-import request (``addon_runs``) with its scan's state and photo count.
+         */
+        AddonRun: {
+            /** Addon Id */
+            addon_id: string;
+            /** Finished At */
+            finished_at?: string | null;
+            /** Job Id */
+            job_id: string;
+            /** Opened At */
+            opened_at?: string | null;
+            /**
+             * Photo Count
+             * @default 0
+             */
+            photo_count?: number;
+            /** Requested At */
+            requested_at?: string | null;
+            /** Run Id */
+            run_id?: number | null;
+            /** Started At */
+            started_at?: string | null;
+            /** Status */
+            status?: string | null;
         };
         /**
          * AddonTokenCreated
@@ -10734,6 +10788,8 @@ export interface components {
         };
         /** ScanStartRequest */
         ScanStartRequest: {
+            /** After Addon */
+            after_addon?: string | null;
             /**
              * Directories
              * @default []
@@ -12242,6 +12298,44 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    get_addon_run_api_addons_runs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddonRun"];
+                };
+            };
+            /** @description No such after-import run (for an add-on: none of its own). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

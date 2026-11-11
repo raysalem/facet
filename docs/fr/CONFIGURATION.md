@@ -2135,7 +2135,7 @@ Un manifeste est refusé en bloc, avec la raison affichée sur la page **Modules
 
 | Permission | Routes |
 |---|---|
-| `photos.read` | `GET /api/photos`, `GET /api/photo`, `GET /thumbnail`, `GET /image` |
+| `photos.read` | `GET /api/photos` (incl. `scan_run`), `GET /api/photo`, `GET /thumbnail`, `GET /image`, `GET /api/addons/runs/<job id>` |
 | `tags.write` | `POST /api/photos/batch_manual_tags`, `DELETE /api/photo/manual_tags` |
 | `annotations.write` | — |
 | `gps.write` | `PUT /api/photo/gps` |
@@ -2159,6 +2159,12 @@ panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | 
 ```
 
 Facet n'accepte un message que de la fenêtre du panneau avec son nonce, et seulement après `ready` (de nouveau après chaque rechargement). Les chemins que l'onglet ne peut pas afficher sont ignorés.
+
+### Après l'import
+
+Un module avec l'emplacement `import_hook` peut être choisi dans la boîte de dialogue d'analyse sous **Après l'import, ouvrir :**. Facet enregistre seulement la demande (table `addon_runs`, par identifiant de tâche de l'analyse) ; l'analyseur n'en sait rien et rien ne démarre tout seul. Quand l'analyse se termine sans erreur, un onglet Facet ouvert propose **Import terminé. Ouvrir Astro pour N photos ?** ; si aucun onglet ne regardait, la page Modules complémentaires liste l'exécution sous *Imports en attente d'un module* avec un bouton **Ouvrir**.
+
+Le module lit ses photos avec `GET /api/photos?scan_run=<identifiant de tâche ou numéro d'exécution>` (combinable avec tous les autres filtres de la galerie et la pagination) et l'exécution avec `GET /api/addons/runs/<identifiant de tâche>` (`photos.read`, ses propres exécutions uniquement). Les photos d'une exécution sont celles qu'elle a entièrement (ré)enregistrées : `scanned_at` entre le début et la fin de l'exécution (ou maintenant, tant qu'elle tourne) et sous l'un de ses dossiers. Un passage qui ne met à jour que certaines colonnes ne marque pas les photos à nouveau.
 
 ## Capsules
 

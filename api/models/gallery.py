@@ -447,6 +447,9 @@ class GalleryParams(BaseModel):
     max_moment_confidence: str = ''
     # Path
     path_prefix: str = ''
+    # One scan run's photos (scan_runs.id or the viewer job id): those it fully (re)saved, by the
+    # scanned_at window and the run's directories. The add-on after-import scope (api/addons/runs.py).
+    scan_run: str = ''
     # Set scope (photo-detail "open this set in the gallery"). Ephemeral: never
     # round-tripped through the URL, because sequence_group_id is renumbered
     # from 1 on every detection pass -- see gallery-filters.util.ts.

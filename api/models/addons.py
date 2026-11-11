@@ -25,10 +25,26 @@ class RefusedManifest(BaseModel):
     reason: str
 
 
+class AddonRun(BaseModel):
+    """An after-import request (``addon_runs``) with its scan's state and photo count."""
+
+    job_id: str
+    addon_id: str
+    requested_at: Optional[str] = None
+    opened_at: Optional[str] = None
+    run_id: Optional[int] = None
+    status: Optional[str] = None
+    started_at: Optional[str] = None
+    finished_at: Optional[str] = None
+    photo_count: int = 0
+
+
 class AddonList(BaseModel):
     addons: list[AddonItem]
     refused: list[RefusedManifest]
     addons_dir: str
+    # After-import runs not opened yet ("pending: run #N").
+    pending_runs: list[AddonRun] = []
 
 
 class AddonTokenCreated(BaseModel):

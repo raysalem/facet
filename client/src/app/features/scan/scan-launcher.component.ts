@@ -8,6 +8,7 @@ import { ScanService, ScanDirectory } from '../../core/services/scan.service';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { I18N, i18nKeys } from '../../core/i18n/keys';
 import { ScanHistoryComponent } from './scan-history.component';
+import { AddonsService } from '../../core/services/addons.service';
 
 /** Statuses that prove the server refused this start (a 409 may still mean another scan runs). */
 const DEFINITE_REFUSALS = new Set([400, 403, 409, 422, 429]);
@@ -63,6 +64,18 @@ const isRefusal = (err: HttpErrorResponse): boolean =>
               </label>
             }
           </div>
+          @if (importAddons().length) {
+            <label class="flex items-center gap-2 mt-3 text-sm" data-after-import>
+              <span>{{ I18N.addons.after_import | translate }}</span>
+              <select class="min-w-0 flex-1 rounded border border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface)] px-2 py-1 text-sm"
+                      (change)="afterAddon.set($any($event.target).value || null)">
+                <option value="" [selected]="!afterAddon()">{{ I18N.addons.after_import_none | translate }}</option>
+                @for (addon of importAddons(); track addon.id) {
+                  <option [value]="addon.id" [selected]="afterAddon() === addon.id">{{ addon.name }}</option>
+                }
+              </select>
+            </label>
+          }
         }
       } @else {
         <div class="flex items-center gap-2 mb-2 text-sm">
@@ -114,6 +127,11 @@ export class ScanLauncherComponent implements OnInit {
   protected readonly I18N = i18nKeys();
   private readonly scan = inject(ScanService);
   private readonly dialogRef = inject(MatDialogRef<ScanLauncherComponent>);
+  private readonly addons = inject(AddonsService);
+
+  /** Add-ons that can be offered once this import finishes (the `import_hook` slot). */
+  protected readonly importAddons = computed(() => (this.addons.list()?.addons ?? []).filter(a => a.slots.includes('import_hook')));
+  protected readonly afterAddon = signal<string | null>(null);
 
   protected readonly directories = signal<ScanDirectory[]>([]);
   protected readonly selectedDir = signal<string | null>(null);
@@ -191,6 +209,7 @@ export class ScanLauncherComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     void this.scan.connect();
+    if (this.addons.available()) void this.addons.load();
     try {
       this.directories.set(await this.scan.loadDirectories());
     } catch {
@@ -206,7 +225,7 @@ export class ScanLauncherComponent implements OnInit {
     this.started.set(true);
     this.startRefusal.set(null);
     try {
-      await this.scan.startScan([dir]);
+      await this.scan.startScan([dir], this.afterAddon());
     } catch (err) {
       if (err instanceof HttpErrorResponse && isRefusal(err)) {
         // The server answered and refused (a library job holds the lock, the

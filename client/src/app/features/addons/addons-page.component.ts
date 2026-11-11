@@ -5,6 +5,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { AddonsService, type Addon, type AddonTokenCreated } from '../../core/services/addons.service';
 import { AddonPanelService } from '../../core/addons/addon-panel.service';
 import { IncludesPipe } from '../../shared/pipes/array.pipe';
+import { AddonImportNotifier } from '../../core/addons/addon-import-notifier.service';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { i18nKeys } from '../../core/i18n/keys';
 
@@ -90,6 +91,19 @@ import { i18nKeys } from '../../core/i18n/keys';
       @if (mintError()) {
         <p role="alert" class="text-sm text-red-400 mt-2">{{ I18N.addons.token.error | translate }}</p>
       }
+      @if (list.pending_runs?.length) {
+        <section class="mt-6" data-addons-pending>
+          <h2 class="text-base font-medium mb-2">{{ I18N.addons.pending_title | translate }}</h2>
+          <ul class="list-none p-0 m-0 flex flex-col gap-2">
+            @for (run of list.pending_runs; track run.job_id) {
+              <li class="flex flex-wrap items-center gap-2 text-sm" [attr.data-pending-run]="run.job_id">
+                <span class="flex-1 min-w-0">{{ run.addon_id }} — {{ I18N.addons.pending_run | translate: { run: run.run_id ?? '?', count: run.photo_count ?? 0 } }}</span>
+                <button mat-stroked-button data-pending-open (click)="openRun(run.addon_id, run.job_id)">{{ I18N.addons.open | translate }}</button>
+              </li>
+            }
+          </ul>
+        </section>
+      }
       @if (list.refused.length) {
         <section class="mt-6" data-addons-refused>
           <h2 class="text-base font-medium mb-1">{{ I18N.addons.refused_title | translate }}</h2>
@@ -110,6 +124,7 @@ export class AddonsPageComponent implements OnInit {
   protected readonly minted = signal<AddonTokenCreated | null>(null);
   protected readonly mintError = signal(false);
   protected readonly panels = inject(AddonPanelService);
+  private readonly imports = inject(AddonImportNotifier);
 
   ngOnInit(): void {
     void this.addons.load();
@@ -122,6 +137,12 @@ export class AddonsPageComponent implements OnInit {
   /** Open the add-on's sidebar for the gallery's current view or selection. */
   protected async open(addon: Addon): Promise<void> {
     await this.panels.openForCurrentView(addon);
+  }
+
+  /** Open an after-import run that nobody opened yet (the browser was closed when it finished). */
+  protected async openRun(addonId: string, jobId: string): Promise<void> {
+    const addon = this.addons.list()?.addons.find(a => a.id === addonId);
+    if (addon && await this.imports.openRun(addon, jobId)) void this.addons.load();
   }
 
   protected async mint(id: string): Promise<void> {

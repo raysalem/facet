@@ -769,6 +769,18 @@ SCAN_RUNS_COLUMNS = [
     ('job_finished_at', 'TEXT'),
 ]
 
+# "After this import, open add-on X": the intent the viewer records when a scan is started with
+# ``after_addon`` (docs/CONFIGURATION.md, Add-ons). A side table keyed by the viewer job id, which
+# ``scan_runs.viewer_job_id`` carries, so the scanner learns nothing about add-ons. ``opened_at`` is set
+# when a panel is opened for the run; until then the Add-ons page lists it as pending.
+ADDON_RUNS_COLUMNS = [
+    ('viewer_job_id', 'TEXT PRIMARY KEY'),
+    ('addon_id', 'TEXT NOT NULL'),
+    ('requested_by', 'TEXT'),
+    ('requested_at', 'TEXT'),
+    ('opened_at', 'TEXT'),
+]
+
 SCAN_RETRY_RECEIPTS_COLUMNS = [
     ('plan_id', 'TEXT PRIMARY KEY'),
     ('actor', 'TEXT NOT NULL'),
@@ -1268,6 +1280,7 @@ _MIGRATED_TABLES = [
     ('panorama_run_cache', PANORAMA_RUN_CACHE_COLUMNS),
     ('face_reextract_snapshot', FACE_REEXTRACT_SNAPSHOT_COLUMNS),
     ('scan_runs', SCAN_RUNS_COLUMNS),
+    ('addon_runs', ADDON_RUNS_COLUMNS),
     ('scan_retry_receipts', SCAN_RETRY_RECEIPTS_COLUMNS),
     ('scan_failures', SCAN_FAILURES_COLUMNS),
     ('iqa_declined', IQA_DECLINED_COLUMNS),
@@ -1528,6 +1541,9 @@ def init_database(db_path='photo_scores_pro.db', build_photo_indexes=True):
 
         # Create mcp_tokens (agent bearer tokens, hash only; side table)
         conn.execute(_build_create_table_sql('mcp_tokens', MCP_TOKENS_COLUMNS))
+
+        # After-import add-on intent, keyed by the viewer's scan job id (side table)
+        conn.execute(_build_create_table_sql('addon_runs', ADDON_RUNS_COLUMNS))
 
         conn.execute(_build_create_table_sql(
             'photo_metadata_edits', PHOTO_METADATA_EDITS_COLUMNS,

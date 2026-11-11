@@ -4238,6 +4238,11 @@
     "open": "Ouvrir",
     "launcher": "Ouvrir un module pour cette vue",
     "launcher_empty": "Aucun module avec panneau latéral n'est installé",
-    "open_error": "Impossible d'ouvrir le module : {detail}"
+    "open_error": "Impossible d'ouvrir le module : {detail}",
+    "after_import": "Après l'import, ouvrir :",
+    "after_import_none": "Rien",
+    "import_done": "Import terminé. Ouvrir {name} pour {count} photos ?",
+    "pending_title": "Imports en attente d'un module",
+    "pending_run": "En attente : exécution n° {run} · {count} photos"
   }
 }

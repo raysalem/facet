@@ -4238,6 +4238,11 @@
     "open": "Abrir",
     "launcher": "Abrir un complemento para esta vista",
     "launcher_empty": "No hay ningún complemento con panel lateral instalado",
-    "open_error": "No se pudo abrir el complemento: {detail}"
+    "open_error": "No se pudo abrir el complemento: {detail}",
+    "after_import": "Tras importar, abrir:",
+    "after_import_none": "Nada",
+    "import_done": "Importación terminada. ¿Abrir {name} para {count} fotos?",
+    "pending_title": "Importaciones a la espera de un complemento",
+    "pending_run": "Pendiente: ejecución n.º {run} · {count} fotos"
   }
 }

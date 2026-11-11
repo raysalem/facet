@@ -4238,6 +4238,11 @@
     "open": "Open",
     "launcher": "Open an add-on for this view",
     "launcher_empty": "No add-on with a sidebar is installed",
-    "open_error": "The add-on could not be opened: {detail}"
+    "open_error": "The add-on could not be opened: {detail}",
+    "after_import": "After import, open:",
+    "after_import_none": "Nothing",
+    "import_done": "Import done. Open {name} for {count} photos?",
+    "pending_title": "Imports waiting for an add-on",
+    "pending_run": "Pending: run #{run} · {count} photos"
   }
 }

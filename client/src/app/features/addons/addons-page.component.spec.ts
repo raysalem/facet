@@ -4,6 +4,7 @@ import { AddonsPageComponent } from './addons-page.component';
 import { AddonsService, type AddonList } from '../../core/services/addons.service';
 import { I18nService } from '../../core/services/i18n.service';
 import { AddonPanelService } from '../../core/addons/addon-panel.service';
+import { AddonImportNotifier } from '../../core/addons/addon-import-notifier.service';
 
 function listing(): AddonList {
   return {
@@ -15,6 +16,7 @@ function listing(): AddonList {
         permissions: ['photos.read'], mode: 'supervised', ui_path: '/ui/', status: 'stopped', live_tokens: 0 },
     ],
     refused: [{ directory: 'broken', reason: 'unknown permissions: db.write' }],
+    pending_runs: [{ job_id: 'f'.repeat(32), addon_id: 'astro', run_id: 41, photo_count: 9 }],
   } as AddonList;
 }
 
@@ -28,6 +30,7 @@ describe('Add-ons page', () => {
   let revokeTokens: ReturnType<typeof vi.fn>;
   let openForCurrentView: ReturnType<typeof vi.fn>;
   const openError = signal<string | null>(null);
+  let openRun: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     list.set(null); loadError.set(false);
@@ -36,9 +39,11 @@ describe('Add-ons page', () => {
     revokeTokens = vi.fn(async () => undefined);
     openForCurrentView = vi.fn(async () => true);
     openError.set(null);
+    openRun = vi.fn(async () => true);
     TestBed.configureTestingModule({ imports: [AddonsPageComponent], providers: [
       { provide: AddonsService, useValue: { list, loadError, load, mintToken, revokeTokens } },
       { provide: AddonPanelService, useValue: { openForCurrentView, openError } },
+      { provide: AddonImportNotifier, useValue: { openRun } },
       { provide: I18nService, useValue: { t: (key: string, params?: Record<string, unknown>) => key + (params ? ' ' + Object.values(params).join(' ') : ''), translations: signal({}), currentLang: signal('en') } },
     ] });
     fixture = TestBed.createComponent(AddonsPageComponent);
@@ -82,6 +87,15 @@ describe('Add-ons page', () => {
     openError.set('The add-on is not running');
     fixture.detectChanges();
     expect(root.querySelector('[role="alert"]')?.textContent).toContain('The add-on is not running');
+  });
+
+  it('lists after-import runs nobody opened and opens one with its import scope', async () => {
+    await settle();
+    const row = root.querySelector('[data-pending-run]')!;
+    expect(row.textContent).toContain('addons.pending_run 41 9');
+    (row.querySelector('[data-pending-open]') as HTMLButtonElement).click();
+    await settle();
+    expect(openRun).toHaveBeenCalledWith(expect.objectContaining({ id: 'astro' }), 'f'.repeat(32));
   });
 
   it('says so when nothing is installed', async () => {

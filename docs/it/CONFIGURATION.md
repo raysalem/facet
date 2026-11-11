@@ -2139,7 +2139,7 @@ Un manifesto viene rifiutato per intero, con il motivo sulla pagina **Componenti
 
 | Permission | Routes |
 |---|---|
-| `photos.read` | `GET /api/photos`, `GET /api/photo`, `GET /thumbnail`, `GET /image` |
+| `photos.read` | `GET /api/photos` (incl. `scan_run`), `GET /api/photo`, `GET /thumbnail`, `GET /image`, `GET /api/addons/runs/<job id>` |
 | `tags.write` | `POST /api/photos/batch_manual_tags`, `DELETE /api/photo/manual_tags` |
 | `annotations.write` | — |
 | `gps.write` | `PUT /api/photo/gps` |
@@ -2163,6 +2163,12 @@ panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | 
 ```
 
 Facet accetta un messaggio solo dalla finestra del pannello con il suo nonce, e solo dopo `ready` (di nuovo dopo ogni ricaricamento). I percorsi che la scheda non può mostrare vengono ignorati.
+
+### Dopo l'importazione
+
+Un componente con lo slot `import_hook` si può scegliere nella finestra di scansione in **Dopo l'importazione, apri:**. Facet registra solo la richiesta (tabella `addon_runs`, per id del processo di scansione); lo scanner non ne sa nulla e niente parte da solo. Quando la scansione termina senza errori, una scheda di Facet aperta propone **Importazione completata. Aprire Astro per N foto?**; se nessuna scheda la seguiva, la pagina Componenti aggiuntivi elenca l'esecuzione in *Importazioni in attesa di un componente* con un pulsante **Apri**.
+
+Il componente legge le sue foto con `GET /api/photos?scan_run=<id del processo o numero di esecuzione>` (combinabile con tutti gli altri filtri della galleria e con la paginazione) e l'esecuzione con `GET /api/addons/runs/<id del processo>` (`photos.read`, solo le proprie esecuzioni). Le foto di un'esecuzione sono quelle che ha salvato (di nuovo) per intero: `scanned_at` tra inizio e fine dell'esecuzione (o adesso, mentre è in corso) e sotto una delle sue cartelle. Un passaggio che aggiorna solo alcune colonne non contrassegna di nuovo le foto.
 
 ## Capsules
 

@@ -6,6 +6,7 @@ import { I18nService } from '../../core/services/i18n.service';
 import { ScanService, ScanStatus } from '../../core/services/scan.service';
 import { ScanLauncherComponent } from './scan-launcher.component';
 import { ScanHistoryComponent } from './scan-history.component';
+import { AddonsService, type AddonList } from '../../core/services/addons.service';
 
 function idleStatus(): ScanStatus {
   return { running: false, directories: [], output: [], elapsed_seconds: null, exit_code: null };
@@ -25,8 +26,12 @@ describe('ScanLauncherComponent', () => {
     canCancel: ReturnType<typeof computed<boolean>>;
   };
   let dialogClose: ReturnType<typeof vi.fn>;
+  const addonList = signal<AddonList | null>(null);
+  const addonsLoad = vi.fn(async () => null);
 
   beforeEach(() => {
+    addonList.set(null);
+    addonsLoad.mockClear();
     mockScan = {
       loadDirectories: vi.fn(() => Promise.resolve([
         { path: '/photos/a', owner: 'alice' },
@@ -44,6 +49,7 @@ describe('ScanLauncherComponent', () => {
       providers: [
         { provide: ScanService, useValue: mockScan },
         { provide: MatDialogRef, useValue: { close: dialogClose } },
+        { provide: AddonsService, useValue: { list: addonList, available: signal(true), load: addonsLoad } },
         { provide: I18nService, useValue: { t: (key: string) => `T(${key})`, translations: () => ({}) } },
       ],
     });
@@ -68,8 +74,22 @@ describe('ScanLauncherComponent', () => {
   it('starts a scan with the selected directory', async () => {
     (component as unknown as { selectedDir: { set(v: string): void } }).selectedDir.set('/photos/b');
     await component.start();
-    expect(mockScan.startScan).toHaveBeenCalledWith(['/photos/b']);
+    expect(mockScan.startScan).toHaveBeenCalledWith(['/photos/b'], null);
     expect(read<boolean>('started')).toBe(true);
+  });
+
+  it('offers only import-hook add-ons and passes the chosen one with the start', async () => {
+    await component.ngOnInit();
+    expect(addonsLoad).toHaveBeenCalled();
+    addonList.set({ addons_dir: '/d', refused: [], pending_runs: [], addons: [
+      { id: 'astro', name: 'Astro', slots: ['sidebar', 'import_hook'] },
+      { id: 'other', name: 'Other', slots: ['sidebar'] },
+    ] } as unknown as AddonList);
+    expect(read<{ id: string }[]>('importAddons').map(a => a.id)).toEqual(['astro']);
+    (component as unknown as { afterAddon: { set(v: string): void } }).afterAddon.set('astro');
+    (component as unknown as { selectedDir: { set(v: string): void } }).selectedDir.set('/photos/a');
+    await component.start();
+    expect(mockScan.startScan).toHaveBeenCalledWith(['/photos/a'], 'astro');
   });
 
   it('does not start without a selected directory', async () => {

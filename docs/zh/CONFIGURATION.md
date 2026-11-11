@@ -2132,7 +2132,7 @@ Webhook 选项：`url`（必填）、`events`（事件名列表）、`min_score`
 
 | Permission | Routes |
 |---|---|
-| `photos.read` | `GET /api/photos`, `GET /api/photo`, `GET /thumbnail`, `GET /image` |
+| `photos.read` | `GET /api/photos` (incl. `scan_run`), `GET /api/photo`, `GET /thumbnail`, `GET /image`, `GET /api/addons/runs/<job id>` |
 | `tags.write` | `POST /api/photos/batch_manual_tags`, `DELETE /api/photo/manual_tags` |
 | `annotations.write` | — |
 | `gps.write` | `PUT /api/photo/gps` |
@@ -2156,6 +2156,12 @@ panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | 
 ```
 
 Facet 只接受来自面板自身窗口且带有其 nonce 的消息，并且只在 `ready` 之后（每次重新加载框架后都需要重新 `ready`）。标签页无法显示的路径会被忽略。
+
+### 导入之后
+
+带有 `import_hook` 插槽的附加组件可在扫描对话框的**导入后打开：**中选择。Facet 只记录这个请求（`addon_runs` 表，以扫描的作业 ID 为键）；扫描程序对此一无所知，也不会自动启动任何东西。扫描无错完成后，打开的 Facet 标签页会提示**导入完成。要为 N 张照片打开 Astro 吗？**；如果当时没有标签页在关注，附加组件页面会在*等待附加组件处理的导入*下列出该次运行，并提供**打开**按钮。
+
+附加组件通过 `GET /api/photos?scan_run=<作业 ID 或运行编号>` 读取其照片（可与其他所有图库筛选条件及分页组合），通过 `GET /api/addons/runs/<作业 ID>` 读取运行信息（`photos.read`，仅限自己的运行）。一次运行的照片是它完整（重新）保存的照片：`scanned_at` 位于运行的开始与结束之间（运行中则为当前时间之前），且位于该运行的某个文件夹下。只更新部分列的处理过程不会再次标记照片。
 
 ## 照片胶囊
 

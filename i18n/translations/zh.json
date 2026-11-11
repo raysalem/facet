@@ -4238,6 +4238,11 @@
     "open": "打开",
     "launcher": "为此视图打开附加组件",
     "launcher_empty": "未安装带侧边栏的附加组件",
-    "open_error": "无法打开附加组件：{detail}"
+    "open_error": "无法打开附加组件：{detail}",
+    "after_import": "导入后打开：",
+    "after_import_none": "无",
+    "import_done": "导入完成。要为 {count} 张照片打开 {name} 吗？",
+    "pending_title": "等待附加组件处理的导入",
+    "pending_run": "待处理：第 {run} 次运行 · {count} 张照片"
   }
 }

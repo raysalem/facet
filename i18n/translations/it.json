@@ -4238,6 +4238,11 @@
     "open": "Apri",
     "launcher": "Apri un componente per questa vista",
     "launcher_empty": "Nessun componente con pannello laterale installato",
-    "open_error": "Impossibile aprire il componente: {detail}"
+    "open_error": "Impossibile aprire il componente: {detail}",
+    "after_import": "Dopo l'importazione, apri:",
+    "after_import_none": "Niente",
+    "import_done": "Importazione completata. Aprire {name} per {count} foto?",
+    "pending_title": "Importazioni in attesa di un componente",
+    "pending_run": "In attesa: esecuzione n. {run} · {count} foto"
   }
 }

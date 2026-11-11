@@ -129,6 +129,7 @@
   "quality_tier",
   "require_tags",
   "review_status",
+  "scan_run",
   "score_presence",
   "search",
   "sequence_group_id",

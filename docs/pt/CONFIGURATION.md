@@ -2127,7 +2127,7 @@ Um manifesto é recusado por inteiro, com o motivo na página **Complementos** (
 
 | Permission | Routes |
 |---|---|
-| `photos.read` | `GET /api/photos`, `GET /api/photo`, `GET /thumbnail`, `GET /image` |
+| `photos.read` | `GET /api/photos` (incl. `scan_run`), `GET /api/photo`, `GET /thumbnail`, `GET /image`, `GET /api/addons/runs/<job id>` |
 | `tags.write` | `POST /api/photos/batch_manual_tags`, `DELETE /api/photo/manual_tags` |
 | `annotations.write` | — |
 | `gps.write` | `PUT /api/photo/gps` |
@@ -2151,6 +2151,12 @@ panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | 
 ```
 
 O Facet só aceita uma mensagem da janela do painel com o seu nonce, e só depois de `ready` (novamente após cada recarregamento). Os caminhos que o separador não consegue mostrar são ignorados.
+
+### Após importar
+
+Um complemento com a ranhura `import_hook` pode ser escolhido no diálogo de análise em **Após importar, abrir:**. O Facet só regista o pedido (tabela `addon_runs`, pelo id de tarefa da análise); o analisador não é avisado e nada arranca sozinho. Quando a análise termina sem erros, um separador do Facet aberto propõe **Importação concluída. Abrir Astro para N fotos?**; se nenhum separador estava a acompanhar, a página Complementos lista a execução em *Importações à espera de um complemento* com um botão **Abrir**.
+
+O complemento lê as suas fotos com `GET /api/photos?scan_run=<id de tarefa ou número de execução>` (combinável com todos os outros filtros da galeria e com a paginação) e a execução com `GET /api/addons/runs/<id de tarefa>` (`photos.read`, só as suas execuções). As fotos de uma execução são as que ela guardou (de novo) por inteiro: `scanned_at` entre o início e o fim da execução (ou agora, enquanto decorre) e dentro de uma das suas pastas. Uma passagem que só atualiza algumas colunas não volta a marcar as fotos.
 
 ## Capsules
 

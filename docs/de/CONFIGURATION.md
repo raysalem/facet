@@ -2148,7 +2148,7 @@ Ein Manifest wird als Ganzes abgelehnt, mit dem Grund auf der Seite **Add-ons** 
 
 | Permission | Routes |
 |---|---|
-| `photos.read` | `GET /api/photos`, `GET /api/photo`, `GET /thumbnail`, `GET /image` |
+| `photos.read` | `GET /api/photos` (incl. `scan_run`), `GET /api/photo`, `GET /thumbnail`, `GET /image`, `GET /api/addons/runs/<job id>` |
 | `tags.write` | `POST /api/photos/batch_manual_tags`, `DELETE /api/photo/manual_tags` |
 | `annotations.write` | — |
 | `gps.write` | `PUT /api/photo/gps` |
@@ -2172,6 +2172,12 @@ panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | 
 ```
 
 Facet nimmt eine Nachricht nur vom Fenster des Bereichs mit dessen Nonce an, und erst nach `ready` (nach jedem Neuladen erneut). Pfade, die der Tab nicht zeigen kann, werden ignoriert.
+
+### Nach dem Import
+
+Ein Add-on mit dem Slot `import_hook` lässt sich im Scan-Dialog unter **Nach dem Import öffnen:** auswählen. Facet speichert nur die Anfrage (Tabelle `addon_runs`, nach der Job-ID des Scans); der Scanner erfährt nichts davon, und nichts startet von selbst. Endet der Scan ohne Fehler, bietet ein offener Facet-Tab **Import abgeschlossen. Astro für N Fotos öffnen?** an; hat kein Tab zugesehen, führt die Seite Add-ons den Lauf unter *Importe, die auf ein Add-on warten* mit der Schaltfläche **Öffnen**.
+
+Das Add-on liest seine Fotos mit `GET /api/photos?scan_run=<Job-ID oder Laufnummer>` (kombinierbar mit allen anderen Galeriefiltern und dem Blättern) und den Lauf mit `GET /api/addons/runs/<Job-ID>` (`photos.read`, nur eigene Läufe). Die Fotos eines Laufs sind die, die er vollständig (neu) gespeichert hat: `scanned_at` zwischen Start und Ende des Laufs (oder jetzt, solange er läuft) und unter einem seiner Ordner. Ein Durchgang, der nur einzelne Spalten aktualisiert, markiert Fotos nicht erneut.
 
 ## Capsules
 

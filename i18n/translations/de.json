@@ -4238,6 +4238,11 @@
     "open": "Öffnen",
     "launcher": "Ein Add-on für diese Ansicht öffnen",
     "launcher_empty": "Kein Add-on mit Seitenleiste installiert",
-    "open_error": "Das Add-on konnte nicht geöffnet werden: {detail}"
+    "open_error": "Das Add-on konnte nicht geöffnet werden: {detail}",
+    "after_import": "Nach dem Import öffnen:",
+    "after_import_none": "Nichts",
+    "import_done": "Import abgeschlossen. {name} für {count} Fotos öffnen?",
+    "pending_title": "Importe, die auf ein Add-on warten",
+    "pending_run": "Ausstehend: Lauf #{run} · {count} Fotos"
   }
 }

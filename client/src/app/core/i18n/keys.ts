@@ -4253,6 +4253,11 @@ export const I18N = {
     launcher: "addons.launcher",
     launcher_empty: "addons.launcher_empty",
     open_error: "addons.open_error",
+    after_import: "addons.after_import",
+    after_import_none: "addons.after_import_none",
+    import_done: "addons.import_done",
+    pending_title: "addons.pending_title",
+    pending_run: "addons.pending_run",
   },
 } as const;
 

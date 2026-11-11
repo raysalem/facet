@@ -143,10 +143,12 @@ export class ScanService implements OnDestroy {
     return this.authCurrent(session) && !!result;
   }
 
-  async startScan(directories: string[]): Promise<void> {
+  /** `afterAddon`: an add-on to offer for this import once it finishes (recorded server-side only). */
+  async startScan(directories: string[], afterAddon: string | null = null): Promise<void> {
     const session = this.capture();
     if (!this.authCurrent(session)) throw new Error('Scan session changed');
-    await firstValueFrom(this.api.post<{ success: boolean }>('/scan/start', { directories: [...directories] }));
+    const body = afterAddon ? { directories: [...directories], after_addon: afterAddon } : { directories: [...directories] };
+    await firstValueFrom(this.api.post<{ success: boolean }>('/scan/start', body));
     // An accepted start belongs to its captured session, never the new account.
     if (this.authCurrent(session)) await this.connect(false);
   }

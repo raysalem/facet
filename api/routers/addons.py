@@ -12,11 +12,16 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from api.addons import manifest, panels, proxy
+from api.addons import manifest, panels, proxy, runs
+from api.addons.auth import register_routes
 from api.addons.auth import live_addon_tokens, mint_addon_token, revoke_addon_tokens
-from api.auth import CurrentUser, require_human_session, require_scan_access
+from api.auth import (
+    EDITION_PASSWORD_KEY, CurrentUser, _is_open_install, require_authenticated, require_human_session,
+    require_scan_access, scan_access_refusal,
+)
+from api.config import is_multi_user_enabled
 from api.models.addons import (
-    AddonClosed, AddonCloseRequest, AddonList, AddonOpened, AddonOpenRequest, AddonTokenCreated,
+    AddonClosed, AddonCloseRequest, AddonList, AddonRun, AddonOpened, AddonOpenRequest, AddonTokenCreated,
     AddonTokensRevoked,
 )
 
@@ -135,3 +140,31 @@ def open_panel(addon_id: str, body: AddonOpenRequest, _user: CurrentUser = Depen
 def close_panel(addon_id: str, body: AddonCloseRequest, _user: CurrentUser = Depends(require_addon_operator)):
     """Forget one panel's nonce (the sidebar was closed); the proxy refuses it from now on."""
     return {"closed": panels.close(addon_id, body.nonce)}
+
+
+@router.get(
+    "/runs/{job_id}",
+    response_model=AddonRun,
+    responses={404: {"description": "No such after-import run (for an add-on: none of its own)."}},
+)
+def get_addon_run(job_id: str, user: CurrentUser = Depends(require_authenticated)):
+    """One after-import run: its add-on, scan state and photo count.
+
+    An add-on token (``photos.read``) sees only its own runs; a person needs the scan gate.
+    """
+    if user.addon is None:
+        refusal = scan_access_refusal(is_multi_user_enabled(), user.is_superadmin, user.is_edition,
+                                      _is_open_install(EDITION_PASSWORD_KEY), user.trusted_local_editing)
+        if refusal is not None:
+            raise HTTPException(status_code=refusal[0], detail=refusal[1])
+    run = runs.get_run(job_id)
+    if run is None or (user.addon is not None and run["addon_id"] != user.addon.id):
+        raise HTTPException(status_code=404, detail="Run not found")
+    return run
+
+
+# The import hook plugs into the shared add-on surfaces: the route map, the scope check and the list.
+register_routes(lambda: {("GET", get_addon_run): "photos.read"})
+panels.IMPORT_RUN_CHECKS.append(runs.is_run_of)
+panels.IMPORT_OPENED.append(runs.mark_opened)
+LIST_EXTRAS.append(lambda: {"pending_runs": runs.pending_runs()})

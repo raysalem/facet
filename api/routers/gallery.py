@@ -750,6 +750,11 @@ def _build_gallery_where(params, conn=None, user_id=None, include_manual=True, *
     _apply_color_quality_filters(where_clauses, sql_params, params)
     _apply_date_album_geo_filters(where_clauses, sql_params, params, logical=logical)
     _apply_set_scope_filter(where_clauses, sql_params, params)
+    if params.get('scan_run'):
+        from api.addons.runs import scan_run_clause
+        run_sql, run_params = scan_run_clause(str(params['scan_run']))
+        where_clauses.append(run_sql)
+        sql_params.extend(run_params)
     if params.get('stack_id'):
         # Smart-album and share consumers call this builder directly too.
         # Private membership must never become an ignored/broadening filter.

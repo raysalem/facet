@@ -25,6 +25,7 @@ import { AuthService } from './core/services/auth.service';
 import { ScanService } from './core/services/scan.service';
 import { AddonsService } from './core/services/addons.service';
 import { AddonPanelService } from './core/addons/addon-panel.service';
+import { AddonImportNotifier } from './core/addons/addon-import-notifier.service';
 import { AddonSidebarComponent } from './shared/components/addon-sidebar/addon-sidebar.component';
 import { AddonLauncherComponent } from './shared/components/addon-sidebar/addon-launcher.component';
 import { I18nService } from './core/services/i18n.service';
@@ -161,6 +162,8 @@ export class App implements OnInit {
   protected readonly scan = inject(ScanService);
   protected readonly addons = inject(AddonsService);
   protected readonly addonPanel = inject(AddonPanelService);
+  // Offers "Open X for N photos?" when a watched import finishes; constructed with the shell.
+  private readonly addonImports = inject(AddonImportNotifier);
   private readonly api = inject(ApiService);
   protected readonly auth = inject(AuthService);
   protected readonly i18n = inject(I18nService);

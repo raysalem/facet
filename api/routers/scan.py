@@ -20,7 +20,7 @@ from datetime import timedelta
 from typing import Optional, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Path as ApiPath, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse
 
 from api.auth import EDITION_PASSWORD_KEY, CurrentUser, _is_open_install, _match_password_generations, _trusted_local_editing_enabled, create_access_token, decode_access_token, require_edition, require_scan_access, scan_access_refusal, scan_feature_enabled, trusted_local_for
@@ -169,6 +169,9 @@ def _read_scan_output(proc, cleanup=None, on_exit=None):
 
 class ScanStartRequest(BaseModel):
     directories: list[str] = []
+    # An add-on to offer once this import finishes (an enabled manifest with the import_hook slot).
+    # Recorded in addon_runs only; the scanner is not told and nothing starts by itself.
+    after_addon: Optional[str] = Field(default=None, max_length=64)
 
 
 class RecomputeRequest(BaseModel):
@@ -489,11 +492,22 @@ def start_scan(
         if not directories:
             raise HTTPException(status_code=400, detail="No directories specified")
 
+        from api.addons.runs import record_request, validate_after_addon
+        after_addon = validate_after_addon(body.after_addon)
+
         # Rebuild from canonical server-side list so subprocess args are provably server-origin
         validated_dirs = [d for d in get_all_scan_directories() if d in set(directories)]
         cmd = [sys.executable, FACET_SCRIPT, '--', *validated_dirs]
 
-        return _spawn_scan(cmd, directories)
+        receipt = _spawn_scan(cmd, directories)
+        if after_addon is not None:
+            # Best effort: a lost intent row costs the "Open ..." offer, never the accepted scan.
+            try:
+                from api.agent.tokens import session_principal
+                record_request(receipt['job_id'], after_addon, session_principal(user.user_id))
+            except sqlite3.Error:
+                logger.exception("Could not record the after-import add-on for job %s", receipt['job_id'])
+        return receipt
 
     except HTTPException:
         raise
