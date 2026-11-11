@@ -4230,6 +4230,14 @@
       "revoke": "Revoca i token",
       "error": "Impossibile creare il token."
     },
-    "refresh": "Aggiorna"
+    "refresh": "Aggiorna",
+    "panel": {
+      "close": "Chiudi il pannello del componente",
+      "resize": "Ridimensiona il pannello del componente"
+    },
+    "open": "Apri",
+    "launcher": "Apri un componente per questa vista",
+    "launcher_empty": "Nessun componente con pannello laterale installato",
+    "open_error": "Impossibile aprire il componente: {detail}"
   }
 }

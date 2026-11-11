@@ -168,9 +168,15 @@
   }
 
   <!-- Main content -->
-  <main class="relative flex-1 min-h-0 overflow-auto lg:pb-0" [class.pb-15]="isAlbumsRoute() || isPersonsRoute() || isCapsuleRoute() || isTimelineRoute()">
-    <router-outlet />
-  </main>
+  <!-- The add-on sidebar docks to the right of every page, so it survives navigation. -->
+  <div class="flex flex-1 min-h-0 min-w-0">
+    <main class="relative flex-1 min-h-0 min-w-0 overflow-auto lg:pb-0" [class.pb-15]="isAlbumsRoute() || isPersonsRoute() || isCapsuleRoute() || isTimelineRoute()">
+      <router-outlet />
+    </main>
+    @if (addonPanel.panel()) {
+      <app-addon-sidebar />
+    }
+  </div>
 
   <!-- Mobile albums bottom bars (search row stacks over the toolbar) -->
   @if (auth.isAuthenticated() && isAlbumsRoute()) {
@@ -325,6 +331,10 @@
         <button mat-icon-button class="!bg-[var(--mat-sys-primary-container)] !text-[var(--mat-sys-on-primary-container)]" (click)="openScanLauncher()" [matTooltip]="I18N.gallery.scan_action | translate" [attr.aria-label]="I18N.gallery.scan_action | translate">
           <mat-icon>add_photo_alternate</mat-icon>
         </button>
+      }
+
+      @if (auth.isAuthenticated() && addons.available()) {
+        <app-addon-launcher />
       }
 
       <!-- User menu (authenticated: account + language + edition + logout).

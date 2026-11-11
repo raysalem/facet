@@ -4245,6 +4245,14 @@ export const I18N = {
       error: "addons.token.error",
     },
     refresh: "addons.refresh",
+    panel: {
+      close: "addons.panel.close",
+      resize: "addons.panel.resize",
+    },
+    open: "addons.open",
+    launcher: "addons.launcher",
+    launcher_empty: "addons.launcher_empty",
+    open_error: "addons.open_error",
   },
 } as const;
 

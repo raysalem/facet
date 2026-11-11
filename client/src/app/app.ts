@@ -24,6 +24,9 @@ import { StalenessGuardFactory } from './core/services/staleness-guard.service';
 import { AuthService } from './core/services/auth.service';
 import { ScanService } from './core/services/scan.service';
 import { AddonsService } from './core/services/addons.service';
+import { AddonPanelService } from './core/addons/addon-panel.service';
+import { AddonSidebarComponent } from './shared/components/addon-sidebar/addon-sidebar.component';
+import { AddonLauncherComponent } from './shared/components/addon-sidebar/addon-launcher.component';
 import { I18nService } from './core/services/i18n.service';
 import { ThemeService } from './core/services/theme.service';
 import { PageHelpService } from './core/services/page-help.service';
@@ -120,6 +123,8 @@ export class EditionDialogComponent {
   selector: 'app-root',
   imports: [
     AssistantActivityChipComponent,
+    AddonSidebarComponent,
+    AddonLauncherComponent,
     RouterOutlet,
     RouterLink,
     MatToolbarModule,
@@ -155,6 +160,7 @@ export class App implements OnInit {
   private readonly staleness = inject(StalenessGuardFactory);
   protected readonly scan = inject(ScanService);
   protected readonly addons = inject(AddonsService);
+  protected readonly addonPanel = inject(AddonPanelService);
   private readonly api = inject(ApiService);
   protected readonly auth = inject(AuthService);
   protected readonly i18n = inject(I18nService);

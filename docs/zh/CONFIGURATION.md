@@ -2141,6 +2141,22 @@ Webhook 选项：`url`（必填）、`events`（事件名列表）、`min_score`
 
 **信任。** 安装清单意味着以运行 Facet 的操作系统用户身份信任该程序，与 `plugins/` 中的文件相同。权限让正常的附加组件只做自己的事，并限制错误的影响范围；但无法约束以同一用户运行的恶意程序。真正的隔离需要把附加组件放在不挂载数据库卷的独立容器中。
 
+### 附加组件侧边栏
+
+带有 `sidebar` 插槽的附加组件会在每个页面右侧停靠的面板中打开（页眉中的拼图按钮，或附加组件页面上的**打开**）。有选择时作用于所选照片，否则作用于图库的当前视图；在图库和照片之间切换时面板保持打开。拖动其左边缘可调整宽度。
+
+面板是附加组件自己的页面，由 Facet 通过 `/addons/<id>/…` 提供，并以 `sandbox="allow-scripts"` 嵌入，因此是不透明来源：它无法读取 Facet 的 Cookie、存储或令牌，只有它自己的后端（持有附加组件令牌）调用 `/api`。`/addons/<id>/` 下的每个响应都带有 `sandbox allow-scripts; default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'`、`Referrer-Policy: no-referrer` 和 `Cache-Control: no-store`，且从不带 `Set-Cookie`。
+
+面板作者须知：文档 URL 为 `/addons/<id><ui.path>?nonce=…`；请把 nonce 保存在内存中（不透明来源中访问存储会抛错），并在发往后端的每个请求中以 `X-Addon-Nonce` 发送。只有文档请求可以把它放在查询字符串中，因此脚本和样式请内联，图片用 `fetch` → `blob:` 加载。不支持弹窗、下载、表单提交或 WebSocket；服务器发送事件流可以使用。相对重定向会改写到前缀之下，绝对重定向会被拒绝。
+
+```text
+Facet → panel  {type: "context", v: 1, nonce, route, album_id, photo, selection: [≤ 500 paths],
+                scope: {kind: "view", query} | {kind: "selection"} | {kind: "import", run_id}}
+panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | "refresh" {paths} | "close", v: 1, nonce}
+```
+
+Facet 只接受来自面板自身窗口且带有其 nonce 的消息，并且只在 `ready` 之后（每次重新加载框架后都需要重新 `ready`）。标签页无法显示的路径会被忽略。
+
 ## 照片胶囊
 
 按主题分组的精选幻灯片，由你的照片库生成，并缓存 `freshness_hours` 小时。

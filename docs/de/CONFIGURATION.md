@@ -2157,6 +2157,22 @@ Die beiden `tags.write`-Routen sind ein vorübergehender Ersatz, bis es Plugin-e
 
 **Vertrauen.** Ein installiertes Manifest vertraut dem Programm als dem Betriebssystembenutzer, unter dem Facet läuft, wie bei einer Datei in `plugins/`. Berechtigungen halten ein korrektes Add-on bei seiner Aufgabe und begrenzen, was ein Fehler erreicht; ein feindseliges Programm desselben Benutzers halten sie nicht auf. Echte Isolation erfordert einen eigenen Container ohne das Datenbank-Volume.
 
+### Add-on-Seitenleiste
+
+Ein Add-on mit dem Slot `sidebar` öffnet sich in einem Bereich rechts neben jeder Seite (Puzzle-Schaltfläche in der Kopfzeile oder **Öffnen** auf der Seite Add-ons). Er bezieht sich auf die Auswahl, falls vorhanden, sonst auf die aktuelle Galerieansicht, und bleibt beim Wechsel zwischen Galerie und Foto offen. Die Breite ändern Sie am linken Rand.
+
+Der Bereich ist die eigene Seite des Add-ons, über Facet unter `/addons/<id>/…` ausgeliefert und mit `sandbox="allow-scripts"` eingebettet. Damit hat er einen opaken Ursprung: Er kann weder Facets Cookie noch Speicher oder Token lesen, und nur sein eigenes Backend (das das Add-on-Token hält) ruft `/api` auf. Jede Antwort unter `/addons/<id>/` trägt `sandbox allow-scripts; default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'`, `Referrer-Policy: no-referrer` und `Cache-Control: no-store` und nie ein `Set-Cookie`.
+
+Regeln für die Seite: Die Dokument-URL ist `/addons/<id><ui.path>?nonce=…`; die Nonce bleibt im Speicher (Storage wirft im opaken Ursprung) und geht als `X-Addon-Nonce` mit jeder Anfrage ans Backend. Nur die Dokumentanfrage darf sie in der Abfrage tragen; Skript und Stil also inline, Bilder per `fetch` → `blob:`. Keine Pop-ups, Downloads, Formular-Posts oder WebSocket; ein Server-Sent-Events-Stream funktioniert. Relative Weiterleitungen werden unter das Präfix umgeschrieben, absolute abgelehnt.
+
+```text
+Facet → panel  {type: "context", v: 1, nonce, route, album_id, photo, selection: [≤ 500 paths],
+                scope: {kind: "view", query} | {kind: "selection"} | {kind: "import", run_id}}
+panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | "refresh" {paths} | "close", v: 1, nonce}
+```
+
+Facet nimmt eine Nachricht nur vom Fenster des Bereichs mit dessen Nonce an, und erst nach `ready` (nach jedem Neuladen erneut). Pfade, die der Tab nicht zeigen kann, werden ignoriert.
+
 ## Capsules
 
 Kuratierte Foto-Diaschauen (Slideshows), nach Thema gruppiert, aus Ihrer Bibliothek erzeugt und für `freshness_hours` zwischengespeichert.

@@ -2144,6 +2144,22 @@ The two `tags.write` routes are a temporary stand-in until plugin-owned tags exi
 
 **Trust.** Installing a manifest trusts that program as the operating-system user Facet runs as, the same trust as a file in `plugins/`. Permissions keep a well-behaved add-on to its job and bound what a bug can reach; they cannot contain a hostile program running as the same user. Real isolation needs the add-on in its own container without the database volume.
 
+### Add-on sidebar
+
+An add-on with the `sidebar` slot opens in a panel docked to the right of every page (the puzzle-piece button in the header, or **Open** on the Add-ons page). It is scoped to the selection when there is one, else to the gallery's current view, and it stays open while you move between the gallery and a photo. Drag its left edge to resize it.
+
+The panel is the add-on's own page, served through Facet at `/addons/<id>/…` and framed with `sandbox="allow-scripts"`. That makes it an opaque origin: it cannot read Facet's cookie, storage or token, and its own backend (which holds the add-on token) is the only thing that calls `/api`. Every response through `/addons/<id>/` carries `sandbox allow-scripts; default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'`, `Referrer-Policy: no-referrer` and `Cache-Control: no-store`, and never a `Set-Cookie`.
+
+Rules for the panel's author: the document URL is `/addons/<id><ui.path>?nonce=…`; keep the nonce in memory (storage throws in an opaque origin) and send it as `X-Addon-Nonce` on every request to the backend. Only the document request may carry it in the query string, so inline the panel's script and style and load images with `fetch` → `blob:`. No popups, downloads, form posts or WebSocket; a server-sent event stream works. A relative redirect is rewritten under the prefix; an absolute one is refused.
+
+```text
+Facet → panel  {type: "context", v: 1, nonce, route, album_id, photo, selection: [≤ 500 paths],
+                scope: {kind: "view", query} | {kind: "selection"} | {kind: "import", run_id}}
+panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | "refresh" {paths} | "close", v: 1, nonce}
+```
+
+Facet accepts a message only from the panel's own window with its nonce, and only after `ready` (again after every reload of the frame). Paths outside what the tab can show are ignored.
+
 ## Capsules
 
 Curated slideshows grouped by theme, generated from your library and cached for `freshness_hours`.

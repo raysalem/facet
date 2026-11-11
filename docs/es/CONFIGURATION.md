@@ -2146,6 +2146,22 @@ Las dos rutas `tags.write` son un sustituto temporal hasta que existan etiquetas
 
 **Confianza.** Instalar un manifiesto es confiar en ese programa como el usuario del sistema con el que corre Facet, igual que un archivo en `plugins/`. Los permisos mantienen a un complemento correcto en su tarea y limitan lo que alcanza un error; no contienen un programa hostil que corre como el mismo usuario. El aislamiento real requiere un contenedor propio sin el volumen de la base de datos.
 
+### Panel lateral de un complemento
+
+Un complemento con la ranura `sidebar` se abre en un panel acoplado a la derecha de cada página (botón de pieza de puzle en la cabecera, o **Abrir** en la página Complementos). Se aplica a la selección si la hay, si no a la vista actual de la galería, y sigue abierto al pasar de la galería a una foto. Arrastra su borde izquierdo para cambiar el tamaño.
+
+El panel es la página del propio complemento, servida por Facet en `/addons/<id>/…` e incrustada con `sandbox="allow-scripts"`. Así tiene un origen opaco: no puede leer la cookie, el almacenamiento ni el token de Facet, y solo su backend (que guarda el token del complemento) llama a `/api`. Toda respuesta bajo `/addons/<id>/` lleva `sandbox allow-scripts; default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'`, `Referrer-Policy: no-referrer` y `Cache-Control: no-store`, y nunca un `Set-Cookie`.
+
+Reglas para el autor del panel: la URL del documento es `/addons/<id><ui.path>?nonce=…`; guarda el nonce en memoria (el almacenamiento falla en un origen opaco) y envíalo como `X-Addon-Nonce` en cada petición al backend. Solo la petición del documento puede llevarlo en la consulta: incrusta el script y el estilo y carga las imágenes con `fetch` → `blob:`. Sin ventanas emergentes, descargas, envíos de formulario ni WebSocket; un flujo de eventos del servidor funciona. Una redirección relativa se reescribe bajo el prefijo; una absoluta se rechaza.
+
+```text
+Facet → panel  {type: "context", v: 1, nonce, route, album_id, photo, selection: [≤ 500 paths],
+                scope: {kind: "view", query} | {kind: "selection"} | {kind: "import", run_id}}
+panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | "refresh" {paths} | "close", v: 1, nonce}
+```
+
+Facet solo acepta un mensaje de la ventana del panel con su nonce, y solo después de `ready` (de nuevo tras cada recarga). Las rutas que la pestaña no puede mostrar se ignoran.
+
 ## Cápsulas
 
 Diaporamas de fotos curados agrupados por tema, generados a partir de tu biblioteca y almacenados en caché durante `freshness_hours`.

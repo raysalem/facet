@@ -2,7 +2,9 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@ang
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { AddonsService, type AddonTokenCreated } from '../../core/services/addons.service';
+import { AddonsService, type Addon, type AddonTokenCreated } from '../../core/services/addons.service';
+import { AddonPanelService } from '../../core/addons/addon-panel.service';
+import { IncludesPipe } from '../../shared/pipes/array.pipe';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { i18nKeys } from '../../core/i18n/keys';
 
@@ -14,7 +16,7 @@ import { i18nKeys } from '../../core/i18n/keys';
 @Component({
   selector: 'app-addons-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatButtonModule, MatIconModule, MatTooltipModule, TranslatePipe],
+  imports: [MatButtonModule, MatIconModule, MatTooltipModule, TranslatePipe, IncludesPipe],
   host: { class: 'block px-4 pt-4 pb-8 max-w-3xl mx-auto' },
   template: `
     <header class="flex items-center gap-2 mb-2">
@@ -55,6 +57,13 @@ import { i18nKeys } from '../../core/i18n/keys';
                 <li class="text-xs rounded px-2 py-0.5 bg-[var(--mat-sys-surface-container)]">{{ ('addons.permission.' + permission) | translate }}</li>
               }
             </ul>
+            @if (addon.slots | includes: 'sidebar') {
+              <div class="flex flex-wrap items-center gap-2 mt-3">
+                <button mat-flat-button data-addon-open (click)="open(addon)">
+                  <mat-icon>open_in_new</mat-icon>{{ I18N.addons.open | translate }}
+                </button>
+              </div>
+            }
             @if (addon.mode === 'external') {
               <div class="flex flex-wrap items-center gap-2 mt-3">
                 <button mat-stroked-button data-addon-mint (click)="mint(addon.id)">
@@ -75,6 +84,9 @@ import { i18nKeys } from '../../core/i18n/keys';
           </li>
         }
       </ul>
+      @if (panels.openError(); as error) {
+        <p role="alert" class="text-sm text-red-400 mt-2">{{ I18N.addons.open_error | translate: { detail: error } }}</p>
+      }
       @if (mintError()) {
         <p role="alert" class="text-sm text-red-400 mt-2">{{ I18N.addons.token.error | translate }}</p>
       }
@@ -97,6 +109,7 @@ export class AddonsPageComponent implements OnInit {
   protected readonly addons = inject(AddonsService);
   protected readonly minted = signal<AddonTokenCreated | null>(null);
   protected readonly mintError = signal(false);
+  protected readonly panels = inject(AddonPanelService);
 
   ngOnInit(): void {
     void this.addons.load();
@@ -104,6 +117,11 @@ export class AddonsPageComponent implements OnInit {
 
   protected refresh(): void {
     void this.addons.load();
+  }
+
+  /** Open the add-on's sidebar for the gallery's current view or selection. */
+  protected async open(addon: Addon): Promise<void> {
+    await this.panels.openForCurrentView(addon);
   }
 
   protected async mint(id: string): Promise<void> {

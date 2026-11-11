@@ -4230,6 +4230,14 @@
       "revoke": "Revoke tokens",
       "error": "The token could not be created."
     },
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "panel": {
+      "close": "Close add-on panel",
+      "resize": "Resize add-on panel"
+    },
+    "open": "Open",
+    "launcher": "Open an add-on for this view",
+    "launcher_empty": "No add-on with a sidebar is installed",
+    "open_error": "The add-on could not be opened: {detail}"
   }
 }

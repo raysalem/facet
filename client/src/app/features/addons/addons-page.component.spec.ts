@@ -3,6 +3,7 @@ import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { AddonsPageComponent } from './addons-page.component';
 import { AddonsService, type AddonList } from '../../core/services/addons.service';
 import { I18nService } from '../../core/services/i18n.service';
+import { AddonPanelService } from '../../core/addons/addon-panel.service';
 
 function listing(): AddonList {
   return {
@@ -25,14 +26,19 @@ describe('Add-ons page', () => {
   let load: ReturnType<typeof vi.fn>;
   let mintToken: ReturnType<typeof vi.fn>;
   let revokeTokens: ReturnType<typeof vi.fn>;
+  let openForCurrentView: ReturnType<typeof vi.fn>;
+  const openError = signal<string | null>(null);
 
   beforeEach(() => {
     list.set(null); loadError.set(false);
     load = vi.fn(async () => { list.set(listing()); return list(); });
     mintToken = vi.fn(async (id: string) => ({ id: 7, addon_id: id, level: 'edition', token: 'fct_secret', scopes: [] }));
     revokeTokens = vi.fn(async () => undefined);
+    openForCurrentView = vi.fn(async () => true);
+    openError.set(null);
     TestBed.configureTestingModule({ imports: [AddonsPageComponent], providers: [
       { provide: AddonsService, useValue: { list, loadError, load, mintToken, revokeTokens } },
+      { provide: AddonPanelService, useValue: { openForCurrentView, openError } },
       { provide: I18nService, useValue: { t: (key: string, params?: Record<string, unknown>) => key + (params ? ' ' + Object.values(params).join(' ') : ''), translations: signal({}), currentLang: signal('en') } },
     ] });
     fixture = TestBed.createComponent(AddonsPageComponent);
@@ -67,6 +73,15 @@ describe('Add-ons page', () => {
     (root.querySelector('[data-addon-mint]') as HTMLButtonElement).click();
     await settle();
     expect(root.querySelector('[role="alert"]')?.textContent).toContain('addons.token.error');
+  });
+
+  it('opens a sidebar add-on for the current view and shows why it could not', async () => {
+    await settle();
+    (root.querySelector('[data-addon="astro"] [data-addon-open]') as HTMLButtonElement).click();
+    expect(openForCurrentView).toHaveBeenCalledWith(expect.objectContaining({ id: 'astro' }));
+    openError.set('The add-on is not running');
+    fixture.detectChanges();
+    expect(root.querySelector('[role="alert"]')?.textContent).toContain('The add-on is not running');
   });
 
   it('says so when nothing is installed', async () => {

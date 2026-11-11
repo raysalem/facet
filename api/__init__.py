@@ -192,6 +192,21 @@ class RequestBodyCapMiddleware:
         await self.app(scope, limited_receive, send)
 
 
+class SiteCORSMiddleware(CORSMiddleware):
+    """``CORSMiddleware`` for the site, minus the add-on panel prefix.
+
+    An add-on panel is an opaque-origin (sandboxed) frame, so its requests say ``Origin: null``, which
+    the site's allow-list rightly refuses. ``/addons/`` answers CORS itself (``api.addons.proxy``):
+    ``*`` without credentials, the per-open nonce being the capability.
+    """
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope.get("path", "").startswith("/addons/"):
+            await self.app(scope, receive, send)
+            return
+        await super().__call__(scope, receive, send)
+
+
 def _api_docs_enabled() -> bool:
     """``FACET_ENABLE_API_DOCS`` turns the interactive docs on; only explicit yes-values count."""
     return os.environ.get("FACET_ENABLE_API_DOCS", "").strip().lower() in ("1", "true", "yes", "on")
@@ -550,6 +565,8 @@ async def lifespan(app: FastAPI):
     _plugin_mgr = get_plugin_manager()
     if _plugin_mgr is not None:
         _plugin_mgr.shutdown()
+    from api.addons import proxy as addon_proxy
+    await addon_proxy.aclose()
 
 
 def create_app() -> FastAPI:
@@ -619,7 +636,7 @@ def create_app() -> FastAPI:
     default_origins = ["http://localhost:4200", "http://localhost:5000"]
     allowed_origins = _FULL_CONFIG.get("viewer", {}).get("allowed_origins", default_origins)
     app.add_middleware(
-        CORSMiddleware,
+        SiteCORSMiddleware,
         allow_origins=allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
@@ -751,6 +768,9 @@ def create_app() -> FastAPI:
     app.include_router(mcp_tokens_router)
     from api.routers.addons import router as addons_router
     app.include_router(addons_router)
+    # The add-on panel proxy, /addons/{id}/{path}; before the SPA catch-all below.
+    from api.addons.proxy import router as addon_proxy_router
+    app.include_router(addon_proxy_router)
 
     # Agent (MCP) endpoint: POST /mcp. Appended here, before the SPA catch-all below.
     # An install upgraded without re-running `pip install -r requirements.txt` has no

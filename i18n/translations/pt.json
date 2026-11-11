@@ -4230,6 +4230,14 @@
       "revoke": "Revogar tokens",
       "error": "Não foi possível criar o token."
     },
-    "refresh": "Atualizar"
+    "refresh": "Atualizar",
+    "panel": {
+      "close": "Fechar o painel do complemento",
+      "resize": "Redimensionar o painel do complemento"
+    },
+    "open": "Abrir",
+    "launcher": "Abrir um complemento para esta vista",
+    "launcher_empty": "Nenhum complemento com painel lateral instalado",
+    "open_error": "Não foi possível abrir o complemento: {detail}"
   }
 }

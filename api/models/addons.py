@@ -1,6 +1,6 @@
 """Wire models for ``/api/addons`` (the Add-ons page). Never carries an add-on's argv."""
 
-from typing import Literal
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel
 
@@ -45,3 +45,23 @@ class AddonTokensRevoked(BaseModel):
     addon_id: str
     revoked: int
 
+
+class AddonOpenRequest(BaseModel):
+    """``scope``: ``{"kind": "view", "query": "..."}`` | ``{"kind": "selection"}`` | ``{"kind": "import", "run_id": "..."}``."""
+
+    scope: Optional[dict[str, Any]] = None
+
+
+class AddonOpened(BaseModel):
+    addon_id: str
+    nonce: str
+    src: str
+    scope: dict[str, Any]
+
+
+class AddonCloseRequest(BaseModel):
+    nonce: str
+
+
+class AddonClosed(BaseModel):
+    closed: bool

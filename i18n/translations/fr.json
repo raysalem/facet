@@ -4230,6 +4230,14 @@
       "revoke": "Révoquer les jetons",
       "error": "Impossible de créer le jeton."
     },
-    "refresh": "Actualiser"
+    "refresh": "Actualiser",
+    "panel": {
+      "close": "Fermer le panneau du module",
+      "resize": "Redimensionner le panneau du module"
+    },
+    "open": "Ouvrir",
+    "launcher": "Ouvrir un module pour cette vue",
+    "launcher_empty": "Aucun module avec panneau latéral n'est installé",
+    "open_error": "Impossible d'ouvrir le module : {detail}"
   }
 }

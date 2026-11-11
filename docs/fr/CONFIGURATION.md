@@ -2144,6 +2144,22 @@ Les deux routes `tags.write` sont un substitut temporaire en attendant les mots-
 
 **Confiance.** Installer un manifeste revient à faire confiance à ce programme en tant qu'utilisateur système de Facet, comme pour un fichier dans `plugins/`. Les permissions cantonnent un module correct à sa tâche et limitent la portée d'un bogue ; elles ne contiennent pas un programme hostile exécuté sous le même utilisateur. Une vraie isolation exige un conteneur séparé sans le volume de la base.
 
+### Panneau latéral d'un module
+
+Un module avec l'emplacement `sidebar` s'ouvre dans un panneau ancré à droite de chaque page (bouton pièce de puzzle dans l'en-tête, ou **Ouvrir** sur la page Modules complémentaires). Il porte sur la sélection s'il y en a une, sinon sur la vue courante de la galerie, et reste ouvert quand vous passez de la galerie à une photo. Faites glisser son bord gauche pour le redimensionner.
+
+Le panneau est la page du module, servie par Facet sous `/addons/<id>/…` et intégrée avec `sandbox="allow-scripts"`. Son origine est donc opaque : il ne peut lire ni le cookie, ni le stockage, ni le jeton de Facet, et seul son propre backend (qui détient le jeton du module) appelle `/api`. Chaque réponse sous `/addons/<id>/` porte `sandbox allow-scripts; default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'`, `Referrer-Policy: no-referrer` et `Cache-Control: no-store`, et jamais de `Set-Cookie`.
+
+Règles pour l'auteur du panneau : l'URL du document est `/addons/<id><ui.path>?nonce=…` ; gardez le nonce en mémoire (le stockage lève une erreur dans une origine opaque) et envoyez-le en `X-Addon-Nonce` à chaque requête vers le backend. Seule la requête du document peut le porter dans la chaîne de requête : intégrez script et style en ligne et chargez les images par `fetch` → `blob:`. Pas de fenêtres surgissantes, téléchargements, envois de formulaire ni WebSocket ; un flux d'événements serveur fonctionne. Une redirection relative est réécrite sous le préfixe ; une absolue est refusée.
+
+```text
+Facet → panel  {type: "context", v: 1, nonce, route, album_id, photo, selection: [≤ 500 paths],
+                scope: {kind: "view", query} | {kind: "selection"} | {kind: "import", run_id}}
+panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | "refresh" {paths} | "close", v: 1, nonce}
+```
+
+Facet n'accepte un message que de la fenêtre du panneau avec son nonce, et seulement après `ready` (de nouveau après chaque rechargement). Les chemins que l'onglet ne peut pas afficher sont ignorés.
+
 ## Capsules
 
 Diaporamas organisés par thème, générés à partir de votre bibliothèque et mis en cache pendant `freshness_hours`.

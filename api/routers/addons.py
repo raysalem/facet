@@ -12,11 +12,12 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from api.addons import manifest
+from api.addons import manifest, panels, proxy
 from api.addons.auth import live_addon_tokens, mint_addon_token, revoke_addon_tokens
 from api.auth import CurrentUser, require_human_session, require_scan_access
 from api.models.addons import (
-    AddonList, AddonTokenCreated, AddonTokensRevoked,
+    AddonClosed, AddonCloseRequest, AddonList, AddonOpened, AddonOpenRequest, AddonTokenCreated,
+    AddonTokensRevoked,
 )
 
 logger = logging.getLogger(__name__)
@@ -106,3 +107,31 @@ def revoke_tokens(addon_id: str, _user: CurrentUser = Depends(require_addon_oper
     logger.info("Revoked %d token(s) of add-on %s", revoked, addon_id)
     return {"addon_id": addon_id, "revoked": revoked}
 
+
+def open_addon_panel(addon: manifest.Addon, scope: object) -> dict:
+    """Validate ``scope`` and issue a panel nonce; shared with the supervisor's start."""
+    if "sidebar" not in addon.slots:
+        raise HTTPException(status_code=409, detail="This add-on has no sidebar")
+    if proxy.upstream_for(addon) is None:
+        raise HTTPException(status_code=409, detail="The add-on is not running")
+    panel = panels.open_panel(addon.id, panels.validate_scope(addon.id, scope))
+    return {"addon_id": addon.id, "nonce": panel.nonce, "scope": panel.scope,
+            "src": f"{proxy.PREFIX}/{addon.id}{addon.ui_path}?nonce={panel.nonce}"}
+
+
+@router.post(
+    "/{addon_id}/open",
+    response_model=AddonOpened,
+    responses={404: {"description": "Unknown add-on, or add-ons are disabled."},
+               409: {"description": "No sidebar slot, or the add-on is not running."},
+               422: {"description": "The scope failed validation."}},
+)
+def open_panel(addon_id: str, body: AddonOpenRequest, _user: CurrentUser = Depends(require_addon_operator)):
+    """Open the add-on's sidebar for ``scope``: a fresh per-open nonce and the iframe ``src``."""
+    return open_addon_panel(addon_or_404(addon_id), body.scope)
+
+
+@router.post("/{addon_id}/close", response_model=AddonClosed)
+def close_panel(addon_id: str, body: AddonCloseRequest, _user: CurrentUser = Depends(require_addon_operator)):
+    """Forget one panel's nonce (the sidebar was closed); the proxy refuses it from now on."""
+    return {"closed": panels.close(addon_id, body.nonce)}

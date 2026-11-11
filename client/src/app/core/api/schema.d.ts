@@ -24,6 +24,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/addons/{addon_id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close Panel
+         * @description Forget one panel's nonce (the sidebar was closed); the proxy refuses it from now on.
+         */
+        post: operations["close_panel_api_addons__addon_id__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/addons/{addon_id}/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open Panel
+         * @description Open the add-on's sidebar for ``scope``: a fresh per-open nonce and the iframe ``src``.
+         */
+        post: operations["open_panel_api_addons__addon_id__open_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/addons/{addon_id}/token": {
         parameters: {
             query?: never;
@@ -6094,6 +6134,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AddonCloseRequest */
+        AddonCloseRequest: {
+            /** Nonce */
+            nonce: string;
+        };
+        /** AddonClosed */
+        AddonClosed: {
+            /** Closed */
+            closed: boolean;
+        };
         /** AddonItem */
         AddonItem: {
             /** Facet Api */
@@ -6133,6 +6183,29 @@ export interface components {
             addons_dir: string;
             /** Refused */
             refused: components["schemas"]["RefusedManifest"][];
+        };
+        /**
+         * AddonOpenRequest
+         * @description ``scope``: ``{"kind": "view", "query": "..."}`` | ``{"kind": "selection"}`` | ``{"kind": "import", "run_id": "..."}``.
+         */
+        AddonOpenRequest: {
+            /** Scope */
+            scope?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** AddonOpened */
+        AddonOpened: {
+            /** Addon Id */
+            addon_id: string;
+            /** Nonce */
+            nonce: string;
+            /** Scope */
+            scope: {
+                [key: string]: unknown;
+            };
+            /** Src */
+            src: string;
         };
         /**
          * AddonTokenCreated
@@ -12165,6 +12238,88 @@ export interface operations {
             };
             /** @description Add-ons are disabled (addons.enabled). */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    close_panel_api_addons__addon_id__close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                addon_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddonCloseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddonClosed"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_panel_api_addons__addon_id__open_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                addon_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddonOpenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddonOpened"];
+                };
+            };
+            /** @description Unknown add-on, or add-ons are disabled. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No sidebar slot, or the add-on is not running. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The scope failed validation. */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

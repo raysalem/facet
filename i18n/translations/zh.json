@@ -4230,6 +4230,14 @@
       "revoke": "撤销令牌",
       "error": "无法创建令牌。"
     },
-    "refresh": "刷新"
+    "refresh": "刷新",
+    "panel": {
+      "close": "关闭附加组件面板",
+      "resize": "调整附加组件面板大小"
+    },
+    "open": "打开",
+    "launcher": "为此视图打开附加组件",
+    "launcher_empty": "未安装带侧边栏的附加组件",
+    "open_error": "无法打开附加组件：{detail}"
   }
 }

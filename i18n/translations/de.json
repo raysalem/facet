@@ -4230,6 +4230,14 @@
       "revoke": "Tokens widerrufen",
       "error": "Das Token konnte nicht erstellt werden."
     },
-    "refresh": "Aktualisieren"
+    "refresh": "Aktualisieren",
+    "panel": {
+      "close": "Add-on-Bereich schließen",
+      "resize": "Größe des Add-on-Bereichs ändern"
+    },
+    "open": "Öffnen",
+    "launcher": "Ein Add-on für diese Ansicht öffnen",
+    "launcher_empty": "Kein Add-on mit Seitenleiste installiert",
+    "open_error": "Das Add-on konnte nicht geöffnet werden: {detail}"
   }
 }
