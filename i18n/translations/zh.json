@@ -4191,5 +4191,45 @@
       "help_label": "关于关键词编辑"
     },
     "help_label": "关于关键词树"
+  },
+  "addons": {
+    "title": "附加组件",
+    "intro": "附加组件是独立的程序，通过受限且经过权限检查的连接处理您的图库。附加组件的安装程序会把清单放在此文件夹中：",
+    "empty": "未安装任何附加组件。",
+    "load_error": "无法加载附加组件。",
+    "refused_title": "未加载",
+    "refused_help": "这些文件夹中的清单被 Facet 拒绝。请修正文件后重新加载配置或重启 Facet。",
+    "version": "版本 {version}",
+    "permissions": "权限",
+    "permission": {
+      "photos": {
+        "read": "读取照片"
+      },
+      "tags": {
+        "write": "写入标签"
+      },
+      "annotations": {
+        "write": "写入注释"
+      },
+      "gps": {
+        "write": "设置位置"
+      }
+    },
+    "mode": {
+      "supervised": "由 Facet 启动",
+      "external": "独立运行"
+    },
+    "status": {
+      "external": "外部",
+      "stopped": "已停止"
+    },
+    "token": {
+      "create": "创建访问令牌",
+      "shown_once": "请立即将此令牌复制到附加组件的设置中。它只显示一次。",
+      "live": "有效令牌：{count}",
+      "revoke": "撤销令牌",
+      "error": "无法创建令牌。"
+    },
+    "refresh": "刷新"
   }
 }

@@ -357,6 +357,12 @@
               {{ I18N.dialog.connect_assistant.menu | translate }}
             </button>
           }
+          @if (addons.available()) {
+            <a mat-menu-item routerLink="/addons" data-menu-addons>
+              <mat-icon>extension</mat-icon>
+              {{ I18N.addons.title | translate }}
+            </a>
+          }
           <button mat-menu-item (click)="openKeymapDialog()">
             <mat-icon>keyboard</mat-icon>
             {{ I18N.shortcuts.keymap_title | translate }}

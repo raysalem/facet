@@ -37,6 +37,7 @@ Cada configuração é distribuída em `config/scoring_config.default.json`. O s
 - [Desempenho](#performance)
 - [Armazenamento](#storage)
 - [Plugins](#plugins)
+- [Complementos](#complementos)
 - [Cápsulas](#capsules)
 - [Grupos de Similaridade](#similarity-groups)
 - [Cenas](#scenes)
@@ -2092,6 +2093,48 @@ Opções de webhook: `url` (obrigatório), `events` (lista de nomes de eventos),
 | `POST` | `/api/plugins/test-webhook` | Envia uma carga útil de teste para uma URL de webhook |
 
 ---
+
+## Complementos
+
+Um complemento (add-on) é um programa separado (repositório e ambiente virtual próprios) que trabalha com a biblioteca através da API HTTP do Facet com um conjunto limitado de permissões. Ao contrário de um [plugin](#plugins), nunca corre dentro do processo do Facet.
+
+```json
+{
+  "addons": {
+    "enabled": false
+  }
+}
+```
+
+| Chave | Predefinição | Descrição |
+|-----|---------|-------------|
+| `enabled` | `false` | Interruptor geral. Com false, `/api/addons` responde 404, os tokens de complemento são recusados e nenhum complemento é listado ou iniciado |
+
+**Instalação.** O instalador de um complemento escreve um único ficheiro, `<facet data>/addons/<id>/addon.json`. *Facet data* é a pasta da base de dados (`dirname(DB_PATH)`): `%LOCALAPPDATA%\Facet\data` no Windows, `/app/data` no Docker. Os manifestos são lidos no arranque e sempre que a configuração é recarregada. Para desinstalar, apague a pasta. Colocar o manifesto é a aprovação; não há passo de aprovação no navegador.
+
+```json
+{"id": "astro-id", "name": "Astro", "version": "0.3.0", "icon": "star", "facet_api": 1,
+ "start": {"argv": ["C:/Tools/uv.exe", "run", "--project", "C:/Tools/astro-id", "astro-id", "facet", "serve"],
+           "port": "auto", "health": "/health"},
+ "ui": {"path": "/ui/"},
+ "slots": ["sidebar", "import_hook"],
+ "permissions": ["photos.read", "tags.write", "annotations.write", "gps.write"]}
+```
+
+Um manifesto é recusado por inteiro, com o motivo na página **Complementos** (menu do utilizador → Complementos), quando: `id` não corresponde a `^[a-z0-9][a-z0-9._-]{0,63}$` ou difere do nome da pasta; uma chave, permissão ou ranhura é desconhecida; `start` e `ui.url` estão ambos presentes (ou nenhum); `start.argv[0]` não é um caminho absoluto para um ficheiro existente; `health` ou `ui.path` não é um caminho simples; ou `facet_api` não é um inteiro que este servidor fale (atualmente `1`). Um complemento sem `start` corre noutro lado (por exemplo um serviço Docker) e define `"ui": {"url": "http://astro:5100/"}`.
+
+**Permissões e tokens.** Um complemento autentica-se com um token `fct_` do tipo `addon` (guardado como hash SHA-256 na mesma tabela dos tokens de agente). O token age como a conta que o criou, no máximo ao nível atual dessa conta; uma palavra-passe alterada ou uma conta despromovida corta-o na chamada seguinte. Abaixo estão todas as rotas que pode chamar; qualquer outra responde 403. Um token de complemento nunca abre `/mcp`, e um token de agente não ganha nada em `/api`. Para um complemento sem `start`, a página cria o token uma vez (**Criar token de acesso**) e mostra-o uma vez; **Revogar tokens** revoga-o.
+
+| Permission | Routes |
+|---|---|
+| `photos.read` | `GET /api/photos`, `GET /api/photo`, `GET /thumbnail`, `GET /image` |
+| `tags.write` | `POST /api/photos/batch_manual_tags`, `DELETE /api/photo/manual_tags` |
+| `annotations.write` | — |
+| `gps.write` | `PUT /api/photo/gps` |
+
+As duas rotas `tags.write` são um substituto temporário até existirem etiquetas próprias de plugins; `annotations.write` ainda não corresponde a nenhuma rota.
+
+**Confiança.** Instalar um manifesto é confiar nesse programa como o utilizador do sistema com que o Facet corre, tal como um ficheiro em `plugins/`. As permissões mantêm um complemento correto na sua tarefa e limitam o alcance de um erro; não contêm um programa hostil a correr como o mesmo utilizador. O isolamento real exige um contentor próprio sem o volume da base de dados.
 
 ## Capsules
 

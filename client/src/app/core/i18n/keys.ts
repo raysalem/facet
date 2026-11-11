@@ -4206,6 +4206,46 @@ export const I18N = {
     },
     help_label: "keyword_hierarchy.help_label",
   },
+  addons: {
+    title: "addons.title",
+    intro: "addons.intro",
+    empty: "addons.empty",
+    load_error: "addons.load_error",
+    refused_title: "addons.refused_title",
+    refused_help: "addons.refused_help",
+    version: "addons.version",
+    permissions: "addons.permissions",
+    permission: {
+      photos: {
+        read: "addons.permission.photos.read",
+      },
+      tags: {
+        write: "addons.permission.tags.write",
+      },
+      annotations: {
+        write: "addons.permission.annotations.write",
+      },
+      gps: {
+        write: "addons.permission.gps.write",
+      },
+    },
+    mode: {
+      supervised: "addons.mode.supervised",
+      external: "addons.mode.external",
+    },
+    status: {
+      external: "addons.status.external",
+      stopped: "addons.status.stopped",
+    },
+    token: {
+      create: "addons.token.create",
+      shown_once: "addons.token.shown_once",
+      live: "addons.token.live",
+      revoke: "addons.token.revoke",
+      error: "addons.token.error",
+    },
+    refresh: "addons.refresh",
+  },
 } as const;
 
 /** Returns {@link I18N}; use it to initialize class fields -- see the header comment above. */

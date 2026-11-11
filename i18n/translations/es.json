@@ -4191,5 +4191,45 @@
       "help_label": "Acerca de la edición de palabras clave"
     },
     "help_label": "Acerca del árbol de palabras clave"
+  },
+  "addons": {
+    "title": "Complementos",
+    "intro": "Los complementos son programas independientes que trabajan con tu biblioteca mediante una conexión limitada y con permisos comprobados. El instalador de un complemento coloca su manifiesto en esta carpeta:",
+    "empty": "No hay complementos instalados.",
+    "load_error": "No se pudieron cargar los complementos.",
+    "refused_title": "No cargados",
+    "refused_help": "Estas carpetas contienen un manifiesto que Facet rechazó. Corrige el archivo y vuelve a cargar la configuración o reinicia Facet.",
+    "version": "Versión {version}",
+    "permissions": "Permisos",
+    "permission": {
+      "photos": {
+        "read": "Leer fotos"
+      },
+      "tags": {
+        "write": "Escribir etiquetas"
+      },
+      "annotations": {
+        "write": "Escribir anotaciones"
+      },
+      "gps": {
+        "write": "Fijar ubicaciones"
+      }
+    },
+    "mode": {
+      "supervised": "Iniciado por Facet",
+      "external": "Se ejecuta por separado"
+    },
+    "status": {
+      "external": "Externo",
+      "stopped": "Detenido"
+    },
+    "token": {
+      "create": "Crear token de acceso",
+      "shown_once": "Copia este token en la configuración del complemento ahora. Solo se muestra una vez.",
+      "live": "Tokens activos: {count}",
+      "revoke": "Revocar tokens",
+      "error": "No se pudo crear el token."
+    },
+    "refresh": "Actualizar"
   }
 }

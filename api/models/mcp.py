@@ -35,6 +35,9 @@ class McpTokenItem(BaseModel):
     last_used_at: Optional[str] = None
     revoked: int
     revoked_at: Optional[str] = None
+    # 'agent' (/mcp) or 'addon' (an add-on's /api credential, docs/CONFIGURATION.md, Add-ons); addon_id names it.
+    kind: str = 'agent'
+    addon_id: Optional[str] = None
 
 
 class McpTokenCreated(McpTokenItem):

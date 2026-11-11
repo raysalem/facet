@@ -30,5 +30,5 @@
       }
     }
   ],
-  "navigationUrls": ["/**", "!/**/*.*", "!/api/**"]
+  "navigationUrls": ["/**", "!/**/*.*", "!/api/**", "!/addons/**"]
 }

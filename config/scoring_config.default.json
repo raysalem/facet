@@ -3785,6 +3785,9 @@
     "mode": "default",
     "allow_unclear": false
   },
+  "addons": {
+    "enabled": false
+  },
   "plugins": {
     "enabled": false,
     "high_score_threshold": 8.0,

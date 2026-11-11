@@ -4191,5 +4191,45 @@
       "help_label": "Informazioni sulla modifica delle parole chiave"
     },
     "help_label": "Informazioni sull’albero delle parole chiave"
+  },
+  "addons": {
+    "title": "Componenti aggiuntivi",
+    "intro": "I componenti aggiuntivi sono programmi separati che lavorano sulla libreria tramite una connessione limitata e con permessi verificati. Il programma di installazione di un componente mette il suo manifesto in questa cartella:",
+    "empty": "Nessun componente aggiuntivo installato.",
+    "load_error": "Impossibile caricare i componenti aggiuntivi.",
+    "refused_title": "Non caricati",
+    "refused_help": "Queste cartelle contengono un manifesto rifiutato da Facet. Correggi il file e ricarica la configurazione o riavvia Facet.",
+    "version": "Versione {version}",
+    "permissions": "Permessi",
+    "permission": {
+      "photos": {
+        "read": "Leggere le foto"
+      },
+      "tags": {
+        "write": "Scrivere tag"
+      },
+      "annotations": {
+        "write": "Scrivere annotazioni"
+      },
+      "gps": {
+        "write": "Impostare le posizioni"
+      }
+    },
+    "mode": {
+      "supervised": "Avviato da Facet",
+      "external": "Eseguito separatamente"
+    },
+    "status": {
+      "external": "Esterno",
+      "stopped": "Fermo"
+    },
+    "token": {
+      "create": "Crea token di accesso",
+      "shown_once": "Copia ora questo token nelle impostazioni del componente. Viene mostrato una sola volta.",
+      "live": "Token attivi: {count}",
+      "revoke": "Revoca i token",
+      "error": "Impossibile creare il token."
+    },
+    "refresh": "Aggiorna"
   }
 }

@@ -20,6 +20,7 @@ from api.auth import (
 from api.config import (
     VIEWER_CONFIG, is_multi_user_enabled, get_user_config, mcp_settings
 )
+from api.addons.manifest import addons_enabled
 from api.models.auth import (
     LoginRequest, LoginResponse, EditionLoginRequest, AuthStatusResponse
 )
@@ -249,6 +250,8 @@ def auth_status(user: Optional[CurrentUser] = Depends(get_optional_user)):
             'mcp': mcp_settings()['enabled'],
             'mcp_bridge': mcp_settings()['enabled'] and mcp_settings()['bridge'],
             'mcp_inpage': mcp_settings()['enabled'] and mcp_settings()['inpage_tools'],
+            # Derived like mcp: the switch is addons.enabled (docs/CONFIGURATION.md, Add-ons).
+            'addons': addons_enabled(),
         },
         download_profiles=profile_names,
     )

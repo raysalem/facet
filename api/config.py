@@ -1457,6 +1457,9 @@ def reload_config():
     # while every other key went live at once.
     from api.routers.search import _reset_clip_config_cache
     _reset_clip_config_cache()
+    # Add-on manifests are re-read with the config (the operator's "I added one" signal).
+    from api.addons import manifest as addon_manifests
+    addon_manifests.reload()
 
 
 def map_disk_path(db_path):

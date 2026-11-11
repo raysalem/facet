@@ -991,6 +991,12 @@ MCP_TOKENS_COLUMNS = [
     ('revoked_at', 'TEXT'),
     # Level of the session that minted the token; NULL (pre-column rows) counts as readonly.
     ('minted_level', 'TEXT'),
+    # 'agent' (an MCP client, /mcp only) or 'addon' (an out-of-process add-on, /api only, under
+    # ``scopes``). Pre-column rows read 'agent'. ``addon_id`` names the manifest and ``scopes`` is a
+    # JSON list of add-on permissions (api/addons/scopes.py); both are NULL for an agent token.
+    ('kind', "TEXT NOT NULL DEFAULT 'agent'"),
+    ('addon_id', 'TEXT'),
+    ('scopes', 'TEXT'),
 ]
 
 MCP_TOKENS_INDEXES = [

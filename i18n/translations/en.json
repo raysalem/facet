@@ -4191,5 +4191,45 @@
       "help_label": "About keyword editing"
     },
     "help_label": "About the keyword tree"
+  },
+  "addons": {
+    "title": "Add-ons",
+    "intro": "Add-ons are separate programs that work with your library through a limited, permission-checked connection. An add-on's installer places its manifest in this folder:",
+    "empty": "No add-ons are installed.",
+    "load_error": "The add-ons could not be loaded.",
+    "refused_title": "Not loaded",
+    "refused_help": "These folders hold a manifest Facet refused. Fix the file and reload the configuration or restart Facet.",
+    "version": "Version {version}",
+    "permissions": "Permissions",
+    "permission": {
+      "photos": {
+        "read": "Read photos"
+      },
+      "tags": {
+        "write": "Write tags"
+      },
+      "annotations": {
+        "write": "Write annotations"
+      },
+      "gps": {
+        "write": "Set locations"
+      }
+    },
+    "mode": {
+      "supervised": "Started by Facet",
+      "external": "Runs separately"
+    },
+    "status": {
+      "external": "External",
+      "stopped": "Stopped"
+    },
+    "token": {
+      "create": "Create access token",
+      "shown_once": "Copy this token into the add-on's settings now. It is shown only once.",
+      "live": "Active tokens: {count}",
+      "revoke": "Revoke tokens",
+      "error": "The token could not be created."
+    },
+    "refresh": "Refresh"
   }
 }

@@ -37,6 +37,7 @@ Ogni impostazione è distribuita in `config/scoring_config.default.json`. Il tuo
 - [Prestazioni](#performance)
 - [Archiviazione](#storage)
 - [Plugin](#plugins)
+- [Componenti aggiuntivi](#componenti-aggiuntivi)
 - [Capsule](#capsules)
 - [Gruppi di similarità](#similarity-groups)
 - [Scene](#scenes)
@@ -2104,6 +2105,48 @@ Opzioni del webhook: `url` (obbligatorio), `events` (lista di nomi di eventi), `
 | `POST` | `/api/plugins/test-webhook` | Invia un payload di test a un URL webhook |
 
 ---
+
+## Componenti aggiuntivi
+
+Un componente aggiuntivo (add-on) è un programma separato (repository e ambiente virtuale propri) che lavora sulla libreria tramite l'API HTTP di Facet con un insieme limitato di permessi. A differenza di un [plugin](#plugins), non viene mai eseguito nel processo di Facet.
+
+```json
+{
+  "addons": {
+    "enabled": false
+  }
+}
+```
+
+| Chiave | Predefinito | Descrizione |
+|-----|---------|-------------|
+| `enabled` | `false` | Interruttore generale. Con false, `/api/addons` risponde 404, i token dei componenti sono rifiutati e nessun componente viene elencato o avviato |
+
+**Installazione.** Il programma di installazione di un componente scrive un solo file, `<facet data>/addons/<id>/addon.json`. *Facet data* è la cartella del database (`dirname(DB_PATH)`): `%LOCALAPPDATA%\Facet\data` su Windows, `/app/data` in Docker. I manifesti vengono letti all'avvio e a ogni ricaricamento della configurazione. Per disinstallare, elimina la cartella. Mettere il manifesto è l'approvazione; non c'è un passaggio di approvazione nel browser.
+
+```json
+{"id": "astro-id", "name": "Astro", "version": "0.3.0", "icon": "star", "facet_api": 1,
+ "start": {"argv": ["C:/Tools/uv.exe", "run", "--project", "C:/Tools/astro-id", "astro-id", "facet", "serve"],
+           "port": "auto", "health": "/health"},
+ "ui": {"path": "/ui/"},
+ "slots": ["sidebar", "import_hook"],
+ "permissions": ["photos.read", "tags.write", "annotations.write", "gps.write"]}
+```
+
+Un manifesto viene rifiutato per intero, con il motivo sulla pagina **Componenti aggiuntivi** (menu utente → Componenti aggiuntivi), quando: `id` non corrisponde a `^[a-z0-9][a-z0-9._-]{0,63}$` o differisce dal nome della cartella; una chiave, un permesso o uno slot è sconosciuto; `start` e `ui.url` sono entrambi presenti (o nessuno); `start.argv[0]` non è un percorso assoluto di un file esistente; `health` o `ui.path` non è un percorso semplice; oppure `facet_api` non è un intero supportato dal server (ora `1`). Un componente senza `start` gira altrove (per esempio un servizio Docker) e imposta `"ui": {"url": "http://astro:5100/"}`.
+
+**Permessi e token.** Un componente si autentica con un token `fct_` di tipo `addon` (salvato come hash SHA-256 nella stessa tabella dei token degli agenti). Il token agisce come l'account che lo ha creato, al massimo al livello attuale di quell'account; una password cambiata o un account declassato lo blocca alla chiamata successiva. Sotto sono elencate tutte le rotte che può chiamare; ogni altra risponde 403. Un token di componente non apre mai `/mcp`, e un token di agente non ottiene nulla su `/api`. Per un componente senza `start`, la pagina crea il token una volta (**Crea token di accesso**) e lo mostra una volta; **Revoca i token** lo revoca.
+
+| Permission | Routes |
+|---|---|
+| `photos.read` | `GET /api/photos`, `GET /api/photo`, `GET /thumbnail`, `GET /image` |
+| `tags.write` | `POST /api/photos/batch_manual_tags`, `DELETE /api/photo/manual_tags` |
+| `annotations.write` | — |
+| `gps.write` | `PUT /api/photo/gps` |
+
+Le due rotte `tags.write` sono un sostituto temporaneo finché non esisteranno tag propri dei plugin; `annotations.write` non corrisponde ancora a nessuna rotta.
+
+**Fiducia.** Installare un manifesto significa fidarsi di quel programma come dell'utente di sistema con cui gira Facet, come per un file in `plugins/`. I permessi tengono un componente corretto nel suo compito e limitano ciò che un errore può raggiungere; non contengono un programma ostile eseguito con lo stesso utente. Un vero isolamento richiede un container separato senza il volume del database.
 
 ## Capsules
 

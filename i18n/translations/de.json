@@ -4191,5 +4191,45 @@
       "help_label": "Über die Schlagwortbearbeitung"
     },
     "help_label": "Über den Schlagwortbaum"
+  },
+  "addons": {
+    "title": "Add-ons",
+    "intro": "Add-ons sind eigenständige Programme, die über eine eingeschränkte, berechtigungsgeprüfte Verbindung mit Ihrer Bibliothek arbeiten. Das Installationsprogramm eines Add-ons legt sein Manifest in diesem Ordner ab:",
+    "empty": "Es sind keine Add-ons installiert.",
+    "load_error": "Die Add-ons konnten nicht geladen werden.",
+    "refused_title": "Nicht geladen",
+    "refused_help": "Diese Ordner enthalten ein Manifest, das Facet abgelehnt hat. Korrigieren Sie die Datei und laden Sie die Konfiguration neu oder starten Sie Facet neu.",
+    "version": "Version {version}",
+    "permissions": "Berechtigungen",
+    "permission": {
+      "photos": {
+        "read": "Fotos lesen"
+      },
+      "tags": {
+        "write": "Schlagwörter schreiben"
+      },
+      "annotations": {
+        "write": "Anmerkungen schreiben"
+      },
+      "gps": {
+        "write": "Orte festlegen"
+      }
+    },
+    "mode": {
+      "supervised": "Von Facet gestartet",
+      "external": "Läuft separat"
+    },
+    "status": {
+      "external": "Extern",
+      "stopped": "Gestoppt"
+    },
+    "token": {
+      "create": "Zugriffstoken erstellen",
+      "shown_once": "Kopieren Sie dieses Token jetzt in die Einstellungen des Add-ons. Es wird nur einmal angezeigt.",
+      "live": "Aktive Tokens: {count}",
+      "revoke": "Tokens widerrufen",
+      "error": "Das Token konnte nicht erstellt werden."
+    },
+    "refresh": "Aktualisieren"
   }
 }

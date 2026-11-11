@@ -566,6 +566,7 @@ def create_app() -> FastAPI:
         logger.warning("%s", exposure_warning)
 
     from api.db_helpers import warm_schema_caches
+    from api.addons.auth import addon_route_gate
     docs_enabled = _api_docs_enabled()
     app = FastAPI(
         title="Facet API",
@@ -582,7 +583,8 @@ def create_app() -> FastAPI:
         openapi_url="/api/openapi.json" if docs_enabled else None,
         # Before every route: the cached schema probes that handlers read
         # synchronously are filled on a worker thread, never on the event loop.
-        dependencies=[Depends(warm_schema_caches)],
+        # And default deny for an add-on's token on every route (api/addons/auth.py).
+        dependencies=[Depends(warm_schema_caches), Depends(addon_route_gate)],
     )
 
     from api.config import _FULL_CONFIG
@@ -747,6 +749,8 @@ def create_app() -> FastAPI:
     app.include_router(immich_router)
     app.include_router(immich_diagnostics_router)
     app.include_router(mcp_tokens_router)
+    from api.routers.addons import router as addons_router
+    app.include_router(addons_router)
 
     # Agent (MCP) endpoint: POST /mcp. Appended here, before the SPA catch-all below.
     # An install upgraded without re-running `pip install -r requirements.txt` has no
@@ -771,6 +775,10 @@ def create_app() -> FastAPI:
     # Check for plaintext passwords at startup
     from api.auth import check_legacy_password_warnings
     check_legacy_password_warnings()
+
+    # Add-on manifests (<facet data>/addons/*/addon.json); re-read on reload_config.
+    from api.addons import manifest as addon_manifests
+    addon_manifests.reload()
 
     # Initialise plugin manager (global singleton + router reference)
     from plugins import init_global_plugin_manager

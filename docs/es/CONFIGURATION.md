@@ -37,6 +37,7 @@ Cada ajuste se incluye en `config/scoring_config.default.json`. Tu propio `scori
 - [Rendimiento](#rendimiento)
 - [Almacenamiento](#almacenamiento)
 - [Plugins](#plugins)
+- [Complementos](#complementos)
 - [Cápsulas](#cápsulas)
 - [Grupos de similitud](#grupos-de-similitud)
 - [Escenas](#escenas)
@@ -2102,6 +2103,48 @@ Opciones del webhook: `url` (obligatorio), `events` (lista de nombres de evento)
 | `POST` | `/api/plugins/test-webhook` | Envía una carga de prueba a una URL de webhook |
 
 ---
+
+## Complementos
+
+Un complemento (add-on) es un programa independiente (su propio repositorio y entorno virtual) que trabaja con la biblioteca a través de la API HTTP de Facet con un conjunto limitado de permisos. A diferencia de un [plugin](#plugins), nunca se ejecuta dentro del proceso de Facet.
+
+```json
+{
+  "addons": {
+    "enabled": false
+  }
+}
+```
+
+| Clave | Predeterminado | Descripción |
+|-----|---------|-------------|
+| `enabled` | `false` | Interruptor general. Con false, `/api/addons` responde 404, se rechazan los tokens de complemento y ningún complemento se lista ni se inicia |
+
+**Instalación.** El instalador de un complemento escribe un único archivo, `<facet data>/addons/<id>/addon.json`. *Facet data* es la carpeta de la base de datos (`dirname(DB_PATH)`): `%LOCALAPPDATA%\Facet\data` en Windows, `/app/data` en Docker. Los manifiestos se leen al arrancar y cada vez que se recarga la configuración. Para desinstalar, borra la carpeta. Colocar el manifiesto es la aprobación; no hay paso de aprobación en el navegador.
+
+```json
+{"id": "astro-id", "name": "Astro", "version": "0.3.0", "icon": "star", "facet_api": 1,
+ "start": {"argv": ["C:/Tools/uv.exe", "run", "--project", "C:/Tools/astro-id", "astro-id", "facet", "serve"],
+           "port": "auto", "health": "/health"},
+ "ui": {"path": "/ui/"},
+ "slots": ["sidebar", "import_hook"],
+ "permissions": ["photos.read", "tags.write", "annotations.write", "gps.write"]}
+```
+
+Un manifiesto se rechaza por completo, con el motivo en la página **Complementos** (menú de usuario → Complementos), cuando: `id` no cumple `^[a-z0-9][a-z0-9._-]{0,63}$` o difiere del nombre de su carpeta; una clave, permiso o ranura es desconocido; `start` y `ui.url` están ambos (o ninguno); `start.argv[0]` no es una ruta absoluta a un archivo existente; `health` o `ui.path` no es una ruta simple; o `facet_api` no es un entero que este servidor hable (ahora `1`). Un complemento sin `start` se ejecuta en otro lugar (por ejemplo un servicio Docker) y usa `"ui": {"url": "http://astro:5100/"}`.
+
+**Permisos y tokens.** Un complemento se autentica con un token `fct_` de tipo `addon` (guardado como hash SHA-256 en la misma tabla que los tokens de agente). El token actúa como la cuenta que lo creó, como mucho con el nivel actual de esa cuenta; una contraseña cambiada o una cuenta degradada lo corta en la siguiente llamada. Abajo figuran todas las rutas que puede llamar; cualquier otra responde 403. Un token de complemento nunca abre `/mcp`, y un token de agente no gana nada en `/api`. Para un complemento sin `start`, la página crea el token una vez (**Crear token de acceso**) y lo muestra una vez; **Revocar tokens** lo revoca.
+
+| Permission | Routes |
+|---|---|
+| `photos.read` | `GET /api/photos`, `GET /api/photo`, `GET /thumbnail`, `GET /image` |
+| `tags.write` | `POST /api/photos/batch_manual_tags`, `DELETE /api/photo/manual_tags` |
+| `annotations.write` | — |
+| `gps.write` | `PUT /api/photo/gps` |
+
+Las dos rutas `tags.write` son un sustituto temporal hasta que existan etiquetas propias de plugins; `annotations.write` aún no corresponde a ninguna ruta.
+
+**Confianza.** Instalar un manifiesto es confiar en ese programa como el usuario del sistema con el que corre Facet, igual que un archivo en `plugins/`. Los permisos mantienen a un complemento correcto en su tarea y limitan lo que alcanza un error; no contienen un programa hostil que corre como el mismo usuario. El aislamiento real requiere un contenedor propio sin el volumen de la base de datos.
 
 ## Cápsulas
 

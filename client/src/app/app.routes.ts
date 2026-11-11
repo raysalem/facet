@@ -155,6 +155,14 @@ export const routes: Routes = [
     canActivate: [authGuard],
   },
   {
+    // The Add-ons page. Not under /addons/<id>/, which is the server's add-on panel proxy.
+    path: 'addons',
+    title: I18N.addons.title,
+    loadComponent: () =>
+      import('./features/addons/addons-page.component').then(m => m.AddonsPageComponent),
+    canActivate: [authGuard],
+  },
+  {
     path: 'shared/album/:albumId',
     loadComponent: () =>
       import('./shared/components/shared-view/shared-view.component').then(m => m.SharedViewComponent),

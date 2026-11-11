@@ -37,6 +37,7 @@ Chaque réglage est livré dans `config/scoring_config.default.json`. Votre prop
 - [Performance](#performance)
 - [Stockage](#stockage)
 - [Plugins](#plugins)
+- [Modules complémentaires](#modules-complémentaires)
 - [Capsules](#capsules)
 - [Groupes de similarité](#groupes-de-similarité)
 - [Scènes](#scènes)
@@ -2100,6 +2101,48 @@ Options de webhook : `url` (requis), `events` (liste de noms d'événements), `
 | `POST` | `/api/plugins/test-webhook` | Envoyer une charge utile de test à une URL de webhook |
 
 ---
+
+## Modules complémentaires
+
+Un module complémentaire (add-on) est un programme séparé (son propre dépôt et son propre environnement virtuel) qui travaille sur la bibliothèque via l'API HTTP de Facet avec un ensemble limité de permissions. Contrairement à un [plugin](#plugins), il ne s'exécute jamais dans le processus de Facet.
+
+```json
+{
+  "addons": {
+    "enabled": false
+  }
+}
+```
+
+| Clé | Défaut | Description |
+|-----|---------|-------------|
+| `enabled` | `false` | Interrupteur principal. À false, `/api/addons` répond 404, les jetons de module sont refusés et aucun module n'est listé ni démarré |
+
+**Installation.** L'installateur d'un module écrit un seul fichier, `<facet data>/addons/<id>/addon.json`. *Facet data* est le dossier de la base de données (`dirname(DB_PATH)`) : `%LOCALAPPDATA%\Facet\data` sous Windows, `/app/data` sous Docker. Les manifestes sont lus au démarrage et à chaque rechargement de la configuration. Pour désinstaller, supprimez le dossier. Déposer le manifeste vaut approbation ; il n'y a pas d'approbation dans le navigateur.
+
+```json
+{"id": "astro-id", "name": "Astro", "version": "0.3.0", "icon": "star", "facet_api": 1,
+ "start": {"argv": ["C:/Tools/uv.exe", "run", "--project", "C:/Tools/astro-id", "astro-id", "facet", "serve"],
+           "port": "auto", "health": "/health"},
+ "ui": {"path": "/ui/"},
+ "slots": ["sidebar", "import_hook"],
+ "permissions": ["photos.read", "tags.write", "annotations.write", "gps.write"]}
+```
+
+Un manifeste est refusé en bloc, avec la raison affichée sur la page **Modules complémentaires** (menu utilisateur → Modules complémentaires), si : `id` ne correspond pas à `^[a-z0-9][a-z0-9._-]{0,63}$` ou diffère du nom de son dossier ; une clé, une permission ou un emplacement est inconnu ; `start` et `ui.url` sont tous deux présents (ou aucun) ; `start.argv[0]` n'est pas un chemin absolu vers un fichier existant ; `health` ou `ui.path` n'est pas un simple chemin ; ou `facet_api` n'est pas un entier que ce serveur parle (actuellement `1`). Un module sans `start` tourne ailleurs (par exemple un service Docker) et indique `"ui": {"url": "http://astro:5100/"}`.
+
+**Permissions et jetons.** Un module s'authentifie avec un jeton `fct_` de type `addon` (stocké sous forme de hachage SHA-256 dans la même table que les jetons d'agent). Le jeton agit au nom du compte qui l'a créé, au plus au niveau actuel de ce compte : un mot de passe changé ou un compte rétrogradé le coupe dès l'appel suivant. Chaque route qu'un jeton de module peut appeler figure ci-dessous ; toute autre route répond 403. Un jeton de module n'ouvre jamais `/mcp`, et un jeton d'agent n'obtient rien sur `/api`. Pour un module sans `start`, la page crée le jeton une fois (**Créer un jeton d'accès**) et l'affiche une fois ; **Révoquer les jetons** le révoque.
+
+| Permission | Routes |
+|---|---|
+| `photos.read` | `GET /api/photos`, `GET /api/photo`, `GET /thumbnail`, `GET /image` |
+| `tags.write` | `POST /api/photos/batch_manual_tags`, `DELETE /api/photo/manual_tags` |
+| `annotations.write` | — |
+| `gps.write` | `PUT /api/photo/gps` |
+
+Les deux routes `tags.write` sont un substitut temporaire en attendant les mots-clés propres aux plugins ; `annotations.write` ne correspond encore à aucune route.
+
+**Confiance.** Installer un manifeste revient à faire confiance à ce programme en tant qu'utilisateur système de Facet, comme pour un fichier dans `plugins/`. Les permissions cantonnent un module correct à sa tâche et limitent la portée d'un bogue ; elles ne contiennent pas un programme hostile exécuté sous le même utilisateur. Une vraie isolation exige un conteneur séparé sans le volume de la base.
 
 ## Capsules
 

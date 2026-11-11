@@ -1,0 +1,54 @@
+import { Injectable, computed, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
+import { ApiService } from './api.service';
+import { AuthService } from './auth.service';
+import { ScanService } from './scan.service';
+import type { components } from '../api/schema';
+
+export type AddonList = components['schemas']['AddonList'];
+export type Addon = components['schemas']['AddonItem'];
+export type AddonTokenCreated = components['schemas']['AddonTokenCreated'];
+
+/**
+ * The client side of the add-on boundary (docs/CONFIGURATION.md, Add-ons): the installed manifests as the server
+ * lists them. Manifests are placed on disk by the operator; nothing here can declare or edit one.
+ * Offered only where the server would accept the calls: `addons.enabled` (the `addons` feature) and
+ * the scan gate (`ScanService.canLaunch`, the same rule as `require_scan_access`).
+ */
+@Injectable({ providedIn: 'root' })
+export class AddonsService {
+  private readonly api = inject(ApiService);
+  private readonly auth = inject(AuthService);
+  private readonly scan = inject(ScanService);
+
+  readonly list = signal<AddonList | null>(null);
+  readonly loadError = signal(false);
+  readonly available = computed(() => this.auth.hasFeature('addons') && this.scan.canLaunch());
+
+  async load(): Promise<AddonList | null> {
+    if (!this.available()) {
+      this.list.set(null);
+      return null;
+    }
+    try {
+      const list = await firstValueFrom(this.api.get<AddonList>('/addons'));
+      this.list.set(list);
+      this.loadError.set(false);
+      return list;
+    } catch {
+      this.loadError.set(true);
+      return null;
+    }
+  }
+
+  async mintToken(id: string): Promise<AddonTokenCreated> {
+    const created = await firstValueFrom(this.api.post<AddonTokenCreated>(`/addons/${encodeURIComponent(id)}/token`));
+    void this.load();
+    return created;
+  }
+
+  async revokeTokens(id: string): Promise<void> {
+    await firstValueFrom(this.api.delete(`/addons/${encodeURIComponent(id)}/tokens`));
+    await this.load();
+  }
+}

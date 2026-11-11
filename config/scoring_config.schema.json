@@ -5,6 +5,13 @@
   "type": "object",
   "required": ["categories"],
   "properties": {
+    "addons": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    },
     "scanning": {
       "type": "object",
       "properties": {

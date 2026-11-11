@@ -37,6 +37,7 @@ Jede Einstellung wird in `config/scoring_config.default.json` ausgeliefert. Ihre
 - [Performance](#performance)
 - [Speicherung](#storage)
 - [Plugins](#plugins)
+- [Add-ons](#add-ons)
 - [Capsules](#capsules)
 - [Ähnlichkeitsgruppen](#similarity-groups)
 - [Szenen](#scenes)
@@ -2113,6 +2114,48 @@ Webhook-Optionen: `url` (erforderlich), `events` (Liste von Ereignisnamen), `min
 | `POST` | `/api/plugins/test-webhook` | Eine Test-Payload an eine Webhook-URL senden |
 
 ---
+
+## Add-ons
+
+Ein Add-on ist ein eigenständiges Programm (eigenes Repository, eigene virtuelle Umgebung), das über Facets HTTP-API mit einem begrenzten Satz von Berechtigungen auf die Bibliothek zugreift. Anders als ein [Plugin](#plugins) läuft es nie im Prozess von Facet.
+
+```json
+{
+  "addons": {
+    "enabled": false
+  }
+}
+```
+
+| Schlüssel | Standard | Beschreibung |
+|-----|---------|-------------|
+| `enabled` | `false` | Hauptschalter. Bei false antwortet `/api/addons` mit 404, Add-on-Tokens werden abgelehnt und kein Add-on wird angezeigt oder gestartet |
+
+**Installation.** Das Installationsprogramm eines Add-ons schreibt genau eine Datei, `<facet data>/addons/<id>/addon.json`. *Facet data* ist der Ordner der Datenbank (`dirname(DB_PATH)`): `%LOCALAPPDATA%\Facet\data` unter Windows, `/app/data` in Docker. Manifeste werden beim Start und bei jedem Neuladen der Konfiguration gelesen. Zum Deinstallieren den Ordner löschen. Das Ablegen des Manifests ist die Freigabe; eine Freigabe im Browser gibt es nicht.
+
+```json
+{"id": "astro-id", "name": "Astro", "version": "0.3.0", "icon": "star", "facet_api": 1,
+ "start": {"argv": ["C:/Tools/uv.exe", "run", "--project", "C:/Tools/astro-id", "astro-id", "facet", "serve"],
+           "port": "auto", "health": "/health"},
+ "ui": {"path": "/ui/"},
+ "slots": ["sidebar", "import_hook"],
+ "permissions": ["photos.read", "tags.write", "annotations.write", "gps.write"]}
+```
+
+Ein Manifest wird als Ganzes abgelehnt, mit dem Grund auf der Seite **Add-ons** (Benutzermenü → Add-ons), wenn: `id` nicht `^[a-z0-9][a-z0-9._-]{0,63}$` entspricht oder vom Ordnernamen abweicht; ein Schlüssel, eine Berechtigung oder ein Slot unbekannt ist; `start` und `ui.url` beide (oder keines von beiden) vorhanden sind; `start.argv[0]` kein absoluter Pfad zu einer vorhandenen Datei ist; `health` oder `ui.path` kein einfacher Pfad ist; oder `facet_api` keine Ganzzahl ist, die dieser Server spricht (derzeit `1`). Ein Add-on ohne `start` läuft anderswo (etwa als Docker-Dienst) und setzt stattdessen `"ui": {"url": "http://astro:5100/"}`.
+
+**Berechtigungen und Tokens.** Ein Add-on meldet sich mit einem `fct_`-Token der Art `addon` an (als SHA-256-Hash in derselben Tabelle wie Agent-Tokens gespeichert). Das Token handelt als das Konto, das es erstellt hat, höchstens mit dessen aktueller Stufe; ein geändertes Passwort oder ein herabgestuftes Konto sperrt es beim nächsten Aufruf. Jede Route, die ein Add-on-Token aufrufen darf, steht unten; jede andere antwortet mit 403. Ein Add-on-Token öffnet nie `/mcp`, und ein Agent-Token gewinnt auf `/api` nichts. Für ein Add-on ohne `start` erstellt die Seite Add-ons das Token einmal (**Zugriffstoken erstellen**) und zeigt es einmal an; **Tokens widerrufen** widerruft es.
+
+| Permission | Routes |
+|---|---|
+| `photos.read` | `GET /api/photos`, `GET /api/photo`, `GET /thumbnail`, `GET /image` |
+| `tags.write` | `POST /api/photos/batch_manual_tags`, `DELETE /api/photo/manual_tags` |
+| `annotations.write` | — |
+| `gps.write` | `PUT /api/photo/gps` |
+
+Die beiden `tags.write`-Routen sind ein vorübergehender Ersatz, bis es Plugin-eigene Schlagwörter gibt; `annotations.write` ist noch keiner Route zugeordnet.
+
+**Vertrauen.** Ein installiertes Manifest vertraut dem Programm als dem Betriebssystembenutzer, unter dem Facet läuft, wie bei einer Datei in `plugins/`. Berechtigungen halten ein korrektes Add-on bei seiner Aufgabe und begrenzen, was ein Fehler erreicht; ein feindseliges Programm desselben Benutzers halten sie nicht auf. Echte Isolation erfordert einen eigenen Container ohne das Datenbank-Volume.
 
 ## Capsules
 

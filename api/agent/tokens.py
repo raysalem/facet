@@ -26,6 +26,7 @@ re-bless an old token.
 """
 
 import hashlib
+import json
 import secrets
 import sqlite3
 import threading
@@ -53,7 +54,11 @@ LEGACY_PRINCIPAL = "_legacy"
 GENERATION_LENGTH = 16
 
 PUBLIC_COLUMNS = ("id", "user_id", "name", "token_prefix", "level", "created_at",
-                  "last_used_at", "revoked", "revoked_at")
+                  "last_used_at", "revoked", "revoked_at", "kind", "addon_id")
+# ``kind`` separates an MCP agent's token (``/mcp`` only) from an add-on's (``/api`` only, under its
+# scopes: api/addons/auth.py). Same prefix, same table, same verifier; the kind is never inferred.
+KIND_AGENT = "agent"
+KIND_ADDON = "addon"
 
 _last_touched: dict[int, float] = {}
 _touch_lock = threading.Lock()
@@ -154,24 +159,31 @@ class TokenLimitReached(Exception):
 
 @retry_on_locked()
 def mint(principal: str, name: str, level: str, minted_level: str = "readonly",
-         max_live: Optional[int] = None) -> tuple[dict, str]:
+         max_live: Optional[int] = None, *, kind: str = KIND_AGENT, addon_id: Optional[str] = None,
+         scopes: Optional[list[str]] = None) -> tuple[dict, str]:
     """Create a token; return ``(public row, plaintext)``. The plaintext is never stored.
 
     ``minted_level`` is the level of the minting session; single-password routing caps a
     token's tab reach with it. ``max_live`` is enforced inside the INSERT (the count and the
     insert are one statement under the write lock), so concurrent mints cannot overshoot it;
-    :class:`TokenLimitReached` when it is already held.
+    :class:`TokenLimitReached` when it is already held. ``kind='addon'`` mints an add-on's credential
+    (``addon_id`` and ``scopes`` required); the cap counts agent tokens only.
     """
+    if kind not in (KIND_AGENT, KIND_ADDON) or (kind == KIND_ADDON) != (addon_id is not None):
+        raise ValueError("an addon token needs addon_id, an agent token must not have one")
     plaintext = TOKEN_PREFIX + secrets.token_urlsafe(32)
     user_gen, edition_gen = snapshot(principal)
     cap = -1 if max_live is None else max_live
     with get_db() as conn:
         cursor = conn.execute(
             "INSERT INTO mcp_tokens (user_id, name, token_prefix, token_hash, level, user_gen, "
-            "edition_gen, created_at, minted_level) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? "
-            "WHERE ? < 0 OR (SELECT COUNT(*) FROM mcp_tokens WHERE user_id = ? AND revoked = 0) < ?",
+            "edition_gen, created_at, minted_level, kind, addon_id, scopes) "
+            "SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? "
+            "WHERE ? < 0 OR (SELECT COUNT(*) FROM mcp_tokens WHERE user_id = ? AND revoked = 0 "
+            "AND kind = 'agent') < ?",
             (principal, name, plaintext[:DISPLAY_PREFIX_LENGTH], _hash(plaintext), level,
-             user_gen, edition_gen, _now_iso(), minted_level, cap, principal, cap))
+             user_gen, edition_gen, _now_iso(), minted_level, kind, addon_id,
+             None if scopes is None else json.dumps(sorted(set(scopes))), cap, principal, cap))
         if cursor.rowcount == 0:
             conn.rollback()
             raise TokenLimitReached(principal)
@@ -180,8 +192,11 @@ def mint(principal: str, name: str, level: str, minted_level: str = "readonly",
         return _public(row), plaintext
 
 
-def verify(plaintext: Optional[str]) -> Optional["TokenGrant"]:
-    """The grant behind ``plaintext``, or None when unknown, malformed or revoked.
+def verify(plaintext: Optional[str], kinds: tuple[str, ...] = (KIND_AGENT,)) -> Optional["TokenGrant"]:
+    """The grant behind ``plaintext``, or None when unknown, malformed, revoked or of another kind.
+
+    ``kinds`` defaults to agent tokens only, so an add-on's token can never open ``/mcp``; the
+    add-on verifier (api/addons/auth.py) asks for ``("addon",)``.
 
     Liveness against the owner's credentials is NOT decided here -- that is
     :meth:`TokenGrant.resolve`, which runs on every call. The grant is never local or trusted-local:
@@ -192,17 +207,23 @@ def verify(plaintext: Optional[str]) -> Optional["TokenGrant"]:
         return None
     with get_db() as conn:
         row = conn.execute(
-            "SELECT id, user_id, name, level, user_gen, edition_gen, minted_level FROM mcp_tokens "
-            "WHERE token_hash = ? AND revoked = 0", (_hash(plaintext),)).fetchone()
-    if row is None:
+            "SELECT id, user_id, name, level, user_gen, edition_gen, minted_level, kind, addon_id, scopes "
+            "FROM mcp_tokens WHERE token_hash = ? AND revoked = 0", (_hash(plaintext),)).fetchone()
+    if row is None or (row["kind"] or KIND_AGENT) not in kinds:
+        return None
+    try:
+        scopes = tuple(json.loads(row["scopes"])) if row["scopes"] else ()
+    except ValueError:
         return None
     return TokenGrant(row["id"], row["user_id"], row["name"], row["level"],
-                      row["user_gen"], row["edition_gen"], row["minted_level"] or row["level"])
+                      row["user_gen"], row["edition_gen"], row["minted_level"] or row["level"],
+                      kind=row["kind"] or KIND_AGENT, addon_id=row["addon_id"], scopes=scopes)
 
 
-def verify_request(plaintext: Optional[str], request: Any) -> Optional["TokenGrant"]:
+def verify_request(plaintext: Optional[str], request: Any,
+                   kinds: tuple[str, ...] = (KIND_AGENT,)) -> Optional["TokenGrant"]:
     """:func:`verify`, with ``local`` and ``trusted_local`` derived from the /mcp ``request`` itself (a Request or a WebSocket)."""
-    grant = verify(plaintext)
+    grant = verify(plaintext, kinds)
     return None if grant is None else replace(grant, local=request_is_local_for(request),
                                               trusted_local=trusted_local_for(request))
 
@@ -410,6 +431,9 @@ class TokenGrant:
     local: bool = False
     # ... and ``viewer.trusted_local_editing`` was on for it. Both default False: fail closed.
     trusted_local: bool = False
+    kind: str = KIND_AGENT
+    addon_id: Optional[str] = None
+    scopes: tuple[str, ...] = ()
 
     @property
     def rate_key(self) -> int:

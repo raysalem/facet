@@ -4,6 +4,66 @@
  */
 
 export interface paths {
+    "/api/addons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Addons
+         * @description Installed add-ons (never their argv) and the manifests that were refused, with the reason.
+         */
+        get: operations["list_addons_api_addons_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/addons/{addon_id}/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mint Token
+         * @description Mint an external add-on's token. The plaintext is in this response and nowhere else.
+         */
+        post: operations["mint_token_api_addons__addon_id__token_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/addons/{addon_id}/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Tokens
+         * @description Revoke every live token of an add-on (an external add-on's credential, in practice).
+         */
+        delete: operations["revoke_tokens_api_addons__addon_id__tokens_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/albums": {
         parameters: {
             query?: never;
@@ -6034,6 +6094,69 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AddonItem */
+        AddonItem: {
+            /** Facet Api */
+            facet_api: number;
+            /** Icon */
+            icon: string;
+            /** Id */
+            id: string;
+            /**
+             * Live Tokens
+             * @default 0
+             */
+            live_tokens?: number;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "supervised" | "external";
+            /** Name */
+            name: string;
+            /** Permissions */
+            permissions: string[];
+            /** Slots */
+            slots: string[];
+            /** Status */
+            status: string;
+            /** Ui Path */
+            ui_path: string;
+            /** Version */
+            version: string;
+        };
+        /** AddonList */
+        AddonList: {
+            /** Addons */
+            addons: components["schemas"]["AddonItem"][];
+            /** Addons Dir */
+            addons_dir: string;
+            /** Refused */
+            refused: components["schemas"]["RefusedManifest"][];
+        };
+        /**
+         * AddonTokenCreated
+         * @description The one response that carries an external add-on's token in plaintext.
+         */
+        AddonTokenCreated: {
+            /** Addon Id */
+            addon_id: string;
+            /** Id */
+            id: number;
+            /** Level */
+            level: string;
+            /** Scopes */
+            scopes: string[];
+            /** Token */
+            token: string;
+        };
+        /** AddonTokensRevoked */
+        AddonTokensRevoked: {
+            /** Addon Id */
+            addon_id: string;
+            /** Revoked */
+            revoked: number;
+        };
         /** AiEdit */
         AiEdit: {
             /** Created At */
@@ -8724,10 +8847,17 @@ export interface components {
          * @description The one response that carries the plaintext token.
          */
         McpTokenCreated: {
+            /** Addon Id */
+            addon_id?: string | null;
             /** Created At */
             created_at: string;
             /** Id */
             id: number;
+            /**
+             * Kind
+             * @default agent
+             */
+            kind?: string;
             /** Last Used At */
             last_used_at?: string | null;
             /**
@@ -8755,10 +8885,17 @@ export interface components {
          *     ``revoked`` is int-typed because SQLite has no boolean: the wire carries 0/1.
          */
         McpTokenItem: {
+            /** Addon Id */
+            addon_id?: string | null;
             /** Created At */
             created_at: string;
             /** Id */
             id: number;
+            /**
+             * Kind
+             * @default agent
+             */
+            kind?: string;
             /** Last Used At */
             last_used_at?: string | null;
             /**
@@ -10232,6 +10369,13 @@ export interface components {
             total_files?: number | null;
             /** Viewer Job Id */
             viewer_job_id?: string | null;
+        };
+        /** RefusedManifest */
+        RefusedManifest: {
+            /** Directory */
+            directory: string;
+            /** Reason */
+            reason: string;
         };
         /** RejectMergeRequest */
         RejectMergeRequest: {
@@ -11994,6 +12138,123 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_addons_api_addons_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddonList"];
+                };
+            };
+            /** @description Scan access required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Add-ons are disabled (addons.enabled). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mint_token_api_addons__addon_id__token_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                addon_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddonTokenCreated"];
+                };
+            };
+            /** @description Unknown add-on, or add-ons are disabled. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description A supervised add-on gets a fresh token on every start. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_tokens_api_addons__addon_id__tokens_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                addon_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddonTokensRevoked"];
+                };
+            };
+            /** @description Unknown add-on, or add-ons are disabled. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_albums_api_albums_get: {
         parameters: {
             query?: {

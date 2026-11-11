@@ -37,6 +37,7 @@
 - [性能](#性能)
 - [存储](#存储)
 - [插件](#插件)
+- [附加组件](#附加组件)
 - [照片胶囊](#照片胶囊)
 - [相似照片分组](#相似照片分组)
 - [场景](#场景)
@@ -2097,6 +2098,48 @@ Webhook 选项：`url`（必填）、`events`（事件名列表）、`min_score`
 | `POST` | `/api/plugins/test-webhook` | 向某个 Webhook URL 发送测试载荷 |
 
 ---
+
+## 附加组件
+
+附加组件（add-on）是一个独立的程序（有自己的代码库和虚拟环境），通过 Facet 的 HTTP API 以有限的权限处理图库。与[插件](#插件)不同，它从不在 Facet 进程内运行。
+
+```json
+{
+  "addons": {
+    "enabled": false
+  }
+}
+```
+
+| 键 | 默认值 | 说明 |
+|-----|---------|-------------|
+| `enabled` | `false` | 总开关。为 false 时 `/api/addons` 返回 404，附加组件令牌被拒绝，不列出也不启动任何附加组件 |
+
+**安装。** 附加组件的安装程序只写入一个文件：`<facet data>/addons/<id>/addon.json`。*Facet data* 是数据库所在的文件夹（`dirname(DB_PATH)`）：Windows 上为 `%LOCALAPPDATA%\Facet\data`，Docker 中为 `/app/data`。清单在启动时以及每次重新加载配置时读取。卸载时删除该文件夹即可。放置清单即表示批准，浏览器中没有批准步骤。
+
+```json
+{"id": "astro-id", "name": "Astro", "version": "0.3.0", "icon": "star", "facet_api": 1,
+ "start": {"argv": ["C:/Tools/uv.exe", "run", "--project", "C:/Tools/astro-id", "astro-id", "facet", "serve"],
+           "port": "auto", "health": "/health"},
+ "ui": {"path": "/ui/"},
+ "slots": ["sidebar", "import_hook"],
+ "permissions": ["photos.read", "tags.write", "annotations.write", "gps.write"]}
+```
+
+出现以下情况时整个清单会被拒绝，原因显示在**附加组件**页面（用户菜单 → 附加组件）：`id` 不符合 `^[a-z0-9][a-z0-9._-]{0,63}$` 或与文件夹名不同；键、权限或插槽未知；同时存在（或都不存在）`start` 和 `ui.url`；`start.argv[0]` 不是指向现有文件的绝对路径；`health` 或 `ui.path` 不是普通路径；或 `facet_api` 不是本服务器支持的整数（目前为 `1`）。没有 `start` 的附加组件在其他地方运行（例如 Docker 服务），改为设置 `"ui": {"url": "http://astro:5100/"}`。
+
+**权限与令牌。** 附加组件使用类型为 `addon` 的 `fct_` 令牌进行身份验证（以 SHA-256 哈希存储在与代理令牌相同的表中）。令牌以创建它的账户身份操作，最高不超过该账户当前的级别；更改密码或降级账户会在下一次调用时将其切断。下表列出了附加组件令牌可以调用的全部路由，其他路由一律返回 403。附加组件令牌永远无法打开 `/mcp`，代理令牌在 `/api` 上也得不到任何权限。对于没有 `start` 的附加组件，该页面只创建一次令牌（**创建访问令牌**）并只显示一次；**撤销令牌**可将其撤销。
+
+| Permission | Routes |
+|---|---|
+| `photos.read` | `GET /api/photos`, `GET /api/photo`, `GET /thumbnail`, `GET /image` |
+| `tags.write` | `POST /api/photos/batch_manual_tags`, `DELETE /api/photo/manual_tags` |
+| `annotations.write` | — |
+| `gps.write` | `PUT /api/photo/gps` |
+
+两个 `tags.write` 路由是在插件专属标签出现之前的临时替代；`annotations.write` 目前不对应任何路由。
+
+**信任。** 安装清单意味着以运行 Facet 的操作系统用户身份信任该程序，与 `plugins/` 中的文件相同。权限让正常的附加组件只做自己的事，并限制错误的影响范围；但无法约束以同一用户运行的恶意程序。真正的隔离需要把附加组件放在不挂载数据库卷的独立容器中。
 
 ## 照片胶囊
 

@@ -37,6 +37,7 @@ Every setting ships in `config/scoring_config.default.json`. Your own `scoring_c
 - [Performance](#performance)
 - [Storage](#storage)
 - [Plugins](#plugins)
+- [Add-ons](#add-ons)
 - [Capsules](#capsules)
 - [Similarity Groups](#similarity-groups)
 - [Scenes](#scenes)
@@ -2100,6 +2101,48 @@ Webhook options: `url` (required), `events` (list of event names), `min_score` (
 | `POST` | `/api/plugins/test-webhook` | Send a test payload to a webhook URL |
 
 ---
+
+## Add-ons
+
+An add-on is a separate program (its own repository and virtual environment) that works with the library through Facet's HTTP API under a limited set of permissions. Unlike a [plugin](#plugins), it never runs inside Facet's process.
+
+```json
+{
+  "addons": {
+    "enabled": false
+  }
+}
+```
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `enabled` | `false` | Master switch. When false, `/api/addons` answers 404, add-on tokens are refused and no add-on is listed or started |
+
+**Installing.** An add-on's installer writes one file, `<facet data>/addons/<id>/addon.json`, and nothing else. *Facet data* is the folder that holds the database (`dirname(DB_PATH)`): `%LOCALAPPDATA%\Facet\data` on Windows, `/app/data` in Docker. Manifests are read at startup and whenever the configuration is reloaded. To uninstall, delete the folder. Placing the manifest is the approval; there is no in-browser approval step.
+
+```json
+{"id": "astro-id", "name": "Astro", "version": "0.3.0", "icon": "star", "facet_api": 1,
+ "start": {"argv": ["C:/Tools/uv.exe", "run", "--project", "C:/Tools/astro-id", "astro-id", "facet", "serve"],
+           "port": "auto", "health": "/health"},
+ "ui": {"path": "/ui/"},
+ "slots": ["sidebar", "import_hook"],
+ "permissions": ["photos.read", "tags.write", "annotations.write", "gps.write"]}
+```
+
+A manifest is refused as a whole, with the reason shown on the **Add-ons** page (user menu → Add-ons), when: `id` does not match `^[a-z0-9][a-z0-9._-]{0,63}$` or differs from its folder name; a key, permission or slot is unknown; `start` and `ui.url` are both present (or neither); `start.argv[0]` is not an absolute path to an existing file; `health` or `ui.path` is not a plain path; or `facet_api` is not an integer this server speaks (currently `1`). An add-on without `start` runs elsewhere (for example a Docker service) and sets `"ui": {"url": "http://astro:5100/"}` instead.
+
+**Permissions and tokens.** An add-on authenticates with an `fct_` token of kind `addon` (stored as a SHA-256 hash in the same table as agent tokens). The token acts as the account that minted it, at most at that account's live level, so a changed password or a demoted account cuts it off on the next call. Every route an add-on token may call is listed below; any other route answers 403. An add-on token never opens `/mcp`, and an agent token gains nothing on `/api`. For an add-on without `start`, the Add-ons page mints the token once (**Create access token**) and shows it once; **Revoke tokens** revokes it.
+
+| Permission | Routes |
+|---|---|
+| `photos.read` | `GET /api/photos`, `GET /api/photo`, `GET /thumbnail`, `GET /image` |
+| `tags.write` | `POST /api/photos/batch_manual_tags`, `DELETE /api/photo/manual_tags` |
+| `annotations.write` | — |
+| `gps.write` | `PUT /api/photo/gps` |
+
+The two `tags.write` routes are a temporary stand-in until plugin-owned tags exist; `annotations.write` maps to no route yet.
+
+**Trust.** Installing a manifest trusts that program as the operating-system user Facet runs as, the same trust as a file in `plugins/`. Permissions keep a well-behaved add-on to its job and bound what a bug can reach; they cannot contain a hostile program running as the same user. Real isolation needs the add-on in its own container without the database volume.
 
 ## Capsules
 

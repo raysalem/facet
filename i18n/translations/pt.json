@@ -4191,5 +4191,45 @@
       "help_label": "Sobre a edição de palavras-chave"
     },
     "help_label": "Sobre a árvore de palavras-chave"
+  },
+  "addons": {
+    "title": "Complementos",
+    "intro": "Os complementos são programas separados que trabalham com a sua biblioteca através de uma ligação limitada e com permissões verificadas. O instalador de um complemento coloca o seu manifesto nesta pasta:",
+    "empty": "Não há complementos instalados.",
+    "load_error": "Não foi possível carregar os complementos.",
+    "refused_title": "Não carregados",
+    "refused_help": "Estas pastas contêm um manifesto que o Facet recusou. Corrija o ficheiro e recarregue a configuração ou reinicie o Facet.",
+    "version": "Versão {version}",
+    "permissions": "Permissões",
+    "permission": {
+      "photos": {
+        "read": "Ler fotos"
+      },
+      "tags": {
+        "write": "Escrever etiquetas"
+      },
+      "annotations": {
+        "write": "Escrever anotações"
+      },
+      "gps": {
+        "write": "Definir localizações"
+      }
+    },
+    "mode": {
+      "supervised": "Iniciado pelo Facet",
+      "external": "Executa separadamente"
+    },
+    "status": {
+      "external": "Externo",
+      "stopped": "Parado"
+    },
+    "token": {
+      "create": "Criar token de acesso",
+      "shown_once": "Copie este token para as definições do complemento agora. Só é mostrado uma vez.",
+      "live": "Tokens ativos: {count}",
+      "revoke": "Revogar tokens",
+      "error": "Não foi possível criar o token."
+    },
+    "refresh": "Atualizar"
   }
 }

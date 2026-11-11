@@ -4191,5 +4191,45 @@
       "help_label": "À propos de la modification des mots-clés"
     },
     "help_label": "À propos de l’arbre des mots-clés"
+  },
+  "addons": {
+    "title": "Modules complémentaires",
+    "intro": "Les modules complémentaires sont des programmes séparés qui travaillent sur votre bibliothèque via une connexion limitée et contrôlée par des permissions. L'installateur d'un module place son manifeste dans ce dossier :",
+    "empty": "Aucun module complémentaire n'est installé.",
+    "load_error": "Impossible de charger les modules complémentaires.",
+    "refused_title": "Non chargés",
+    "refused_help": "Ces dossiers contiennent un manifeste refusé par Facet. Corrigez le fichier puis rechargez la configuration ou redémarrez Facet.",
+    "version": "Version {version}",
+    "permissions": "Permissions",
+    "permission": {
+      "photos": {
+        "read": "Lire les photos"
+      },
+      "tags": {
+        "write": "Écrire des mots-clés"
+      },
+      "annotations": {
+        "write": "Écrire des annotations"
+      },
+      "gps": {
+        "write": "Définir les positions"
+      }
+    },
+    "mode": {
+      "supervised": "Démarré par Facet",
+      "external": "Fonctionne séparément"
+    },
+    "status": {
+      "external": "Externe",
+      "stopped": "Arrêté"
+    },
+    "token": {
+      "create": "Créer un jeton d'accès",
+      "shown_once": "Copiez ce jeton dans les réglages du module maintenant. Il ne s'affiche qu'une fois.",
+      "live": "Jetons actifs : {count}",
+      "revoke": "Révoquer les jetons",
+      "error": "Impossible de créer le jeton."
+    },
+    "refresh": "Actualiser"
   }
 }

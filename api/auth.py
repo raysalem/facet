@@ -370,7 +370,7 @@ def trusted_local_for(request) -> bool:
 class CurrentUser:
     """Represents the current authenticated user."""
     __slots__ = ('user_id', 'role', 'display_name', 'edition_authenticated', 'agent',
-                 'trusted_local_editing')
+                 'trusted_local_editing', 'addon')
 
     def __init__(self, user_id=None, role='user', display_name='',
                  edition_authenticated=False, agent=False, trusted_local_editing=False):
@@ -380,6 +380,8 @@ class CurrentUser:
         self.edition_authenticated = edition_authenticated
         self.agent = agent
         self.trusted_local_editing = trusted_local_editing
+        # ``api.addons.auth.AddonScope`` when an add-on token authenticated the request, else None.
+        self.addon = None
 
     @classmethod
     def from_payload(cls, payload, trusted_local_editing=False):
@@ -448,6 +450,13 @@ async def get_optional_user(
 ) -> Optional[CurrentUser]:
     """Extract user from JWT token if present, without requiring auth."""
     token = credentials.credentials if credentials else None
+    if token is not None:
+        # An add-on's ``fct_`` bearer (mcp_tokens kind='addon'): its own verifier and route map,
+        # api/addons/auth.py. Anything else -- an agent token included -- falls through as before.
+        from api.addons.auth import addon_user
+        addon = addon_user(request)
+        if addon is not None:
+            return addon
     if token is None and request.method in ('GET', 'HEAD'):
         # <img> and EventSource requests cannot carry the Authorization
         # header; fall back to the HttpOnly login cookie for safe methods
