@@ -45,6 +45,40 @@ describe('add-on bridge v1', () => {
       .toBe(true);
   });
 
+  it('accepts an annotation_view, drops unknown keys and keeps only what it validated', () => {
+    const base = { v: 1, nonce: 'n', type: 'annotation_view' };
+    expect(readPanelMessage(msg({ ...base, view: { visible: false } }), frame, 'n'))
+      .toEqual({ type: 'annotation_view', view: { visible: false } });
+    const full = {
+      visible: true, groups: { star: true, planet: false }, score: 80, metrics: { mag: 6.5 },
+      show_scores: true, show_members: false, extra: 'dropped', source: 'evil-addon',
+    };
+    expect(readPanelMessage(msg({ ...base, view: full, source: 'evil-addon' }), frame, 'n')).toEqual({
+      type: 'annotation_view',
+      view: { visible: true, groups: { star: true, planet: false }, score: 80, metrics: { mag: 6.5 }, show_scores: true, show_members: false },
+    });
+    expect(readPanelMessage(msg({ ...base, view: { visible: true, score: null } }), frame, 'n'))
+      .toEqual({ type: 'annotation_view', view: { visible: true, score: null } });
+  });
+
+  it('rejects a malformed annotation_view', () => {
+    const base = { v: 1, nonce: 'n', type: 'annotation_view' };
+    const bad: unknown[] = [
+      undefined, null, 'x', [], {}, { visible: 'yes' }, { visible: 1 },
+      { visible: true, groups: { a: 'on' } }, { visible: true, groups: [true] }, { visible: true, groups: null },
+      { visible: true, metrics: { m: '5' } }, { visible: true, metrics: { m: Infinity } }, { visible: true, metrics: { m: NaN } },
+      { visible: true, score: '80' }, { visible: true, score: NaN }, { visible: true, score: Infinity },
+      { visible: true, show_scores: 1 }, { visible: true, show_members: 'true' },
+      { visible: true, groups: Object.fromEntries(Array.from({ length: 201 }, (_, i) => [`g${i}`, true])) },
+      { visible: true, metrics: Object.fromEntries(Array.from({ length: 201 }, (_, i) => [`m${i}`, 1])) },
+    ];
+    for (const view of bad) expect(readPanelMessage(msg({ ...base, view }), frame, 'n')).toBeNull();
+    const atCap = Object.fromEntries(Array.from({ length: 200 }, (_, i) => [`g${i}`, true]));
+    expect(readPanelMessage(msg({ ...base, view: { visible: true, groups: atCap } }), frame, 'n')).not.toBeNull();
+    expect(readPanelMessage(msg({ ...base, view: { visible: true }, nonce: 'wrong' }), frame, 'n')).toBeNull();
+    expect(readPanelMessage(msg({ ...base, view: { visible: true }, v: 2 }), frame, 'n')).toBeNull();
+  });
+
   it('reads the route, album and photo out of the router URL', () => {
     expect(routeOf('/album/12?x=1')).toBe('/album/12');
     expect(albumIdOf('/album/12?x=1')).toBe(12);

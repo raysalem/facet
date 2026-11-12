@@ -7,11 +7,15 @@
  * everything else is ignored, and every iframe `load` requires a new `ready`.
  */
 
+import type { AnnotationView } from './annotation-view.service';
+
 export const BRIDGE_VERSION = 1;
 /** The most selection paths one `context` message carries. */
 export const MAX_CONTEXT_PATHS = 500;
 /** The most paths one `show_photos` / `refresh` message may name (the ui_show_photos cap). */
 export const MAX_PANEL_PATHS = 200;
+/** The most keys in one object of an `annotation_view` (groups, metrics). */
+export const MAX_VIEW_KEYS = 200;
 
 export type PanelScope =
   | { kind: 'import'; run_id: string; path_prefix?: string }
@@ -35,6 +39,7 @@ export type PanelRequest =
   | { type: 'open_photo'; path: string }
   | { type: 'refresh'; paths: string[] }
   | { type: 'open_map'; site: MapSite }
+  | { type: 'annotation_view'; view: AnnotationView }
   | { type: 'close' };
 
 /**
@@ -51,6 +56,52 @@ export type MapSite = keyof typeof MAP_SITES;
 function pathList(value: unknown, max: number): string[] | null {
   if (!Array.isArray(value) || value.length === 0 || value.length > max) return null;
   return value.every(p => typeof p === 'string' && p.length > 0 && p.length <= 4096) ? value as string[] : null;
+}
+
+/** A plain object of at most `MAX_VIEW_KEYS` keys whose values all pass `ok`, else null. Own keys only. */
+function keyedValues<T>(value: unknown, ok: (v: unknown) => v is T): Record<string, T> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const entries = Object.entries(value);
+  if (entries.length > MAX_VIEW_KEYS || !entries.every(([k, v]) => k.length <= 256 && ok(v))) return null;
+  // Own, null-prototype copy: a key such as `__proto__` stays plain data.
+  const out = Object.create(null) as Record<string, T>;
+  for (const [k, v] of entries) out[k] = v as T;
+  return out;
+}
+
+const isBool = (v: unknown): v is boolean => typeof v === 'boolean';
+const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+
+/**
+ * The `view` of an `annotation_view` message, or null when anything in it is malformed. Unknown
+ * keys are dropped; a present key of the wrong type rejects the whole message.
+ */
+export function readAnnotationView(value: unknown): AnnotationView | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+  if (!isBool(raw['visible'])) return null;
+  const view: AnnotationView = { visible: raw['visible'] };
+  if ('groups' in raw) {
+    const groups = keyedValues(raw['groups'], isBool);
+    if (!groups) return null;
+    view.groups = groups;
+  }
+  if ('metrics' in raw) {
+    const metrics = keyedValues(raw['metrics'], isFiniteNumber);
+    if (!metrics) return null;
+    view.metrics = metrics;
+  }
+  if ('score' in raw) {
+    if (raw['score'] !== null && !isFiniteNumber(raw['score'])) return null;
+    view.score = raw['score'] as number | null;
+  }
+  for (const key of ['show_scores', 'show_members'] as const) {
+    if (key in raw) {
+      if (!isBool(raw[key])) return null;
+      view[key] = raw[key];
+    }
+  }
+  return view;
 }
 
 /**
@@ -75,6 +126,10 @@ export function readPanelMessage(event: Pick<MessageEvent, 'source' | 'data'>, f
       const site = data['site'];
       return typeof site === 'string' && Object.prototype.hasOwnProperty.call(MAP_SITES, site)
         ? { type: 'open_map', site: site as MapSite } : null;
+    }
+    case 'annotation_view': {
+      const view = readAnnotationView(data['view']);
+      return view ? { type: 'annotation_view', view } : null;
     }
     case 'open_photo':
       return typeof data['path'] === 'string' && data['path'].length > 0 && data['path'].length <= 4096

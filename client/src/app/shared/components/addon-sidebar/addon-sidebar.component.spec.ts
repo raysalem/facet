@@ -1,8 +1,9 @@
 import { signal } from '@angular/core';
 import { TestBed, ComponentFixture } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { NavigationEnd, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { AddonSidebarComponent } from './addon-sidebar.component';
+import { AnnotationViewService } from '../../../core/addons/annotation-view.service';
 import { AddonPanelService, type OpenPanel } from '../../../core/addons/addon-panel.service';
 import { GalleryStore } from '../../../features/gallery/gallery.store';
 import { WebMcpToolRegistry } from '../../../core/agent/webmcp-registry.service';
@@ -103,5 +104,48 @@ describe('add-on sidebar host', () => {
     expect(report).toHaveBeenCalledWith({ tool: 'addon:astro', paths: ['/p/a.jpg'], count: 1 });
     send({ type: 'close', v: 1, nonce: 'nonce-1' });
     expect(close).toHaveBeenCalled();
+  });
+
+  it('annotation_view sets the view under the add-on id, never a source from the message', () => {
+    const views = TestBed.inject(AnnotationViewService);
+    send({ type: 'annotation_view', v: 1, nonce: 'nonce-1', view: { visible: true } });
+    expect(views.views()).toEqual({});
+    send({ type: 'ready', v: 1, nonce: 'nonce-1' });
+    send({ type: 'annotation_view', v: 1, nonce: 'nonce-1', source: 'evil', view: { visible: true, score: 70, source: 'evil' } });
+    expect(views.views()).toEqual({ astro: { visible: true, score: 70 } });
+    send({ type: 'annotation_view', v: 1, nonce: 'nonce-1', view: { visible: 'yes' } });
+    send({ type: 'annotation_view', v: 1, nonce: 'wrong', view: { visible: false } }, frame().contentWindow);
+    expect(views.views()).toEqual({ astro: { visible: true, score: 70 } });
+    send({ type: 'annotation_view', v: 1, nonce: 'nonce-1', view: { visible: true } }, window);
+    expect(views.views()).toEqual({ astro: { visible: true, score: 70 } });
+  });
+
+  it('closing the panel, or opening another, clears that add-on view', () => {
+    const views = TestBed.inject(AnnotationViewService);
+    views.set('other', { visible: true });
+    send({ type: 'ready', v: 1, nonce: 'nonce-1' });
+    send({ type: 'annotation_view', v: 1, nonce: 'nonce-1', view: { visible: true } });
+    expect(Object.keys(views.views()).sort()).toEqual(['astro', 'other']);
+    panel.set({ addon: { id: 'second', name: 'Second', icon: 'star' }, nonce: 'nonce-2', src: '/addons/second/ui/?nonce=nonce-2',
+      scope: { kind: 'view' } });
+    fixture.detectChanges();
+    expect(Object.keys(views.views())).toEqual(['other']);
+    send({ type: 'ready', v: 1, nonce: 'nonce-2' });
+    send({ type: 'annotation_view', v: 1, nonce: 'nonce-2', view: { visible: true } });
+    expect(Object.keys(views.views()).sort()).toEqual(['other', 'second']);
+    panel.set(null);
+    fixture.detectChanges();
+    expect(Object.keys(views.views())).toEqual(['other']);
+  });
+
+  it('sends the open photo in the context on a /photo route', () => {
+    // buildContext carries photoOf(router.url); the annotation controls depend on it.
+    const router = TestBed.inject(Router) as unknown as { url: string; events: Subject<unknown> };
+    router.url = '/photo?path=%2Fp%2Fsky.jpg';
+    events.next(new NavigationEnd(1, router.url, router.url));
+    const posted = vi.spyOn(frame().contentWindow!, 'postMessage');
+    send({ type: 'ready', v: 1, nonce: 'nonce-1' });
+    fixture.detectChanges();
+    expect(posted).toHaveBeenCalledWith(expect.objectContaining({ type: 'context', route: '/photo', photo: '/p/sky.jpg' }), '*');
   });
 });

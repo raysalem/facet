@@ -9,6 +9,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AddonPanelService } from '../../../core/addons/addon-panel.service';
+import { AnnotationViewService } from '../../../core/addons/annotation-view.service';
 import { MAP_SITES, buildContext, readPanelMessage, type PanelRequest } from '../../../core/addons/addon-bridge';
 import { GalleryStore } from '../../../features/gallery/gallery.store';
 import { WebMcpToolRegistry } from '../../../core/agent/webmcp-registry.service';
@@ -70,6 +71,7 @@ export class AddonSidebarComponent {
   private readonly gallery = inject(GalleryStore);
   private readonly tools = inject(WebMcpToolRegistry);
   private readonly changes = inject(AssistantChangesService);
+  private readonly annotationViews = inject(AnnotationViewService);
   private readonly frame = viewChild<ElementRef<HTMLIFrameElement>>('frame');
 
   protected readonly panel = this.service.panel;
@@ -97,6 +99,11 @@ export class AddonSidebarComponent {
   constructor() {
     // A new panel needs a new handshake.
     effect(() => { this.panel(); untracked(() => this.handshake.set(0)); });
+    // The add-on's annotation view lives as long as its panel: closing it, or opening another, removes the labels.
+    effect((onCleanup) => {
+      const id = this.panel()?.addon.id;
+      if (id) onCleanup(() => this.annotationViews.clear(id));
+    });
     // Context on open (after `ready`) and on every change of route or selection.
     effect(() => {
       const open = this.panel();
@@ -138,6 +145,10 @@ export class AddonSidebarComponent {
       case 'open_photo':
         await this.tools.load();
         await this.tools.execute('ui_open_photo', { path: request.path });
+        return;
+      case 'annotation_view':
+        // The source is the add-on that owns this panel, never anything the message says.
+        this.annotationViews.set(addonId, request.view);
         return;
       case 'open_map':
         // A fixed URL picked by key (never one from the panel); no opener, no referrer.
