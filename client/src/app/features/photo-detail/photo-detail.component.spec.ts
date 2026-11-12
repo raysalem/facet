@@ -315,8 +315,83 @@ describe('PhotoDetailComponent', () => {
     reject.click(); await view.whenStable(); view.detectChanges();
     expect(reject.getAttribute('aria-pressed')).toBe('true');
     expect(undecided.getAttribute('aria-pressed')).toBe('false');
-    const zoom = root.querySelector<HTMLButtonElement>('app-rendition-readout button[aria-label="gallery.compare.rendition.zoom_out"]')!;
+    const zoom = root.querySelector<HTMLButtonElement>('[data-zoom-controls] button[aria-label="gallery.compare.rendition.zoom_out"]')!;
     expect(zoom.disabled).toBe(true);
+  });
+
+  it('keeps the image panel for the image: zoom on hover, the rendition only until the source is ready', async () => {
+    const view = renderDetail();
+    view.componentInstance.photo.set(makePhoto({ path: samplePhoto.path, image_width: 6000, image_height: 4000 }));
+    view.detectChanges(); await view.whenStable(); view.detectChanges();
+    const root = view.nativeElement as HTMLElement;
+    const canvas = root.querySelector<HTMLElement>('[data-photo-canvas]')!;
+    const controls = canvas.querySelector<HTMLElement>('[data-zoom-controls]')!;
+    expect(controls.getAttribute('aria-label')).toBe('photo_detail.zoom_controls');
+    for (const shown of ['opacity-0', 'group-hover/photo:opacity-100', 'focus-within:opacity-100', 'max-xl:opacity-100', 'pointer-coarse:opacity-100']) {
+      expect(controls.classList).toContain(shown);
+    }
+    const [zoomOut, fit, zoomIn] = [...controls.querySelectorAll<HTMLButtonElement>('button')];
+    expect(fit.textContent!.trim()).toBe('gallery.compare.rendition.fit_short');
+    expect(zoomOut.disabled).toBe(true);
+    zoomIn.click(); view.detectChanges();
+    expect(zoomOut.disabled).toBe(false);
+    expect(fit.textContent!.trim()).toMatch(/×$/);
+    fit.click(); view.detectChanges();
+    expect(zoomOut.disabled).toBe(true);
+
+    // Loading: a small badge reports it; ready: nothing under or over the image; failed: the retry comes back.
+    const component = view.componentInstance as unknown as { sourceRendition: { set(value: object): void }; loadedImageUrl: { set(value: string | null): void }; fullImageUrl(): string };
+    expect(canvas.querySelector('[data-rendition-status] app-rendition-readout')).not.toBeNull();
+    component.sourceRendition.set({ kind: 'source', phase: 'ready', width: 6000, height: 4000 });
+    component.loadedImageUrl.set(component.fullImageUrl());
+    view.detectChanges();
+    expect(canvas.querySelector('[data-rendition-status]')).toBeNull();
+    component.sourceRendition.set({ kind: 'source', phase: 'failed' });
+    component.loadedImageUrl.set(null);
+    view.detectChanges();
+    expect(canvas.querySelector('[data-rendition-status] [data-rendition-retry]')).not.toBeNull();
+  });
+
+  describe('inspector width', () => {
+    const KEY = 'facet_photo_inspector_width';
+    afterEach(() => localStorage.removeItem(KEY));
+    async function render() {
+      const view = renderDetail();
+      view.componentInstance.photo.set(makePhoto({ path: samplePhoto.path }));
+      view.detectChanges(); await view.whenStable(); view.detectChanges();
+      const root = view.nativeElement as HTMLElement;
+      return { view, aside: root.querySelector<HTMLElement>('[data-photo-inspector]')!, handle: root.querySelector<HTMLElement>('[data-inspector-resize]')! };
+    }
+    const width = (aside: HTMLElement) => aside.style.getPropertyValue('--facet-inspector-width');
+
+    it('starts at 320px, widens as its left-edge handle moves left, and remembers a committed width', async () => {
+      const { view, aside, handle } = await render();
+      expect(aside.className).toContain('lg:w-[var(--facet-inspector-width)]');
+      expect(width(aside)).toBe('320px');
+      expect(handle.getAttribute('role')).toBe('separator');
+      expect(handle.getAttribute('aria-label')).toBe('photo_detail.inspector_resize');
+      expect(handle.className).toContain('hidden lg:block');
+      const key = (name: string) => { handle.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true })); view.detectChanges(); };
+      key('ArrowLeft'); expect(width(aside)).toBe('336px');
+      expect(localStorage.getItem(KEY)).toBe('336');
+      key('ArrowRight'); key('ArrowRight'); expect(width(aside)).toBe('304px');
+      key('End'); expect(width(aside)).toBe('520px'); expect(handle.getAttribute('aria-valuenow')).toBe('520');
+      key('Home'); expect(width(aside)).toBe('260px');
+      key('ArrowRight'); expect(width(aside)).toBe('260px');
+    });
+
+    it('restores the stored width, clamped', async () => {
+      localStorage.setItem(KEY, '9999');
+      expect(width((await render()).aside)).toBe('520px');
+    });
+  });
+
+  it('keeps the location map short so the inspector stays compact', async () => {
+    const view = renderDetail();
+    view.componentInstance.photo.set(makePhoto({ path: samplePhoto.path, gps_latitude: 1, gps_longitude: 2 }));
+    view.detectChanges(); await view.whenStable(); view.detectChanges();
+    const map = (view.nativeElement as HTMLElement).querySelector<HTMLElement>('[data-photo-location] .rounded-lg')!;
+    expect(map.classList).toContain('h-24');
   });
 
   it('refreshes rendered face boxes after every committed manual edit', async () => {
@@ -739,13 +814,17 @@ describe('PhotoDetailComponent', () => {
     const when = aside.querySelector<HTMLElement>('[data-photo-when]')!;
     expect(when.querySelector('[data-photo-date]')!.parentElement).toBe(when.querySelector('[data-photo-category]')!.parentElement);
     const exposure = when.querySelector<HTMLElement>('[data-photo-exposure]')!;
-    expect([...exposure.querySelectorAll('span')].map(span => span.textContent!.trim())).toEqual(['Canon EOS R6', '85mm', 'f/2.8', '1/100', 'ISO 4000']);
+    // The image's pixel size closes the capture line; no readout bar under the image carries it any more.
+    expect([...exposure.querySelectorAll('span')].map(span => span.textContent!.trim())).toEqual(['Canon EOS R6', '85mm', 'f/2.8', '1/100', 'ISO 4000', '1920 × 1080']);
     expect(exposure.getAttribute('aria-label')).toBe('photo_detail.capture_settings');
-    // The rendition help sits beside the image readout, icon-only, not in the inspector (the metric tabs keep their own).
-    expect([...aside.querySelectorAll('app-context-help')].filter(help => !help.closest('app-photo-metrics-tabs'))).toHaveLength(0);
-    const readoutHelp = (view.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[data-image-readout] app-context-help button')!;
-    expect(readoutHelp.getAttribute('aria-label')).toBe('gallery.compare.rendition.sources');
-    expect(readoutHelp.textContent!.trim()).toBe('help_outline');
+    expect((view.nativeElement as HTMLElement).querySelector('[data-image-readout]')).toBeNull();
+    // The rendition help sits beside the dimensions, icon-only (the metric tabs keep their own).
+    const helps = [...aside.querySelectorAll('app-context-help')].filter(help => !help.closest('app-photo-metrics-tabs'));
+    expect(helps).toHaveLength(1);
+    expect(helps[0].parentElement).toBe(exposure);
+    const renditionHelp = helps[0].querySelector<HTMLButtonElement>('button')!;
+    expect(renditionHelp.getAttribute('aria-label')).toBe('gallery.compare.rendition.sources');
+    expect(renditionHelp.textContent!.trim()).toBe('help_outline');
   });
 
   it('collapses empty caption, tags and location into compact add actions for editors only', async () => {

@@ -3452,6 +3452,8 @@ export const I18N = {
     },
     analysis: "photo_detail.analysis",
     details: "photo_detail.details",
+    inspector_resize: "photo_detail.inspector_resize",
+    zoom_controls: "photo_detail.zoom_controls",
     unassigned_faces: "photo_detail.unassigned_faces",
     tag_refine_collection: "photo_detail.tag_refine_collection",
     tag_search_library: "photo_detail.tag_search_library",

@@ -246,7 +246,7 @@ describe('PhotoCollectionSidebarComponent', () => {
   it('collapses without losing the current-photo input and releases scheduled work on destroy', () => {
     const { fixture, root } = render();
     root.querySelector<HTMLButtonElement>('button')!.click(); fixture.detectChanges();
-    expect(root.style.width).toBe('52px'); expect(root.querySelector('[role="separator"]')).toBeNull();
+    expect(root.style.width).toBe('28px'); expect(root.querySelector('[role="separator"]')).toBeNull();
     expect(fixture.componentInstance.currentPath()).toBe('/b.jpg');
     fixture.destroy(); expect(frame).toBeUndefined();
   });

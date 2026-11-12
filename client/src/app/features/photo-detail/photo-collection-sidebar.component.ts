@@ -5,34 +5,22 @@ import { ThumbnailUrlPipe } from '../../shared/pipes/thumbnail-url.pipe';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { I18N } from '../../core/i18n/keys';
 import { rovingFocusKey } from '../../shared/utils/roving-focus';
+import { PanelWidth } from '../../shared/utils/panel-width';
 
-const WIDTH_KEY = 'facet_collection_sidebar_width';
-const DEFAULT_WIDTH = 192;
-const MIN_WIDTH = 144;
-const MAX_WIDTH = 384;
-/** Home and End jump to the narrowest and widest sidebar; the arrows step by 16 px. */
-const KEY_WIDTHS: Record<string, number> = { Home: MIN_WIDTH, End: MAX_WIDTH };
-const clampWidth = (width: number): number => Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, width));
-
-function storedWidth(): number {
-  try {
-    const stored = Number.parseInt(localStorage.getItem(WIDTH_KEY) ?? '', 10);
-    return Number.isFinite(stored) ? clampWidth(stored) : DEFAULT_WIDTH;
-  } catch {
-    return DEFAULT_WIDTH;
-  }
-}
+/** Collapsed, the sidebar is only its expand chevron, so the photo keeps the room. */
+const COLLAPSED_WIDTH = 28;
 
 /** Reads the originating collection; never changes its query, selection or sort. */
 @Component({
   selector: 'app-photo-collection-sidebar',
   imports: [MatIconModule, ThumbnailUrlPipe, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'relative hidden xl:flex shrink-0 min-h-0 border-r border-[var(--mat-sys-outline-variant)]', '[style.width.px]': 'collapsed() ? 52 : width()' },
+  host: { class: 'relative hidden xl:flex shrink-0 min-h-0 border-r border-[var(--mat-sys-outline-variant)]', '[style.width.px]': 'collapsed() ? COLLAPSED_WIDTH : resize.width()' },
   template: `
     <aside class="flex min-h-0 min-w-0 flex-1 flex-col" [attr.aria-label]="I18N.photo_detail.collection.title | translate">
-      <div class="flex min-h-10 shrink-0 items-center gap-1 px-1">
-        <button type="button" class="flex h-8 w-8 pointer-coarse:h-11 pointer-coarse:w-11 shrink-0 items-center justify-center rounded hover:bg-[var(--mat-sys-surface-container)]"
+      <div class="flex min-h-10 shrink-0 items-center gap-1" [class.px-1]="!collapsed()">
+        <button type="button" class="flex h-8 shrink-0 items-center justify-center rounded hover:bg-[var(--mat-sys-surface-container)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--mat-sys-primary)] pointer-coarse:h-11 pointer-coarse:w-11 pointer-coarse:relative pointer-coarse:z-10"
+          [class.w-8]="!collapsed()" [class.w-7]="collapsed()"
           [attr.aria-label]="(collapsed() ? I18N.photo_detail.collection.show : I18N.photo_detail.collection.hide) | translate"
           [attr.aria-expanded]="!collapsed()" (click)="toggle()">
           <mat-icon>{{ collapsed() ? 'chevron_right' : 'chevron_left' }}</mat-icon>
@@ -68,18 +56,17 @@ function storedWidth(): number {
           }
         </div>
         <div role="separator" tabindex="0" aria-orientation="vertical" [attr.aria-label]="I18N.photo_detail.collection.resize | translate"
-          [attr.aria-valuemin]="MIN_WIDTH" [attr.aria-valuemax]="MAX_WIDTH" [attr.aria-valuenow]="width()"
+          [attr.aria-valuemin]="resize.min" [attr.aria-valuemax]="resize.max" [attr.aria-valuenow]="resize.width()"
           class="absolute inset-y-0 -right-1 z-10 w-2 cursor-col-resize touch-none focus-visible:bg-[var(--mat-sys-primary)]"
-          (pointerdown)="start($event)" (pointermove)="move($event)" (pointerup)="finish($event)"
-          (pointercancel)="finish($event, true)" (lostpointercapture)="finish($event, true)" (keydown)="resizeKey($event)"></div>
+          (pointerdown)="resize.start($event)" (pointermove)="resize.move($event)" (pointerup)="resize.finish($event)"
+          (pointercancel)="resize.finish($event, true)" (lostpointercapture)="resize.finish($event, true)" (keydown)="resize.key($event)"></div>
       }
     </aside>
   `,
 })
 export class PhotoCollectionSidebarComponent {
   protected readonly I18N = I18N;
-  protected readonly MIN_WIDTH = MIN_WIDTH;
-  protected readonly MAX_WIDTH = MAX_WIDTH;
+  protected readonly COLLAPSED_WIDTH = COLLAPSED_WIDTH;
   readonly photos = input<readonly Photo[]>([]);
   readonly currentPath = input('');
   readonly title = input('');
@@ -90,9 +77,9 @@ export class PhotoCollectionSidebarComponent {
   readonly more = output<void>();
   /** Up/Down pressed on the section's first or last thumbnail, for the page to step along the collection. */
   readonly step = output<-1 | 1>();
-  protected readonly width = signal(storedWidth());
+  protected readonly resize = new PanelWidth({ storageKey: 'facet_collection_sidebar_width', defaultWidth: 192, min: 144, max: 384, side: 'left' });
   protected readonly collapsed = signal(false);
-  protected readonly columnCount = computed(() => this.width() >= 280 ? 2 : 1);
+  protected readonly columnCount = computed(() => this.resize.width() >= 280 ? 2 : 1);
   protected readonly columns = computed(() => `repeat(${this.columnCount()}, minmax(0, 1fr))`);
   private readonly injector = inject(Injector);
   private readonly windowSize = 200;
@@ -119,10 +106,7 @@ export class PhotoCollectionSidebarComponent {
   private lastPath = '';
   private lastPathFound = false;
   private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
-  private drag: { id: number; x: number; width: number; target: HTMLElement } | null = null;
   private frame: number | null = null;
-  private resizeFrame: number | null = null;
-  private pendingWidth: number | null = null;
 
   constructor() {
     effect(() => {
@@ -142,7 +126,7 @@ export class PhotoCollectionSidebarComponent {
     });
     // Reflow and hidden-to-visible transitions must keep the same photo in view too.
     effect(cleanup => {
-      this.currentPath(); this.width();
+      this.currentPath(); this.resize.width();
       const viewport = this.scroller()?.nativeElement;
       this.revealCurrent();
       if (viewport && typeof ResizeObserver !== 'undefined') {
@@ -153,7 +137,6 @@ export class PhotoCollectionSidebarComponent {
     });
     inject(DestroyRef).onDestroy(() => {
       if (this.frame !== null) cancelAnimationFrame(this.frame);
-      if (this.drag) this.finishPointer(true);
     });
   }
 
@@ -184,51 +167,5 @@ export class PhotoCollectionSidebarComponent {
       const buttons = viewport.querySelectorAll<HTMLButtonElement>('.grid button');
       (direction > 0 ? buttons[0] : buttons[buttons.length - 1])?.focus({ preventScroll: true });
     }, { injector: this.injector });
-  }
-  private setWidth(width: number): void { this.width.set(clampWidth(width)); }
-  private persistWidth(): void {
-    try { localStorage.setItem(WIDTH_KEY, String(this.width())); } catch { /* Storage blocked: the width still applies, it is just not remembered. */ }
-  }
-  protected start(event: PointerEvent): void {
-    if (this.drag || event.button !== 0 || !event.isPrimary) return;
-    event.preventDefault(); event.stopPropagation();
-    const target = event.currentTarget as HTMLElement;
-    target.focus();
-    this.drag = { id: event.pointerId, x: event.clientX, width: this.width(), target };
-    try { target.setPointerCapture(event.pointerId); } catch { /* Synthetic pointer. */ }
-  }
-  protected move(event: PointerEvent): void {
-    if (this.drag?.id !== event.pointerId) return;
-    event.preventDefault(); event.stopPropagation();
-    this.pendingWidth = this.drag.width + event.clientX - this.drag.x;
-    if (this.resizeFrame === null) this.resizeFrame = requestAnimationFrame(() => {
-      this.resizeFrame = null;
-      if (this.pendingWidth !== null) this.setWidth(this.pendingWidth);
-      this.pendingWidth = null;
-    });
-  }
-  protected finish(event: PointerEvent, cancel = false): void {
-    if (this.drag?.id === event.pointerId) this.finishPointer(cancel);
-  }
-  private finishPointer(cancel: boolean): void {
-    const drag = this.drag;
-    this.drag = null;
-    if (!drag) return;
-    if (this.resizeFrame !== null) cancelAnimationFrame(this.resizeFrame);
-    this.resizeFrame = null;
-    if (!cancel && this.pendingWidth !== null) this.setWidth(this.pendingWidth);
-    this.pendingWidth = null;
-    if (cancel) this.width.set(drag.width);
-    else this.persistWidth();
-    try { drag.target.releasePointerCapture(drag.id); } catch { /* Already released. */ }
-  }
-  protected resizeKey(event: KeyboardEvent): void {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End', 'Escape'].includes(event.key)) return;
-    if (event.key === 'Escape' && !this.drag) return;
-    event.preventDefault(); event.stopPropagation();
-    if (event.key === 'Escape') { this.finishPointer(true); return; }
-    this.finishPointer(true);
-    this.setWidth(KEY_WIDTHS[event.key] ?? this.width() + (event.key === 'ArrowRight' ? 16 : -16));
-    this.persistWidth();
   }
 }

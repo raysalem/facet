@@ -3413,6 +3413,8 @@
     },
     "analysis": "Análisis",
     "details": "Detalles de la foto",
+    "inspector_resize": "Cambiar el ancho del panel de detalles de la foto",
+    "zoom_controls": "Ampliación de la imagen",
     "unassigned_faces": "Caras sin asignar: {count}",
     "tag_refine_collection": "Refinar esta colección",
     "tag_search_library": "Buscar en la biblioteca",

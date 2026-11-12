@@ -3413,6 +3413,8 @@
     },
     "analysis": "Analyse",
     "details": "Fotodetails",
+    "inspector_resize": "Breite der Fotodetails ändern",
+    "zoom_controls": "Bildvergrößerung",
     "unassigned_faces": "Nicht zugewiesene Gesichter: {count}",
     "tag_refine_collection": "Diese Sammlung verfeinern",
     "tag_search_library": "Bibliothek durchsuchen",

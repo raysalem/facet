@@ -3438,6 +3438,8 @@
     },
     "analysis": "Analysis",
     "details": "Photo details",
+    "inspector_resize": "Resize photo details panel",
+    "zoom_controls": "Image zoom",
     "unassigned_faces": "Unassigned faces: {count}",
     "tag_refine_collection": "Refine this collection",
     "tag_search_library": "Search library",

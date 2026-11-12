@@ -65,6 +65,7 @@ import { I18N, i18nKeys } from '../../core/i18n/keys';
 import { isPageShortcutBlocked } from '../../shared/utils/keyboard';
 import { privateImageSessionKey } from '../../shared/utils/private-image-session';
 import { KeyboardMappingService } from '../../core/services/keyboard-mapping.service';
+import { PanelWidth } from '../../shared/utils/panel-width';
 import type { CategoryOverrideResult } from './category-override-dialog.component';
 import { StackNavigatorComponent } from './stack-navigator.component';
 import { PhotoStackService } from '../../core/services/photo-stack.service';
@@ -369,15 +370,33 @@ function inDetectedSet(photo: Photo): boolean {
             [transform]="zoom.transform()"
             [revision]="objectsRevision()" />
           <app-photo-annotation-layer [transform]="zoom.transform()" />
-        </div>
-          <div data-image-readout class="flex shrink-0 items-center gap-1 border-t border-[var(--facet-image-rule)] bg-[var(--facet-image-chrome)] px-4 py-1 text-[var(--facet-image-ink)] cursor-auto" role="presentation" (pointerdown)="$event.stopPropagation()" (dblclick)="$event.stopPropagation()">
-            <app-rendition-readout class="flex-1" [state]="displayedRendition()" [pending]="sourceRendition().phase === 'loading'" [attemptFailed]="sourceRendition().phase === 'failed'" [failureLabel]="I18N.photo_detail.rendition.source_failed" [scale]="zoom.scale()" [minimumScale]="1" [maximumScale]="zoom.maximumScale" (zoomStep)="zoom.zoomStep($event)" (fit)="zoom.reset()" (retry)="retryFullImage()" />
-            <app-context-help [label]="I18N.gallery.compare.rendition.sources" [keys]="[I18N.photo_detail.rendition.note]" [iconOnly]="true" />
+          <!-- The image keeps the whole panel: the rendition shows only while it is not ready yet or failed,
+               and the zoom controls sit on the image like the collection arrows. -->
+          @if (renditionNotice()) {
+            <div data-rendition-status class="absolute bottom-2 left-2 z-30 max-w-[calc(100%-1rem)] rounded bg-black/70 px-2 py-1 text-white cursor-auto"
+              (pointerdown)="$event.stopPropagation()" (dblclick)="$event.stopPropagation()">
+              <app-rendition-readout [state]="displayedRendition()" [pending]="sourceRendition().phase === 'loading'" [attemptFailed]="sourceRendition().phase === 'failed'" [failureLabel]="I18N.photo_detail.rendition.source_failed" (retry)="retryFullImage()" />
+            </div>
+          }
+          <div data-zoom-controls role="group" [attr.aria-label]="I18N.photo_detail.zoom_controls | translate"
+            class="absolute bottom-2 right-2 z-30 flex items-center rounded-full bg-black/60 text-xs text-white cursor-auto opacity-0 transition-opacity group-hover/photo:opacity-100 focus-within:opacity-100 max-xl:opacity-100 pointer-coarse:opacity-100"
+            (pointerdown)="$event.stopPropagation()" (dblclick)="$event.stopPropagation()">
+            <button type="button" data-zoom-out class="min-h-9 min-w-9 max-sm:min-h-11 max-sm:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11 cursor-pointer rounded-full hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-white disabled:opacity-40" [disabled]="zoom.scale() <= 1" [attr.aria-label]="I18N.gallery.compare.rendition.zoom_out | translate" (click)="zoom.zoomStep(-1)">−</button>
+            <button type="button" data-zoom-fit class="min-h-9 min-w-9 max-sm:min-h-11 max-sm:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11 cursor-pointer rounded-full px-1 tabular-nums hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-white" [attr.aria-label]="(I18N.gallery.compare.rendition.fit | translate) + (zoom.scale() === 1 ? '' : ' (' + (zoom.scale() | fixed:1) + '×)')" (click)="zoom.reset()">@if (zoom.scale() === 1) { {{ I18N.gallery.compare.rendition.fit_short | translate }} } @else { {{ zoom.scale() | fixed:1 }}× }</button>
+            <button type="button" data-zoom-in class="min-h-9 min-w-9 max-sm:min-h-11 max-sm:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11 cursor-pointer rounded-full hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-white disabled:opacity-40" [disabled]="zoom.scale() >= zoom.maximumScale" [attr.aria-label]="I18N.gallery.compare.rendition.zoom_in | translate" (click)="zoom.zoomStep(1)">+</button>
           </div>
         </div>
+        </div>
+
+        <!-- Drag or arrow-key the inspector's left edge to trade image room for detail (lg+, remembered). -->
+        <div role="separator" tabindex="0" aria-orientation="vertical" data-inspector-resize [attr.aria-label]="I18N.photo_detail.inspector_resize | translate"
+          [attr.aria-valuemin]="inspectorWidth.min" [attr.aria-valuemax]="inspectorWidth.max" [attr.aria-valuenow]="inspectorWidth.width()"
+          class="relative z-10 hidden lg:block w-2 -mx-1 shrink-0 cursor-col-resize touch-none focus-visible:bg-[var(--mat-sys-primary)]"
+          (pointerdown)="inspectorWidth.start($event)" (pointermove)="inspectorWidth.move($event)" (pointerup)="inspectorWidth.finish($event)"
+          (pointercancel)="inspectorWidth.finish($event, true)" (lostpointercapture)="inspectorWidth.finish($event, true)" (keydown)="inspectorWidth.key($event)"></div>
 
         <!-- Info panel -->
-        <aside data-photo-inspector [attr.aria-label]="I18N.photo_detail.details | translate" class="[overflow-wrap:anywhere] lg:w-80 xl:w-[360px] lg:shrink-0 lg:overflow-y-auto lg:border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-4 space-y-4 text-sm text-[var(--mat-sys-on-surface)]">
+        <aside data-photo-inspector [attr.aria-label]="I18N.photo_detail.details | translate" [style.--facet-inspector-width]="inspectorWidth.width() + 'px'" class="[overflow-wrap:anywhere] lg:w-[var(--facet-inspector-width)] lg:shrink-0 lg:overflow-y-auto lg:border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-4 space-y-4 text-sm text-[var(--mat-sys-on-surface)]">
           <ng-template #categoryExplanation>
               <mat-form-field class="w-full" subscriptSizing="dynamic">
                 <mat-label>{{ I18N.photo.category_override.target_category_label | translate }}</mat-label>
@@ -464,14 +483,18 @@ function inDetectedSet(photo: Photo): boolean {
                 </span>
               }
             </div>
-            @if (p.camera_model || p.focal_length || p.f_stop || p.shutter_speed || p.iso) {
+            @if (p.camera_model || p.focal_length || p.f_stop || p.shutter_speed || p.iso || (p.image_width && p.image_height)) {
               <div data-photo-exposure role="group" [attr.aria-label]="I18N.photo_detail.capture_settings | translate"
-                   class="flex flex-wrap gap-x-1.5 tabular-nums [&>span+span]:before:me-1.5 [&>span+span]:before:content-['·']">
+                   class="flex flex-wrap items-center gap-x-1.5 tabular-nums [&>span+span]:before:me-1.5 [&>span+span]:before:content-['·']">
                 @if (p.camera_model) { <span>{{ p.camera_model }}</span> }
                 @if (p.focal_length) { <span>{{ p.focal_length }}mm</span> }
                 @if (p.f_stop) { <span>f/{{ p.f_stop }}</span> }
                 @if (p.shutter_speed | shutterSpeed; as shutter) { <span>{{ shutter }}</span> }
                 @if (p.iso) { <span>ISO {{ p.iso }}</span> }
+                @if (p.image_width && p.image_height) {
+                  <span data-photo-dimensions>{{ p.image_width }} × {{ p.image_height }}</span>
+                  <app-context-help class="-my-1.5" [label]="I18N.gallery.compare.rendition.sources" [keys]="[I18N.photo_detail.rendition.note]" [iconOnly]="true" />
+                }
               </div>
             }
           </div>
@@ -575,7 +598,7 @@ function inDetectedSet(photo: Photo): boolean {
                   <div class="text-sm font-medium mb-1">{{ locationName() }}</div>
                 }
                 <div class="text-xs text-[var(--mat-sys-on-surface-variant)] mb-2">{{ p.gps_latitude | fixed:6 }}, {{ p.gps_longitude | fixed:6 }}</div>
-                <div #locationMapContainer class="w-full h-40 rounded-lg overflow-hidden"></div>
+                <div #locationMapContainer class="w-full h-24 rounded-lg overflow-hidden"></div>
               </div>
             }
 
@@ -723,6 +746,10 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   private readonly assistantChanges = inject(AssistantChangesService);
   private readonly photoActions = inject(PhotoActionsService);
   private readonly journal = inject(UserActivityJournal);
+  /** The inspector's user-set width (lg+): the image comes first, the details panel gives way. */
+  protected readonly inspectorWidth = new PanelWidth({ storageKey: 'facet_photo_inspector_width', defaultWidth: 320, min: 260, max: 520, side: 'right' });
+  /** The image's rendition only needs a word while it is not ready yet or its source failed. */
+  protected readonly renditionNotice = computed(() => this.displayedRendition().phase !== 'ready' || this.sourceRendition().phase !== 'ready');
   private readonly keymap = inject(KeyboardMappingService);
   private readonly stacks = inject(PhotoStackService);
   private readonly stackNavigator = viewChild(StackNavigatorComponent);

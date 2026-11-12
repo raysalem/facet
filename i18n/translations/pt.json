@@ -3413,6 +3413,8 @@
     },
     "analysis": "Análise",
     "details": "Detalhes da foto",
+    "inspector_resize": "Redimensionar o painel de detalhes da foto",
+    "zoom_controls": "Ampliação da imagem",
     "unassigned_faces": "Rostos não atribuídos: {count}",
     "tag_refine_collection": "Refinar esta coleção",
     "tag_search_library": "Pesquisar na biblioteca",

@@ -3413,6 +3413,8 @@
     },
     "analysis": "分析",
     "details": "照片详情",
+    "inspector_resize": "调整照片详情面板宽度",
+    "zoom_controls": "图像缩放",
     "unassigned_faces": "未分配人脸：{count}",
     "tag_refine_collection": "细化此集合",
     "tag_search_library": "搜索图库",

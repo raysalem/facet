@@ -3413,6 +3413,8 @@
     },
     "analysis": "Analisi",
     "details": "Dettagli della foto",
+    "inspector_resize": "Ridimensiona il pannello dei dettagli della foto",
+    "zoom_controls": "Ingrandimento dell’immagine",
     "unassigned_faces": "Volti non assegnati: {count}",
     "tag_refine_collection": "Affina questa raccolta",
     "tag_search_library": "Cerca nella raccolta",
