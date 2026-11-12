@@ -3501,7 +3501,11 @@ export interface paths {
          * @description Every source's annotations for one photo; empty for a photo the caller cannot see.
          */
         get: operations["list_photo_annotations_api_photo_annotations_get"];
-        put?: never;
+        /**
+         * Put Photo Annotation
+         * @description Store (or replace) one source's annotations for a photo; 422 on a payload that fails validation.
+         */
+        put: operations["put_photo_annotation_api_photo_annotations_put"];
         post?: never;
         /**
          * Delete Photo Annotation
@@ -9979,6 +9983,25 @@ export interface components {
         PhotoAnnotationDelete: {
             /** Removed */
             removed: boolean;
+            /** Success */
+            success: boolean;
+        };
+        /**
+         * PhotoAnnotationPut
+         * @description One source's overlay for one photo, replacing any earlier row of that source.
+         */
+        PhotoAnnotationPut: {
+            /** Path */
+            path: string;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Source */
+            source: string;
+        };
+        /** PhotoAnnotationSaved */
+        PhotoAnnotationSaved: {
             /** Success */
             success: boolean;
         };
@@ -17798,6 +17821,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PhotoAnnotationsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_photo_annotation_api_photo_annotations_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhotoAnnotationPut"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoAnnotationSaved"];
                 };
             };
             /** @description Validation Error */
