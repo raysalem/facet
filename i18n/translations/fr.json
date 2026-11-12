@@ -3284,6 +3284,10 @@
     "technical": "Technique",
     "exif": "Données EXIF",
     "tags": "Mots-clés",
+    "tag_groups": {
+      "ai": "IA",
+      "yours": "Les vôtres"
+    },
     "rating": "Note",
     "generate_caption": "Générer",
     "edit_caption": "Modifier",

@@ -826,7 +826,7 @@ describe('PhotoDetailComponent', () => {
     expect(mockApi.get.mock.calls.filter(([url]) => url === '/photo/related_files')).toHaveLength(0);
   });
 
-  it('orders the inspector Review, date line, Describe, metric tabs, set, file details and pins Review on wide screens', async () => {
+  it('orders the inspector Review, date line, Describe, metric tabs, set, location, file details and pins Review on wide screens', async () => {
     const view = renderDetail();
     const photo = makePhoto({ camera_model: 'Canon EOS R6', focal_length: 85, f_stop: 2.8, shutter_speed: '0.01', iso: 4000,
       caption: 'A street', tags_list: ['street'], gps_latitude: 1, gps_longitude: 2, persons: [{ id: 1, name: 'Alice' }],
@@ -840,14 +840,16 @@ describe('PhotoDetailComponent', () => {
     }
     view.detectChanges();
     const aside = (view.nativeElement as HTMLElement).querySelector<HTMLElement>('[data-photo-inspector]')!;
-    const order = ['[data-photo-review]', '[data-photo-when]', '[data-photo-describe]', 'app-photo-metrics-tabs', '[data-photo-set]', '[data-file-details]']
+    // By priority: review and the date line always, Describe compact, metrics and set below, location then file details folded at the bottom.
+    const order = ['[data-photo-review]', '[data-photo-when]', '[data-photo-describe]', 'app-photo-metrics-tabs', '[data-photo-set]', '[data-photo-location]', '[data-file-details]']
       .map(selector => aside.querySelector<HTMLElement>(selector)!);
     order.forEach(element => expect(element).not.toBeNull());
     for (let i = 1; i < order.length; i++) {
       expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
     const describe = aside.querySelector<HTMLElement>('[data-photo-describe]')!;
-    const fields = ['[data-photo-caption]', '[data-testid="tags-section"]', '[data-photo-location]', '[data-photo-people]']
+    expect(aside.querySelector('[data-photo-describe] [data-photo-location]')).toBeNull();
+    const fields = ['[data-photo-caption]', '[data-testid="tags-section"]', '[data-photo-people]']
       .map(selector => describe.querySelector<HTMLElement>(selector)!);
     fields.forEach(element => expect(element).not.toBeNull());
     for (let i = 1; i < fields.length; i++) {
@@ -3362,6 +3364,24 @@ describe('PhotoDetailComponent', () => {
         const calls = mockApi.get.mock.calls.filter(([url, params]) => url === '/photo' && (params as { path: string }).path === '/photos/row.jpg').length;
         tagsView.componentInstance.photo.set({ ...row, path: '/photos/row.jpg', star_rating: 4 } as never); await settle();
         expect(mockApi.get.mock.calls.filter(([url, params]) => url === '/photo' && (params as { path: string }).path === '/photos/row.jpg').length).toBe(calls);
+      });
+
+      it('groups AI, Yours and add-on tags in that order, naming the groups only when more than one shows', async () => {
+        const el = await render({ ...astro, tags_list: ['sky'] }, true, [addonsMock(vi.fn().mockResolvedValue({ addons: [{ id: 'astro-id', name: 'Astro' }] }))]);
+        await settle(); await settle();
+        const groups = [...el.querySelectorAll<HTMLElement>('[data-testid="tags-section"] [data-tag-group]')];
+        expect(groups.map(group => group.dataset['tagGroup'])).toEqual(['ai', 'yours', 'addons']);
+        expect(groups.map(group => group.firstElementChild!.textContent!.trim())).toEqual(['photo_detail.tag_groups.ai', 'photo_detail.tag_groups.yours', 'addons.title']);
+        expect(groups[0].querySelectorAll('[data-testid="ai-tag-chip"]').length).toBe(1);
+        expect(groups[1].querySelector('[data-add-tag]')).not.toBeNull();
+        expect(groups[2].querySelector('[data-addon-tag-group]')).not.toBeNull();
+      });
+
+      it('leaves a lone group unnamed', async () => {
+        const el = await render({ ...untagged, tags_list: ['sky', 'stars'] }, false);
+        const groups = [...el.querySelectorAll<HTMLElement>('[data-tag-group]')];
+        expect(groups.map(group => group.dataset['tagGroup'])).toEqual(['ai']);
+        expect(groups[0].textContent).not.toContain('photo_detail.tag_groups.ai');
       });
 
       it('shows every manual tag as a chip when no add-on wrote any', async () => {

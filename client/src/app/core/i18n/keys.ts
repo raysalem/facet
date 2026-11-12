@@ -3323,6 +3323,10 @@ export const I18N = {
     technical: "photo_detail.technical",
     exif: "photo_detail.exif",
     tags: "photo_detail.tags",
+    tag_groups: {
+      ai: "photo_detail.tag_groups.ai",
+      yours: "photo_detail.tag_groups.yours",
+    },
     rating: "photo_detail.rating",
     generate_caption: "photo_detail.generate_caption",
     edit_caption: "photo_detail.edit_caption",

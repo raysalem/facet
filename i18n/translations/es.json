@@ -3280,6 +3280,10 @@
     "technical": "Técnico",
     "exif": "Datos EXIF",
     "tags": "Etiquetas",
+    "tag_groups": {
+      "ai": "IA",
+      "yours": "Tuyas"
+    },
     "rating": "Valoración",
     "generate_caption": "Generar",
     "edit_caption": "Editar",

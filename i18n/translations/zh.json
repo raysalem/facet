@@ -3284,6 +3284,10 @@
     "technical": "技术指标",
     "exif": "EXIF 信息",
     "tags": "标签",
+    "tag_groups": {
+      "ai": "AI",
+      "yours": "我的"
+    },
     "rating": "星级",
     "generate_caption": "生成",
     "edit_caption": "编辑",

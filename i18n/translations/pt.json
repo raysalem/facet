@@ -3284,6 +3284,10 @@
     "technical": "Técnico",
     "exif": "Dados EXIF",
     "tags": "Tags",
+    "tag_groups": {
+      "ai": "IA",
+      "yours": "Suas"
+    },
     "rating": "Avaliação",
     "generate_caption": "Gerar",
     "edit_caption": "Editar",

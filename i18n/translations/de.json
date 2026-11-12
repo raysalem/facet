@@ -3280,6 +3280,10 @@
     "technical": "Technisch",
     "exif": "EXIF-Daten",
     "tags": "Schlagwörter",
+    "tag_groups": {
+      "ai": "KI",
+      "yours": "Eigene"
+    },
     "rating": "Bewertung",
     "generate_caption": "Generieren",
     "edit_caption": "Bearbeiten",

@@ -534,13 +534,8 @@ function inDetectedSet(photo: Photo): boolean {
             @if (p.tags_list.length || p.manual_tags.length || tagInputOpen()) {
               <div data-testid="tags-section">
                 <div class="text-xs text-[var(--mat-sys-on-surface-variant)] mb-2">{{ I18N.photo_detail.tags | translate }}</div>
-                <div class="flex gap-1.5 flex-wrap items-center">
-                  @for (tag of p.tags_list; track tag) {
-                    <span data-testid="ai-tag-chip" class="inline-flex min-w-0 max-w-full">
-                      <button class="inline-flex items-center min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 max-sm:min-w-11 pointer-coarse:min-w-11 max-w-full [overflow-wrap:anywhere] text-left px-2 py-0.5 bg-[var(--facet-accent-badge)] text-[var(--facet-accent-text)] rounded-full text-xs cursor-pointer hover:opacity-80 transition-opacity"
-                              [matMenuTriggerFor]="tagNavigationMenu" [matMenuTriggerData]="{ tag: tag }">{{ tag }}</button>
-                    </span>
-                  }
+                <!-- AI, then Yours, then one folded chip per add-on; a group is named only when another one shows. -->
+                <div class="space-y-1.5">
                   <ng-template #manualTagChip let-tag>
                     <span data-testid="manual-tag-chip"
                           class="inline-flex min-w-0 max-w-full items-center rounded-full border border-dashed border-[var(--facet-accent-text)] text-[var(--facet-accent-text)] text-xs">
@@ -561,10 +556,35 @@ function inDetectedSet(photo: Photo): boolean {
                       }
                     </span>
                   </ng-template>
+                @if (p.tags_list.length) {
+                <div data-tag-group="ai" class="flex gap-1.5 flex-wrap items-center">
+                  @if (tagGroups().labelled) { <span class="text-[0.6875rem] text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.tag_groups.ai | translate }}</span> }
+                  @for (tag of p.tags_list; track tag) {
+                    <span data-testid="ai-tag-chip" class="inline-flex min-w-0 max-w-full">
+                      <button class="inline-flex items-center min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 max-sm:min-w-11 pointer-coarse:min-w-11 max-w-full [overflow-wrap:anywhere] text-left px-2 py-0.5 bg-[var(--facet-accent-badge)] text-[var(--facet-accent-text)] rounded-full text-xs cursor-pointer hover:opacity-80 transition-opacity"
+                              [matMenuTriggerFor]="tagNavigationMenu" [matMenuTriggerData]="{ tag: tag }">{{ tag }}</button>
+                    </span>
+                  }
+                </div>
+                }
+                @if (tagGroups().own.length || (auth.isEdition() && !tagInputOpen())) {
+                <div data-tag-group="yours" class="flex gap-1.5 flex-wrap items-center">
+                  @if (tagGroups().labelled && tagGroups().own.length) { <span class="text-[0.6875rem] text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.tag_groups.yours | translate }}</span> }
                   @for (tag of tagGroups().own; track tag) {
                     <ng-container [ngTemplateOutlet]="manualTagChip" [ngTemplateOutletContext]="{ $implicit: tag }" />
                   }
-                  <!-- An add-on's tags fold into one muted chip per add-on, collapsed until asked for. -->
+                  @if (auth.isEdition() && !tagInputOpen()) {
+                    <button type="button" data-add-tag class="inline-flex min-h-6 items-center gap-0.5 rounded-full border border-dashed border-[var(--mat-sys-outline)] px-2 py-0.5 text-xs text-[var(--mat-sys-on-surface-variant)] cursor-pointer hover:bg-[var(--mat-sys-surface-container-high)] max-sm:min-h-11 pointer-coarse:min-h-11"
+                            [attr.aria-label]="I18N.manual_tags.add | translate" (click)="openTagInput()">
+                      <mat-icon class="!text-sm !w-3.5 !h-3.5 !leading-3.5" aria-hidden="true">add</mat-icon>{{ I18N.manual_tags.tag_label | translate }}
+                    </button>
+                  }
+                </div>
+                }
+                @if (tagGroups().addons.length) {
+                <!-- An add-on's tags fold into one muted chip per add-on, collapsed until asked for. -->
+                <div data-tag-group="addons" class="flex gap-1.5 flex-wrap items-center">
+                  @if (tagGroups().labelled) { <span class="text-[0.6875rem] text-[var(--mat-sys-on-surface-variant)]">{{ I18N.addons.title | translate }}</span> }
                   @for (group of tagGroups().addons; track group.source) {
                     <button type="button" data-addon-tag-group [attr.data-source]="group.source" [attr.aria-expanded]="group.expanded"
                             class="inline-flex min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 items-center gap-0.5 rounded-full border border-[var(--mat-sys-outline-variant)] px-2 py-0.5 text-xs text-[var(--mat-sys-on-surface-variant)] cursor-pointer hover:bg-[var(--mat-sys-surface-container-high)]"
@@ -578,12 +598,8 @@ function inDetectedSet(photo: Photo): boolean {
                       }
                     }
                   }
-                  @if (auth.isEdition() && !tagInputOpen()) {
-                    <button type="button" data-add-tag class="inline-flex min-h-6 items-center gap-0.5 rounded-full border border-dashed border-[var(--mat-sys-outline)] px-2 py-0.5 text-xs text-[var(--mat-sys-on-surface-variant)] cursor-pointer hover:bg-[var(--mat-sys-surface-container-high)] max-sm:min-h-11 pointer-coarse:min-h-11"
-                            [attr.aria-label]="I18N.manual_tags.add | translate" (click)="openTagInput()">
-                      <mat-icon class="!text-sm !w-3.5 !h-3.5 !leading-3.5" aria-hidden="true">add</mat-icon>{{ I18N.manual_tags.tag_label | translate }}
-                    </button>
-                  }
+                </div>
+                }
                 </div>
                 <mat-menu #tagNavigationMenu="matMenu">
                   <ng-template matMenuContent let-tag="tag">
@@ -609,31 +625,6 @@ function inDetectedSet(photo: Photo): boolean {
                     </button>
                   </div>
                 }
-              </div>
-            }
-
-            @if (p.gps_latitude !== null && p.gps_longitude !== null) {
-              <!-- One compact line until asked for: the map and exact coordinates open below it, remembered. -->
-              <div data-photo-location>
-                <div class="flex items-center gap-1">
-                  <button type="button" data-location-toggle aria-controls="photo-location-detail" [attr.aria-expanded]="locationOpen()"
-                          [matTooltip]="I18N.photo_detail.location_map | translate" (click)="toggleLocation()"
-                          class="flex min-h-7 min-w-0 flex-1 cursor-pointer items-center gap-1 rounded text-left text-xs text-[var(--mat-sys-on-surface-variant)] hover:bg-[var(--mat-sys-surface-container-high)] focus-visible:outline-2 focus-visible:outline-[var(--mat-sys-primary)] max-sm:min-h-11 pointer-coarse:min-h-11">
-                    <mat-icon class="!text-base !w-4 !h-4 !leading-4 shrink-0" aria-hidden="true">place</mat-icon>
-                    <span class="sr-only">{{ I18N.photo_detail.location | translate }}:</span>
-                    <span data-location-summary class="min-w-0 truncate tabular-nums">{{ locationName() || (p.gps_latitude | fixed:4) + ', ' + (p.gps_longitude | fixed:4) }}</span>
-                    <mat-icon class="!text-base !w-4 !h-4 !leading-4 ml-auto shrink-0" aria-hidden="true">{{ locationOpen() ? 'expand_less' : 'expand_more' }}</mat-icon>
-                  </button>
-                  @if (auth.isEdition()) {
-                    <button mat-icon-button class="!w-7 !h-7 max-sm:!w-11 max-sm:!h-11 pointer-coarse:!w-11 pointer-coarse:!h-11 !p-0" (click)="editGps(p)" [matTooltip]="I18N.photo_detail.edit_location | translate" [attr.aria-label]="I18N.photo_detail.edit_location | translate">
-                      <mat-icon class="!text-base !w-4 !h-4 !leading-4">edit_location</mat-icon>
-                    </button>
-                  }
-                </div>
-                <div id="photo-location-detail" class="mt-1 space-y-1" [hidden]="!locationOpen()">
-                  <div class="text-xs tabular-nums text-[var(--mat-sys-on-surface-variant)]">{{ p.gps_latitude | fixed:6 }}, {{ p.gps_longitude | fixed:6 }}</div>
-                  <div #locationMapContainer class="w-full h-24 rounded-lg overflow-hidden"></div>
-                </div>
               </div>
             }
 
@@ -738,6 +729,31 @@ function inDetectedSet(photo: Photo): boolean {
             }
           }
 
+          <!-- Location, folded to one line near the bottom (map and exact coordinates on demand, remembered). -->
+          @if (p.gps_latitude !== null && p.gps_longitude !== null) {
+            <div data-photo-location>
+              <div class="flex items-center gap-1">
+                <button type="button" data-location-toggle aria-controls="photo-location-detail" [attr.aria-expanded]="locationOpen()"
+                        [matTooltip]="I18N.photo_detail.location_map | translate" (click)="toggleLocation()"
+                        class="flex min-h-7 min-w-0 flex-1 cursor-pointer items-center gap-1 rounded text-left text-xs text-[var(--mat-sys-on-surface-variant)] hover:bg-[var(--mat-sys-surface-container-high)] focus-visible:outline-2 focus-visible:outline-[var(--mat-sys-primary)] max-sm:min-h-11 pointer-coarse:min-h-11">
+                  <mat-icon class="!text-base !w-4 !h-4 !leading-4 shrink-0" aria-hidden="true">place</mat-icon>
+                  <span class="sr-only">{{ I18N.photo_detail.location | translate }}:</span>
+                  <span data-location-summary class="min-w-0 truncate tabular-nums">{{ locationName() || (p.gps_latitude | fixed:4) + ', ' + (p.gps_longitude | fixed:4) }}</span>
+                  <mat-icon class="!text-base !w-4 !h-4 !leading-4 ml-auto shrink-0" aria-hidden="true">{{ locationOpen() ? 'expand_less' : 'expand_more' }}</mat-icon>
+                </button>
+                @if (auth.isEdition()) {
+                  <button mat-icon-button class="!w-7 !h-7 max-sm:!w-11 max-sm:!h-11 pointer-coarse:!w-11 pointer-coarse:!h-11 !p-0" (click)="editGps(p)" [matTooltip]="I18N.photo_detail.edit_location | translate" [attr.aria-label]="I18N.photo_detail.edit_location | translate">
+                    <mat-icon class="!text-base !w-4 !h-4 !leading-4">edit_location</mat-icon>
+                  </button>
+                }
+              </div>
+              <div id="photo-location-detail" class="mt-1 space-y-1" [hidden]="!locationOpen()">
+                <div class="text-xs tabular-nums text-[var(--mat-sys-on-surface-variant)]">{{ p.gps_latitude | fixed:6 }}, {{ p.gps_longitude | fixed:6 }}</div>
+                <div #locationMapContainer class="w-full h-24 rounded-lg overflow-hidden"></div>
+              </div>
+            </div>
+          }
+
           <!-- File details: metadata sources and related files, one open at a time -->
           <mat-accordion data-file-details displayMode="flat" class="block">
             <app-photo-provenance [photo]="p" />
@@ -803,9 +819,12 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
     }
     const names = this.addonNames();
     const expanded = this.expandedTagSources();
+    const addons = [...bySource].map(([source, tags]) => ({ source, tags, name: names.get(source) ?? source, expanded: expanded.has(source) }));
     return {
       own,
-      addons: [...bySource].map(([source, tags]) => ({ source, tags, name: names.get(source) ?? source, expanded: expanded.has(source) })),
+      addons,
+      /** Each group is named (AI, Yours, Add-ons) only when another one is shown beside it. */
+      labelled: [!!photo?.tags_list.length, own.length > 0, addons.length > 0].filter(Boolean).length > 1,
     };
   });
   /** Only `GET /api/photo` names a tag's add-on; a photo opened from a gallery, album or collection row carries no

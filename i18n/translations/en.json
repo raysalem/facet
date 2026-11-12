@@ -3309,6 +3309,10 @@
     "technical": "Technical",
     "exif": "EXIF Data",
     "tags": "Tags",
+    "tag_groups": {
+      "ai": "AI",
+      "yours": "Yours"
+    },
     "rating": "Rating",
     "generate_caption": "Generate",
     "edit_caption": "Edit",
