@@ -267,3 +267,41 @@ class TestShareLinksHideManualTags:
         assert shared.status_code == 200
         assert shared.json()["manual_tags"] == []
         assert TAG not in shared.text
+        assert "manual_tag_sources" not in shared.json()
+
+
+class TestManualTagSources:
+    """``GET /api/photo`` names the add-on behind each tag it wrote; ``manual_tags`` is unchanged."""
+
+    @pytest.fixture()
+    def astro_addon(self, monkeypatch):
+        from api.addons import manifest
+        addon = manifest.Addon(id="astro-id", name="Astro", version="1", icon="star", facet_api=1,
+                               directory="/addons/astro-id", slots=("sidebar",), permissions=("tags.write",))
+        monkeypatch.setattr(manifest, "_registry", manifest.Registry(addons={addon.id: addon}))
+
+    @pytest.fixture()
+    def addon_tags(self, seeded):
+        with _db() as conn:
+            conn.executemany(
+                "INSERT OR REPLACE INTO photo_manual_tags (photo_path, tag, source, created_by) VALUES (?, ?, 'user', ?)",
+                [(MANUAL_ONLY, "orion nebula", "astro-id"), (MANUAL_ONLY, "typed by alice", "alice"),
+                 (MANUAL_ONLY, "gone addon", "uninstalled-addon")],
+            )
+
+    def test_addon_tags_are_attributed_and_still_listed(self, edition_client, astro_addon, addon_tags):
+        body = edition_client.get("/api/photo", params={"path": MANUAL_ONLY}).json()
+        assert body["manual_tags"] == ["gone addon", "orion nebula", TAG, "typed by alice"]
+        assert body["manual_tag_sources"] == {"orion nebula": "astro-id"}
+
+    def test_no_installed_addons_attributes_nothing(self, edition_client, addon_tags, monkeypatch):
+        from api.addons import manifest
+        monkeypatch.setattr(manifest, "_registry", manifest.Registry())
+        body = edition_client.get("/api/photo", params={"path": MANUAL_ONLY}).json()
+        assert body["manual_tag_sources"] == {}
+
+    def test_share_request_omits_sources(self, edition_client, astro_addon, addon_tags):
+        shared = edition_client.get("/api/photo", params={"path": MANUAL_ONLY, "token": SHARE_TOKEN})
+        assert shared.status_code == 200
+        assert "manual_tag_sources" not in shared.json()
+        assert "astro-id" not in shared.text

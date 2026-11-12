@@ -170,6 +170,9 @@ class Photo(PhotoMetadata):
 
     path: str
     logical_review: Optional[LogicalReviewState] = None
+    # Only `GET /api/photo` fills it (never on a share request): tag -> id of the add-on that wrote it,
+    # for the manual tags an add-on wrote. Additive: `manual_tags` still lists every manual tag.
+    manual_tag_sources: Optional[dict[str, str]] = None
     # Only explicit current-scan receipts support a missing-score reason.
     assessment_states: Optional[PhotoAssessmentStates] = None
 

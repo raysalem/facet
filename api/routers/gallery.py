@@ -904,6 +904,24 @@ async def gallery_scope_sql_async(conn, filters, user_id, exclude=None, prepared
                                       hierarchy_available=hierarchy_available, collection_source=collection_source)
 
 
+async def _addon_tag_sources_async(conn, path: str) -> dict[str, str]:
+    """``{tag: add-on id}`` for the photo's manual tags an installed add-on wrote.
+
+    An add-on's tag is stored as ``source='user'`` with ``created_by`` = its id
+    (``api.addons.auth``), so the add-on registry is what tells it apart from a
+    user's ``created_by``. Typed and XMP-imported tags are absent.
+    """
+    from api.addons import manifest
+    from api.db_helpers import is_manual_tags_available
+    if not manifest.registry().addons or not is_manual_tags_available(conn):
+        return {}
+    cur = await conn.execute(
+        "SELECT tag, created_by FROM photo_manual_tags WHERE photo_path = ? AND created_by IS NOT NULL", [path])
+    rows = await cur.fetchall()
+    await cur.close()
+    return {row['tag']: row['created_by'] for row in rows if manifest.get(row['created_by'])}
+
+
 @router.get("/api/photo", response_model=Photo, response_model_exclude_unset=True)
 async def api_photo(
     path: str = Query(...),
@@ -937,6 +955,8 @@ async def api_photo(
             photos = split_photo_tags([row], VIEWER_CONFIG['display']['tags_per_photo'], include_manual_tags=show_manual)
             photo = photos[0]
             photo['date_formatted'] = format_date(photo.get('date_taken'))
+            if show_manual:
+                photo['manual_tag_sources'] = await _addon_tag_sources_async(conn, path)
             await attach_person_data_async([photo], conn)
             # The manual category correction, read only on this one-photo route: the listing
             # feeds carry no such column (the correction lives in a side table), and an agent
