@@ -9,7 +9,7 @@ import { PhotoProvenanceComponent } from './photo-provenance.component';
 import { PhotoRelatedFilesComponent } from './photo-related-files.component';
 import { TimelineFeedCache } from '../timeline/timeline-feed-cache.service';
 import { ContextHelpComponent } from '../../shared/components/context-help/context-help.component';
-import { Component, inject, signal, computed, effect, OnInit, HostListener, DestroyRef, ElementRef, viewChild, ChangeDetectionStrategy, Injector, afterNextRender } from '@angular/core';
+import { Component, inject, signal, computed, effect, untracked, OnInit, HostListener, DestroyRef, ElementRef, viewChild, ChangeDetectionStrategy, Injector, afterNextRender } from '@angular/core';
 import { Location } from '@angular/common';
 import { ActivatedRoute, Router, NavigationStart, NavigationEnd } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
@@ -33,6 +33,9 @@ import { PhotoActionsService } from '../../core/services/photo-actions.service';
 import { PhotoDetailBase } from '../../shared/directives/photo-detail-base.directive';
 import { ZoomPanDirective } from '../../shared/directives/zoom-pan.directive';
 import { PhotoObjectLayerComponent } from './photo-object-layer.component';
+import { PhotoAnnotationLayerComponent } from './photo-annotation-layer.component';
+import { PhotoAnnotationPanelComponent } from './photo-annotation-panel.component';
+import { PhotoAnnotationsState } from './photo-annotations.state';
 import { FixedPipe } from '../../shared/pipes/fixed.pipe';
 import { ShutterSpeedPipe } from '../../shared/pipes/shutter-speed.pipe';
 import { CaptureDatePipe } from '../../shared/pipes/capture-date.pipe';
@@ -106,6 +109,8 @@ function inDetectedSet(photo: Photo): boolean {
     StackNavigatorComponent,
     ZoomPanDirective,
     PhotoObjectLayerComponent,
+    PhotoAnnotationLayerComponent,
+    PhotoAnnotationPanelComponent,
     PhotoMetricsTabsComponent,
     PhotoFaceLayerComponent,
     PersonFaceMenuComponent,
@@ -130,6 +135,8 @@ function inDetectedSet(photo: Photo): boolean {
     EvOffsetPipe,
     ComparisonCategoryExplainerComponent,
   ],
+  // One annotations state per photo page, shared by the overlay layer and its control panel.
+  providers: [PhotoAnnotationsState],
   template: `
     @if (photo(); as p) {
       <!-- Header bar -->
@@ -175,6 +182,15 @@ function inDetectedSet(photo: Photo): boolean {
           <button mat-icon-button class="max-sm:!h-11 max-sm:!w-11 pointer-coarse:!h-11 pointer-coarse:!w-11 max-md:!hidden" [matMenuTriggerFor]="categoryOverrideMenu"
             [matTooltip]="I18N.photo.category_override.menu_tooltip | translate" [attr.aria-label]="I18N.photo.category_override.menu_tooltip | translate">
             <mat-icon>category</mat-icon>
+          </button>
+        }
+
+        @if (annotations.available()) {
+          <button mat-icon-button (click)="annotations.toggle()" data-annotations-toggle
+            [attr.aria-pressed]="annotations.enabled()"
+            [matTooltip]="(annotations.enabled() ? I18N.photo_annotations.toggle_hide : I18N.photo_annotations.toggle_show) | translate"
+            [attr.aria-label]="(annotations.enabled() ? I18N.photo_annotations.toggle_hide : I18N.photo_annotations.toggle_show) | translate">
+            <mat-icon>{{ annotations.enabled() ? 'label' : 'label_off' }}</mat-icon>
           </button>
         }
 
@@ -363,6 +379,7 @@ function inDetectedSet(photo: Photo): boolean {
             [imageHeight]="p.image_height"
             [transform]="zoom.transform()"
             [revision]="objectsRevision()" />
+          <app-photo-annotation-layer [transform]="zoom.transform()" />
         </div>
           <div data-image-readout class="flex shrink-0 items-center gap-1 border-t border-[var(--facet-image-rule)] bg-[var(--facet-image-chrome)] px-4 py-1 text-[var(--facet-image-ink)] cursor-auto" role="presentation" (pointerdown)="$event.stopPropagation()" (dblclick)="$event.stopPropagation()">
             <app-rendition-readout class="flex-1" [state]="displayedRendition()" [pending]="sourceRendition().phase === 'loading'" [attemptFailed]="sourceRendition().phase === 'failed'" [failureLabel]="I18N.photo_detail.rendition.source_failed" [scale]="zoom.scale()" [minimumScale]="1" [maximumScale]="zoom.maximumScale" (zoomStep)="zoom.zoomStep($event)" (fit)="zoom.reset()" (retry)="retryFullImage()" />
@@ -372,6 +389,7 @@ function inDetectedSet(photo: Photo): boolean {
 
         <!-- Info panel -->
         <aside data-photo-inspector [attr.aria-label]="I18N.photo_detail.details | translate" class="[overflow-wrap:anywhere] lg:w-80 xl:w-[360px] lg:shrink-0 lg:overflow-y-auto lg:border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-4 space-y-4 text-sm text-[var(--mat-sys-on-surface)]">
+          <app-photo-annotation-panel />
           <ng-template #categoryExplanation>
               <mat-form-field class="w-full" subscriptSizing="dynamic">
                 <mat-label>{{ I18N.photo.category_override.target_category_label | translate }}</mat-label>
@@ -848,6 +866,9 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   }
 
   readonly photo = signal<Photo | null>(null);
+  /** Plugin overlays for the open photo (a plate solve's labels), drawn by the annotation layer. */
+  protected readonly annotations = inject(PhotoAnnotationsState);
+  private readonly photoPath = computed(() => this.photo()?.path ?? null);
   /** Bumped when the mark dialog adds or removes an object, so the object layer re-reads. */
   protected readonly objectsRevision = signal(0);
   protected readonly photoMissing = signal(false);
@@ -1027,6 +1048,8 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
     });
     this.assistantChanges.batch$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(batch => void this.refreshAfterAssistant(batch));
     this.store.organizationRestored$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => void this.refreshAfterRestore());
+    // Keyed on the path, so a rating or tag change on the same photo does not re-read its annotations.
+    effect(() => { const path = this.photoPath(); untracked(() => void this.annotations.load(path)); });
   }
 
   /** An Organization history restore may have rewritten this photo; a newer local edit wins over the reply. */

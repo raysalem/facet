@@ -20,7 +20,7 @@ Escape returns from a gallery-opened photo using history, preserving the collect
 
 - [Starting the Viewer](#starting-the-viewer) · [Authentication](#authentication) · [Filtering Options](#filtering-options) · [Sorting](#sorting) · [Review decisions](#review-decisions) · [Gallery Features](#gallery-features)
 - [Panoramas and exposure brackets](#panoramas-and-exposure-brackets)
-- [Person Management](#person-management) · [Scan Trigger](#scan-trigger) · [Semantic Search](#semantic-search) · [Albums](#albums)
+- [Person Management](#person-management) · [Photo annotations](#photo-annotations) · [Scan Trigger](#scan-trigger) · [Semantic Search](#semantic-search) · [Albums](#albums)
 - [AI Critique](#ai-critique) · [AI Captioning](#ai-captioning-gpu-12gb16gb24gb-edition) · [Memories ("On This Day")](#memories-on-this-day) · [Timeline View](#timeline-view) · [Map View](#map-view) · [Capsules](#capsules)
 - [Folders View](#folders-view) · [GPS Filter Dialog](#gps-filter-dialog) · [Merge Suggestions](#merge-suggestions) · [Editor Export](#editor-export) · [Download](#download) · [Culling](#culling) · [Junk Sweep](#junk-sweep) · [Pairwise Comparison Mode](#pairwise-comparison-mode)
 - [EXIF Statistics](#exif-statistics) · [Keyboard Shortcuts](#keyboard-shortcuts-gallery) · [Undo](#undo) · [Progressive Web App](#progressive-web-app) · [Mobile](#mobile) · [Photo Frame / Kiosk Endpoint](#photo-frame--kiosk-endpoint) · [Phone Auto-Upload](#phone-auto-upload)
@@ -603,6 +603,17 @@ Saving, editing or removing a manual face updates the photo’s face boxes and p
 The legacy `viewer.performance.face_cache_size` setting is ignored and can be removed.
 
 **Objects.** The same editor can mark an object instead: choose **Object**, draw the box, type a label (for example "birthday cake") and save. Objects show as blue labelled boxes on the photo, the gallery search finds them by label, and assistants can read them (`GET /api/photo/objects`, or the `objects` field of the `get_photo` tool) to know which region is meant. Marks are always drawn by you, never detected automatically: they tell an assistant where to act, for example a box labelled "remove" on one of three bottles in a shot. An object is never a face: it does not touch detection, clustering, people or face scores.
+
+## Photo annotations
+
+A plugin can label what is in a photo and the photo page draws its labels over the image. The first user is a plate-solving plugin for night-sky shots: it names the stars, planets, deep-sky objects and constellations it found, once, and stores the result. Nothing is recomputed when you change what is shown.
+
+- **Turning it on.** When the open photo has annotations, a **label** button appears in the photo page's toolbar. Click it to show or hide the overlay. The choice is remembered by this browser and applies to every annotated photo.
+- **What you see.** Points get a small ring, objects with a size a circle, constellations their stick figure. Each group has its own colour, with a dark outline so labels read on a black sky and on a blue twilight one. Labels follow zoom, pan and window resizes.
+- **Plain labels.** A label is just the name ("Uranus"). Hover or focus a marker to see its score and values (for example "Uranus · Confidence 100 · mag 5.6"); **Show scores** adds the score to every label. When two labels would overlap, the higher-scored one is drawn and the other appears only on hover or focus.
+- **Controls.** A panel at the top of the info column has one checkbox per group (with the plugin's own defaults, for example stars off), a slider for the plugin's score (only items at or above it show) and one slider per value the plugin offers (for example a magnitude limit: only items at or below it show; an item without that value is not filtered by it). **Show members** also shows the parts of a shown item (the stars of an asterism), which are otherwise hidden. The legend line under the controls is the plugin's own summary. The reset button returns to the plugin's defaults.
+- **Live.** Every control filters at once in your browser; nothing is fetched again. Your settings are remembered per plugin by this browser.
+- **Where the data lives.** Annotations are stored per photo and plugin in the `photo_annotations` table. They stay through rescans, move with a photo whose path changes, are deleted with the photo, and travel with a viewer database export. `GET /api/photo/annotations?path=` returns them for a photo you can see; `DELETE /api/photo/annotations?path=&source=` (edition mode) removes one plugin's annotations, which the plugin can write again. How a plugin writes them: [plugins/examples/README.md](../plugins/examples/README.md#photo-annotations).
 
 ## Scan Trigger
 

@@ -17,6 +17,7 @@ import { MatTooltip } from '@angular/material/tooltip';
 import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
 import { MatSelect, MatSelectModule } from '@angular/material/select';
 import { OverlayContainer } from '@angular/cdk/overlay';
+import { PhotoAnnotationsState } from './photo-annotations.state';
 import { ApiService } from '../../core/services/api.service';
 import { PhotoActionsService } from '../../core/services/photo-actions.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -91,6 +92,8 @@ describe('PhotoDetailComponent', () => {
     TestBed.configureTestingModule({
       providers: [
         PhotoDetailComponent,
+        // Provided by the component itself when rendered; injected here as a plain provider.
+        PhotoAnnotationsState,
         { provide: AssistantChangesService, useValue: { batch$: changes$.asObservable() } },
         { provide: ApiService, useValue: mockApi },
         { provide: Router, useValue: mockRouter },

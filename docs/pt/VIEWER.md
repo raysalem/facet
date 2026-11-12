@@ -20,7 +20,7 @@ Escape regressa pelo histórico de uma foto aberta na galeria, preservando o con
 
 - [Iniciando o Visualizador](#iniciando-o-visualizador) · [Autenticação](#autenticação) · [Opções de Filtragem](#opções-de-filtragem) · [Ordenação](#ordenação) · [Decisões de revisão](#decisões-de-revisão) · [Recursos da Galeria](#recursos-da-galeria)
 - [Panorâmicas e brackets de exposição](#panorâmicas-e-brackets-de-exposição)
-- [Gerenciamento de Pessoas](#gerenciamento-de-pessoas) · [Disparo de Varredura](#disparo-de-varredura) · [Busca Semântica](#busca-semântica) · [Álbuns](#álbuns)
+- [Gerenciamento de Pessoas](#gerenciamento-de-pessoas) · [Anotações de fotos](#anotações-de-fotos) · [Disparo de Varredura](#disparo-de-varredura) · [Busca Semântica](#busca-semântica) · [Álbuns](#álbuns)
 - [Crítica por IA](#crítica-por-ia) · [Legendagem por IA](#legendagem-por-ia-gpu-12gb16gb24gb-edition) · [Memórias ("Neste Dia")](#memórias-neste-dia) · [Visão de Linha do Tempo](#visão-de-linha-do-tempo) · [Visão de Mapa](#visão-de-mapa) · [Cápsulas](#cápsulas)
 - [Visão de Pastas](#visão-de-pastas) · [Diálogo de Filtro por GPS](#diálogo-de-filtro-por-gps) · [Sugestões de Mesclagem](#sugestões-de-mesclagem) · [Exportação para Editor](#exportação-para-editor) · [Download](#download) · [Triagem](#triagem) · [Limpeza de lixo](#limpeza-de-lixo) · [Modo de Comparação Pareada](#modo-de-comparação-pareada)
 - [Estatísticas EXIF](#estatísticas-exif) · [Atalhos de Teclado](#atalhos-de-teclado-galeria) · [Desfazer](#desfazer) · [Progressive Web App](#progressive-web-app) · [Mobile](#mobile) · [Moldura Digital / Endpoint de Quiosque](#moldura-digital--endpoint-de-quiosque) · [Envio Automático do Telefone](#envio-automático-do-telefone)
@@ -599,6 +599,17 @@ Salvar, editar ou remover um rosto manual atualiza as caixas e as pessoas da fot
 A configuração antiga `viewer.performance.face_cache_size` é ignorada e pode ser removida.
 
 **Objetos.** O mesmo editor pode marcar um objeto em vez disso: escolha **Objeto**, desenhe o retângulo, escreva uma etiqueta (por exemplo «bolo de aniversário») e guarde. Os objetos aparecem como retângulos azuis com etiqueta na foto, a pesquisa da galeria encontra-os pela etiqueta e os assistentes podem lê-los (`GET /api/photo/objects`, ou o campo `objects` da ferramenta `get_photo`) para saber a que zona se refere. As marcas são sempre desenhadas por si, nunca detetadas automaticamente: indicam a um assistente onde atuar, por exemplo um retângulo com a etiqueta «remover» numa de três garrafas de uma foto. Um objeto nunca é um rosto: não mexe na deteção, no agrupamento, nas pessoas nem nas pontuações de rosto.
+
+## Anotações de fotos
+
+Um plugin pode rotular o que há numa foto e a página da foto desenha os rótulos sobre a imagem. O primeiro usuário é um plugin de resolução astrométrica para fotos do céu noturno: ele nomeia uma única vez as estrelas, planetas, objetos de céu profundo e constelações que encontrou e guarda o resultado. Nada é recalculado quando você muda o que é mostrado.
+
+- **Ativar.** Quando a foto aberta tem anotações, um botão de **rótulo** aparece na barra de ferramentas da página da foto. Clique para mostrar ou ocultar a sobreposição. A escolha é lembrada por este navegador e vale para todas as fotos anotadas.
+- **O que você vê.** Pontos ganham um pequeno anel, objetos com tamanho um círculo, constelações sua figura. Cada grupo tem sua cor, com um contorno escuro para que os rótulos sejam legíveis num céu negro e num céu azul de crepúsculo. Os rótulos acompanham o zoom, o arraste e o redimensionamento da janela.
+- **Rótulos simples.** Um rótulo é só o nome («Uranus»). Passe o ponteiro ou foque um marcador para ver sua pontuação e valores (por exemplo «Uranus · Confidence 100 · mag 5.6»); **Mostrar pontuações** acrescenta a pontuação a cada rótulo. Quando dois rótulos se sobreporiam, o de maior pontuação é desenhado e o outro aparece apenas ao passar o ponteiro ou focar.
+- **Controles.** Um painel no topo da coluna de informações tem uma caixa por grupo (com os padrões do plugin, por exemplo estrelas ocultas), um controle deslizante para a pontuação do plugin (só aparecem os itens iguais ou acima) e um por valor oferecido pelo plugin (por exemplo uma magnitude limite: só aparecem os itens iguais ou abaixo; um item sem esse valor não é filtrado por ele). **Mostrar membros** mostra também as partes de um item visível (as estrelas de um asterismo), ocultas de outra forma. A linha de legenda abaixo dos controles é o resumo do próprio plugin. O botão de repor volta aos padrões do plugin.
+- **Ao vivo.** Cada controle filtra na hora no navegador; nada é buscado de novo. Suas configurações são lembradas por plugin neste navegador.
+- **Onde ficam os dados.** As anotações são guardadas por foto e plugin na tabela `photo_annotations`. Sobrevivem a novas varreduras, acompanham uma foto cujo caminho muda, são apagadas com a foto e seguem com a exportação de um banco de dados do visualizador. `GET /api/photo/annotations?path=` as devolve para uma foto visível; `DELETE /api/photo/annotations?path=&source=` (modo de edição) remove as anotações de um plugin, que pode escrevê-las de novo. Como um plugin as escreve: [plugins/examples/README.md](../../plugins/examples/README.md#photo-annotations).
 
 ## Disparo de Varredura
 

@@ -650,6 +650,18 @@ PHOTO_AI_EDITS_COLUMNS = [
     ('created_at', "TEXT DEFAULT (datetime('now'))"),
 ]
 
+# Plugin-written overlay annotations (e.g. a plate solve's star and planet labels): one
+# JSON payload per (photo, source), drawn and filtered live by the viewer. A plugin
+# computes its result once and stores it here; nothing re-runs when the viewer's
+# sliders move. Side table, so a rescan never touches it; the payload format is
+# validated by db.annotations on every write.
+PHOTO_ANNOTATIONS_COLUMNS = [
+    ('photo_path', 'TEXT NOT NULL REFERENCES photos(path) ON DELETE CASCADE ON UPDATE CASCADE'),
+    ('source', 'TEXT NOT NULL'),
+    ('payload', 'TEXT NOT NULL'),
+    ('created_at', "TEXT DEFAULT (datetime('now'))"),
+]
+
 PHOTO_OBJECTS_INDEXES = [
     ('idx_photo_objects_path', 'photo_objects', 'photo_path'),
     ('idx_photo_objects_label', 'photo_objects', 'label'),
@@ -1257,6 +1269,7 @@ _MIGRATED_TABLES = [
     ('photo_tags', PHOTO_TAGS_COLUMNS),
     ('photo_manual_tags', PHOTO_MANUAL_TAGS_COLUMNS),
     ('photo_objects', PHOTO_OBJECTS_COLUMNS),
+    ('photo_annotations', PHOTO_ANNOTATIONS_COLUMNS),
     ('photo_ai_edits', PHOTO_AI_EDITS_COLUMNS),
     ('mcp_tokens', MCP_TOKENS_COLUMNS),
     ('rating_provenance', RATING_PROVENANCE_COLUMNS),
@@ -1525,6 +1538,20 @@ def init_database(db_path='photo_scores_pro.db', build_photo_indexes=True):
 
         # Create photo_objects (user-marked labelled boxes; side table, survives rescans)
         conn.execute(_build_create_table_sql('photo_objects', PHOTO_OBJECTS_COLUMNS))
+        # Create photo_annotations (plugin overlays; side table, survives rescans). The FK
+        # cascades for connections with foreign_keys=ON; the two triggers keep the rows with
+        # their photo for a writer that leaves foreign keys off (an external plugin's sqlite3).
+        conn.execute(_build_create_table_sql(
+            'photo_annotations', PHOTO_ANNOTATIONS_COLUMNS,
+            constraints=['PRIMARY KEY (photo_path, source)']))
+        conn.execute("""CREATE TRIGGER IF NOT EXISTS photo_annotations_photo_delete
+            AFTER DELETE ON photos BEGIN
+            DELETE FROM photo_annotations WHERE photo_path=OLD.path;
+            END""")
+        conn.execute("""CREATE TRIGGER IF NOT EXISTS photo_annotations_photo_move
+            AFTER UPDATE OF path ON photos WHEN OLD.path IS NOT NEW.path BEGIN
+            UPDATE photo_annotations SET photo_path=NEW.path WHERE photo_path=OLD.path;
+            END""")
         # Create photo_ai_edits (AI-made files linked to their original; side table, survives rescans)
         conn.execute(_build_create_table_sql('photo_ai_edits', PHOTO_AI_EDITS_COLUMNS))
         # edit_path has no foreign key (the edit is not a photo until its scan), so once it IS one,

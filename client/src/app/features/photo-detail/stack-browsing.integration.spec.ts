@@ -45,6 +45,8 @@ describe('manual stack browsing through rendered viewer, Router and HTTP', () =>
     http.match(request => request.url === '/api/photo/set').forEach(request => request.flush({ kind: null, members: [] }));
     // The object layer asks for each photo's marked objects.
     http.match(request => request.url === '/api/photo/objects').forEach(request => request.flush({ objects: [] }));
+    // The annotation overlay asks for each photo's plugin annotations.
+    http.match(request => request.url === '/api/photo/annotations').forEach(request => request.flush({ annotations: [] }));
     // The face layer loads alongside each stack member; keep other requests strict.
     http.match(request => request.url === '/api/photo/faces').forEach(request => request.flush({ faces: [] }));
   };
