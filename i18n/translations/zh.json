@@ -4255,13 +4255,5 @@
     "log_empty": "日志为空。",
     "exit_code": "退出代码 {code}",
     "not_started": "{name} 未能启动"
-  },
-  "photo_annotations": {
-    "toggle_show": "标注：已隐藏（点击显示）",
-    "toggle_hide": "标注：已显示（点击隐藏）",
-    "shown_count": "显示 {shown} / {total}",
-    "show_scores": "显示分数",
-    "show_members": "显示成员",
-    "reset": "恢复插件默认设置"
   }
 }

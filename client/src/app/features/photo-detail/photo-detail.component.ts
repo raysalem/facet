@@ -34,7 +34,6 @@ import { PhotoDetailBase } from '../../shared/directives/photo-detail-base.direc
 import { ZoomPanDirective } from '../../shared/directives/zoom-pan.directive';
 import { PhotoObjectLayerComponent } from './photo-object-layer.component';
 import { PhotoAnnotationLayerComponent } from './photo-annotation-layer.component';
-import { PhotoAnnotationPanelComponent } from './photo-annotation-panel.component';
 import { PhotoAnnotationsState } from './photo-annotations.state';
 import { FixedPipe } from '../../shared/pipes/fixed.pipe';
 import { ShutterSpeedPipe } from '../../shared/pipes/shutter-speed.pipe';
@@ -110,7 +109,6 @@ function inDetectedSet(photo: Photo): boolean {
     ZoomPanDirective,
     PhotoObjectLayerComponent,
     PhotoAnnotationLayerComponent,
-    PhotoAnnotationPanelComponent,
     PhotoMetricsTabsComponent,
     PhotoFaceLayerComponent,
     PersonFaceMenuComponent,
@@ -135,7 +133,7 @@ function inDetectedSet(photo: Photo): boolean {
     EvOffsetPipe,
     ComparisonCategoryExplainerComponent,
   ],
-  // One annotations state per photo page, shared by the overlay layer and its control panel.
+  // One annotations state per photo page, read by the overlay layer.
   providers: [PhotoAnnotationsState],
   template: `
     @if (photo(); as p) {
@@ -182,15 +180,6 @@ function inDetectedSet(photo: Photo): boolean {
           <button mat-icon-button class="max-sm:!h-11 max-sm:!w-11 pointer-coarse:!h-11 pointer-coarse:!w-11 max-md:!hidden" [matMenuTriggerFor]="categoryOverrideMenu"
             [matTooltip]="I18N.photo.category_override.menu_tooltip | translate" [attr.aria-label]="I18N.photo.category_override.menu_tooltip | translate">
             <mat-icon>category</mat-icon>
-          </button>
-        }
-
-        @if (annotations.available()) {
-          <button mat-icon-button (click)="annotations.toggle()" data-annotations-toggle
-            [attr.aria-pressed]="annotations.enabled()"
-            [matTooltip]="(annotations.enabled() ? I18N.photo_annotations.toggle_hide : I18N.photo_annotations.toggle_show) | translate"
-            [attr.aria-label]="(annotations.enabled() ? I18N.photo_annotations.toggle_hide : I18N.photo_annotations.toggle_show) | translate">
-            <mat-icon>{{ annotations.enabled() ? 'label' : 'label_off' }}</mat-icon>
           </button>
         }
 
@@ -389,7 +378,6 @@ function inDetectedSet(photo: Photo): boolean {
 
         <!-- Info panel -->
         <aside data-photo-inspector [attr.aria-label]="I18N.photo_detail.details | translate" class="[overflow-wrap:anywhere] lg:w-80 xl:w-[360px] lg:shrink-0 lg:overflow-y-auto lg:border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-4 space-y-4 text-sm text-[var(--mat-sys-on-surface)]">
-          <app-photo-annotation-panel />
           <ng-template #categoryExplanation>
               <mat-form-field class="w-full" subscriptSizing="dynamic">
                 <mat-label>{{ I18N.photo.category_override.target_category_label | translate }}</mat-label>

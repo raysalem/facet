@@ -3,9 +3,9 @@ import { TestBed } from '@angular/core/testing';
 import { of, Subject } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { I18nService } from '../../core/services/i18n.service';
-import { ANNOTATION_SETTINGS_KEY, ANNOTATIONS_ENABLED_KEY, AnnotationPayload } from './annotations';
+import { AnnotationView, AnnotationViewService } from '../../core/addons/annotation-view.service';
+import { AnnotationPayload } from './annotations';
 import { PhotoAnnotationLayerComponent } from './photo-annotation-layer.component';
-import { PhotoAnnotationPanelComponent } from './photo-annotation-panel.component';
 import { PhotoAnnotationsState } from './photo-annotations.state';
 
 const payload: AnnotationPayload = {
@@ -30,18 +30,18 @@ const payload: AnnotationPayload = {
 
 @Component({
   selector: 'app-annotations-host',
-  imports: [PhotoAnnotationLayerComponent, PhotoAnnotationPanelComponent],
+  imports: [PhotoAnnotationLayerComponent],
   providers: [PhotoAnnotationsState],
-  template: `<div class="relative"><app-photo-annotation-layer transform="scale(2)" /></div><app-photo-annotation-panel />`,
+  template: `<div class="relative"><app-photo-annotation-layer transform="scale(2)" /></div>`,
 })
 class HostComponent {
   readonly state = inject(PhotoAnnotationsState);
 }
 
-describe('photo annotations layer and panel', () => {
+describe('photo annotations layer', () => {
   let api: { get: ReturnType<typeof vi.fn> };
 
-  async function render(response: unknown = { annotations: [{ source: 'astro-id', payload }] }) {
+  async function render(view: AnnotationView | null = { visible: true }, response: unknown = { annotations: [{ source: 'astro-id', payload }] }) {
     TestBed.resetTestingModule();
     api = { get: vi.fn(() => of(response)) };
     TestBed.configureTestingModule({
@@ -50,6 +50,7 @@ describe('photo annotations layer and panel', () => {
         { provide: I18nService, useValue: { t: (k: string, v?: Record<string, unknown>) => (v ? `${k} ${JSON.stringify(v)}` : k), translations: () => ({}) } },
       ],
     });
+    if (view) TestBed.inject(AnnotationViewService).set('astro-id', view);
     const fixture = TestBed.createComponent(HostComponent);
     await fixture.componentInstance.state.load('/sky.jpg');
     fixture.detectChanges();
@@ -60,15 +61,6 @@ describe('photo annotations layer and panel', () => {
 
   const labels = (el: HTMLElement) => [...el.querySelectorAll('[data-annotation-layer] text')].map((t) => t.textContent!.trim());
 
-  beforeEach(() => {
-    localStorage.removeItem(ANNOTATION_SETTINGS_KEY + 'astro-id');
-    localStorage.setItem(ANNOTATIONS_ENABLED_KEY, '1');
-  });
-  afterEach(() => {
-    localStorage.removeItem(ANNOTATION_SETTINGS_KEY + 'astro-id');
-    localStorage.removeItem(ANNOTATIONS_ENABLED_KEY);
-  });
-
   it('reads the photo annotations once and draws the default selection with plain labels', async () => {
     const fixture = await render();
     expect(api.get).toHaveBeenCalledWith('/photo/annotations', { path: '/sky.jpg' });
@@ -77,7 +69,6 @@ describe('photo annotations layer and panel', () => {
     expect(svg.getAttribute('viewBox')).toBe('0 0 1000 500');
     expect((svg as SVGElement).style.transform).toBe('scale(2)');
     expect(labels(el)).toEqual(['Uranus', 'M45', 'Orion']);
-    expect(el.querySelector('[data-annotation-legend]')!.textContent!.trim()).toBe('ASTAP grade A');
   });
 
   it('draws each shape in the payload frame', async () => {
@@ -87,25 +78,20 @@ describe('photo annotations layer and panel', () => {
     expect(el.querySelector('[data-annotation-layer] path')!.getAttribute('d')).toBe('M0 0L50 50');
   });
 
-  it('filters live from the panel without re-fetching', async () => {
+  it('filters live as the add-on changes its view, without re-fetching', async () => {
     const fixture = await render();
-    const state = fixture.componentInstance.state;
-    state.setScore('astro-id', 80);
-    state.setGroup('astro-id', 'star', true);
-    state.setMetric('astro-id', 'mag', 1);
+    TestBed.inject(AnnotationViewService).set('astro-id', {
+      visible: true, score: 80, groups: { star: true }, metrics: { mag: 1 },
+    });
     fixture.detectChanges();
     expect(labels(fixture.nativeElement)).toEqual(['Orion', 'Vega']);
     expect(api.get).toHaveBeenCalledTimes(1);
-    expect(fixture.nativeElement.querySelector('[data-annotation-count]').textContent).toContain('"shown":2');
   });
 
   it('shows scores only on request, and the full tooltip on hover', async () => {
-    const fixture = await render();
-    const state = fixture.componentInstance.state;
-    state.setShowScores('astro-id', true);
-    fixture.detectChanges();
+    const fixture = await render({ visible: true, show_scores: true });
     expect(labels(fixture.nativeElement)[0]).toBe('Uranus 100');
-    state.setShowScores('astro-id', false);
+    TestBed.inject(AnnotationViewService).set('astro-id', { visible: true, show_scores: false });
     fixture.detectChanges();
     const g = fixture.nativeElement.querySelector('[data-annotation]') as SVGGElement;
     g.dispatchEvent(new Event('pointerenter'));
@@ -114,25 +100,33 @@ describe('photo annotations layer and panel', () => {
     expect(g.querySelector('title')!.textContent).toBe('Uranus · Confidence 100 · mag 5.6');
   });
 
-  it('remembers settings per source in this browser', async () => {
-    const fixture = await render();
-    fixture.componentInstance.state.setScore('astro-id', 20);
-    expect(JSON.parse(localStorage.getItem(ANNOTATION_SETTINGS_KEY + 'astro-id')!).score).toBe(20);
-    const again = await render();
-    expect(labels(again.nativeElement)).toContain('Weak');
+  it('is hidden by default: a source with no view draws nothing', async () => {
+    const fixture = await render(null);
+    expect(fixture.componentInstance.state.annotations().length).toBe(1);
+    expect(fixture.nativeElement.querySelector('[data-annotation-layer]')).toBeNull();
   });
 
-  it('draws nothing while the overlay is off', async () => {
-    localStorage.setItem(ANNOTATIONS_ENABLED_KEY, '0');
-    const fixture = await render();
-    expect(fixture.componentInstance.state.available()).toBe(true);
+  it('draws nothing while the add-on view is not visible, and again when it is', async () => {
+    const fixture = await render({ visible: false });
     expect(fixture.nativeElement.querySelector('[data-annotation-layer]')).toBeNull();
-    expect(fixture.nativeElement.querySelector('[data-annotation-panel]')).toBeNull();
+    TestBed.inject(AnnotationViewService).set('astro-id', { visible: true });
+    fixture.detectChanges();
+    expect(labels(fixture.nativeElement)).toEqual(['Uranus', 'M45', 'Orion']);
+    TestBed.inject(AnnotationViewService).clear('astro-id');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-annotation-layer]')).toBeNull();
+  });
+
+  it('ignores the view of an add-on that wrote no annotations here', async () => {
+    const fixture = await render(null);
+    TestBed.inject(AnnotationViewService).set('someone-else', { visible: true });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-annotation-layer]')).toBeNull();
   });
 
   it('ignores payloads it cannot draw', async () => {
-    const fixture = await render({ annotations: [{ source: 'x', payload: { version: 2, items: [] } }] });
-    expect(fixture.componentInstance.state.available()).toBe(false);
+    const fixture = await render({ visible: true }, { annotations: [{ source: 'x', payload: { version: 2, items: [] } }] });
+    expect(fixture.componentInstance.state.annotations()).toEqual([]);
   });
 
   it('drops a response for a photo the user already left', async () => {
@@ -146,6 +140,6 @@ describe('photo annotations layer and panel', () => {
     slow.next({ annotations: [{ source: 'astro-id', payload }] });
     slow.complete();
     await first;
-    expect(state.available()).toBe(false);
+    expect(state.annotations()).toEqual([]);
   });
 });

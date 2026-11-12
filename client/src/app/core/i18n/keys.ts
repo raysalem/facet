@@ -4270,14 +4270,6 @@ export const I18N = {
     exit_code: "addons.exit_code",
     not_started: "addons.not_started",
   },
-  photo_annotations: {
-    toggle_show: "photo_annotations.toggle_show",
-    toggle_hide: "photo_annotations.toggle_hide",
-    shown_count: "photo_annotations.shown_count",
-    show_scores: "photo_annotations.show_scores",
-    show_members: "photo_annotations.show_members",
-    reset: "photo_annotations.reset",
-  },
 } as const;
 
 /** Returns {@link I18N}; use it to initialize class fields -- see the header comment above. */

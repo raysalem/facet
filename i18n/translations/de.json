@@ -4255,13 +4255,5 @@
     "log_empty": "Das Protokoll ist leer.",
     "exit_code": "Exit-Code {code}",
     "not_started": "{name} ist nicht gestartet"
-  },
-  "photo_annotations": {
-    "toggle_show": "Anmerkungen: ausgeblendet (Klick zum Anzeigen)",
-    "toggle_hide": "Anmerkungen: angezeigt (Klick zum Ausblenden)",
-    "shown_count": "{shown} von {total} angezeigt",
-    "show_scores": "Werte anzeigen",
-    "show_members": "Mitglieder anzeigen",
-    "reset": "Auf die Standardwerte des Plugins zurücksetzen"
   }
 }

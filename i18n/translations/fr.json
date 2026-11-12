@@ -4255,13 +4255,5 @@
     "log_empty": "Le journal est vide.",
     "exit_code": "Code de sortie {code}",
     "not_started": "{name} n'a pas démarré"
-  },
-  "photo_annotations": {
-    "toggle_show": "Annotations : masquées (clic pour afficher)",
-    "toggle_hide": "Annotations : affichées (clic pour masquer)",
-    "shown_count": "{shown} sur {total} affichées",
-    "show_scores": "Afficher les scores",
-    "show_members": "Afficher les membres",
-    "reset": "Revenir aux valeurs par défaut du plugin"
   }
 }

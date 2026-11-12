@@ -4255,13 +4255,5 @@
     "log_empty": "The log is empty.",
     "exit_code": "Exit code {code}",
     "not_started": "{name} didn't start"
-  },
-  "photo_annotations": {
-    "toggle_show": "Annotations: hidden (click to show)",
-    "toggle_hide": "Annotations: shown (click to hide)",
-    "shown_count": "{shown} of {total} shown",
-    "show_scores": "Show scores",
-    "show_members": "Show members",
-    "reset": "Reset to the plugin's defaults"
   }
 }

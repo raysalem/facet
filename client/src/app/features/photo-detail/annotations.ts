@@ -1,11 +1,13 @@
 /**
  * Plugin-written photo annotations (payload v1): the types, the live filter, label
- * placement and the per-source settings remembered by this browser.
+ * placement and the mapping from an add-on panel's view to settings.
  *
  * A plugin (astro-id's plate solve, for example) stores its result once; everything
- * here runs client-side on that stored payload, so moving a slider never re-fetches
- * or recomputes on the server. All functions are pure apart from the storage pair.
+ * here runs client-side on that stored payload, so a change in the panel never
+ * re-fetches or recomputes on the server. All functions are pure.
  */
+
+import type { AnnotationView } from '../../core/addons/annotation-view.service';
 
 export interface AnnotationGroup {
   id: string;
@@ -61,7 +63,7 @@ export interface AnnotationPayload {
   items: AnnotationItem[];
 }
 
-/** What the user chose for one source: group toggles, score and metric thresholds, label options. */
+/** What the panel chose for one source: group toggles, score and metric thresholds, label options. */
 export interface AnnotationSettings {
   groups: Record<string, boolean>;
   score: number | null;
@@ -92,8 +94,6 @@ export interface DrawnAnnotation {
   labelPlaced: boolean;
 }
 
-export const ANNOTATION_SETTINGS_KEY = 'facet_annotations:';
-export const ANNOTATIONS_ENABLED_KEY = 'facet_annotations_enabled';
 /** Label size as a fraction of the frame's longer edge, so it reads the same at any resolution. */
 export const ANNOTATION_LABEL_SCALE = 0.013;
 /** Smallest marker radius, as a fraction of the longer edge, so a 1-pixel star is still visible. */
@@ -121,28 +121,26 @@ export function defaultAnnotationSettings(p: AnnotationPayload): AnnotationSetti
 }
 
 /**
- * Stored settings laid over the defaults, field by field: anything missing, mistyped
- * or out of range (the plugin narrowed a slider since) falls back to the default,
- * and a group or metric the payload no longer declares is dropped.
+ * A panel's view laid over the payload's defaults, field by field: a missing key falls
+ * back to the default, a value out of the payload's range is clamped, and a group or
+ * metric the payload does not declare is ignored.
  */
-export function mergeAnnotationSettings(p: AnnotationPayload, stored: unknown): AnnotationSettings {
+export function settingsFromView(p: AnnotationPayload, view: AnnotationView): AnnotationSettings {
   const out = defaultAnnotationSettings(p);
-  if (!stored || typeof stored !== 'object') return out;
-  const s = stored as Partial<Record<keyof AnnotationSettings, unknown>>;
-  const groups = s.groups as Record<string, unknown> | undefined;
-  if (groups && typeof groups === 'object') {
-    for (const id of Object.keys(out.groups)) if (typeof groups[id] === 'boolean') out.groups[id] = groups[id] as boolean;
+  for (const id of Object.keys(out.groups)) {
+    const on = view.groups?.[id];
+    if (typeof on === 'boolean') out.groups[id] = on;
   }
-  if (p.score && finite(s.score)) out.score = clamp(s.score, p.score.min, p.score.max);
-  const metrics = s.metrics as Record<string, unknown> | undefined;
-  if (metrics && typeof metrics === 'object') {
-    for (const m of p.metrics ?? []) {
-      const v = metrics[m.key];
-      if (finite(v)) out.metrics[m.key] = clamp(v, m.min, m.max);
-    }
+  if (p.score) {
+    if (view.score === null) out.score = null;
+    else if (finite(view.score)) out.score = clamp(view.score, p.score.min, p.score.max);
   }
-  if (typeof s.showScores === 'boolean') out.showScores = s.showScores;
-  if (typeof s.showMembers === 'boolean') out.showMembers = s.showMembers;
+  for (const m of p.metrics ?? []) {
+    const v = view.metrics?.[m.key];
+    if (finite(v)) out.metrics[m.key] = clamp(v, m.min, m.max);
+  }
+  if (typeof view.show_scores === 'boolean') out.showScores = view.show_scores;
+  if (typeof view.show_members === 'boolean') out.showMembers = view.show_members;
   return out;
 }
 
@@ -253,46 +251,4 @@ export function isDrawablePayload(p: unknown): p is AnnotationPayload {
   const v = p as AnnotationPayload | null;
   return !!v && v.version === 1 && Array.isArray(v.items) && !!v.image
     && finite(v.image.width) && v.image.width > 0 && finite(v.image.height) && v.image.height > 0;
-}
-
-function storage(): Storage | null {
-  try {
-    return typeof localStorage === 'undefined' ? null : localStorage;
-  } catch {
-    return null;
-  }
-}
-
-/** This browser's settings for ``source``, merged over the payload's defaults. */
-export function readAnnotationSettings(source: string, p: AnnotationPayload, store: Storage | null = storage()): AnnotationSettings {
-  try {
-    const raw = store?.getItem(ANNOTATION_SETTINGS_KEY + source);
-    return mergeAnnotationSettings(p, raw ? JSON.parse(raw) : null);
-  } catch {
-    return defaultAnnotationSettings(p);
-  }
-}
-
-export function writeAnnotationSettings(source: string, s: AnnotationSettings, store: Storage | null = storage()): void {
-  try {
-    store?.setItem(ANNOTATION_SETTINGS_KEY + source, JSON.stringify(s));
-  } catch {
-    // private window or blocked storage: the settings last for this page only
-  }
-}
-
-export function readAnnotationsEnabled(store: Storage | null = storage()): boolean {
-  try {
-    return store?.getItem(ANNOTATIONS_ENABLED_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-export function writeAnnotationsEnabled(on: boolean, store: Storage | null = storage()): void {
-  try {
-    store?.setItem(ANNOTATIONS_ENABLED_KEY, on ? '1' : '0');
-  } catch {
-    // as above
-  }
 }

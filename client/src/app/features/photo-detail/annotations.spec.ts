@@ -1,7 +1,6 @@
 import {
-  ANNOTATION_LABEL_SCALE, ANNOTATION_SETTINGS_KEY, AnnotationItem, AnnotationPayload, annotationTooltip,
-  defaultAnnotationSettings, filterAnnotationItems, isDrawablePayload, layoutAnnotations, mergeAnnotationSettings,
-  readAnnotationSettings, readAnnotationsEnabled, writeAnnotationSettings, writeAnnotationsEnabled,
+  ANNOTATION_LABEL_SCALE, AnnotationItem, AnnotationPayload, annotationTooltip,
+  defaultAnnotationSettings, filterAnnotationItems, isDrawablePayload, layoutAnnotations, settingsFromView,
 } from './annotations';
 
 function payload(items: AnnotationItem[], over: Partial<AnnotationPayload> = {}): AnnotationPayload {
@@ -43,13 +42,18 @@ describe('annotation settings', () => {
     expect(defaultAnnotationSettings(p).score).toBeNull();
   });
 
-  it('merge keeps valid stored values, clamps ranges and ignores junk', () => {
+  it('a view over the defaults keeps valid values, clamps ranges and ignores junk', () => {
     const p = payload([]);
-    const merged = mergeAnnotationSettings(p, {
-      groups: { star: true, gone: true, planet: 'yes' }, score: 500, metrics: { mag: -9, other: 2 }, showScores: true, showMembers: 1,
+    const settings = settingsFromView(p, {
+      visible: true, groups: { star: true, gone: true }, score: 500, metrics: { mag: -9, other: 2 }, show_scores: true,
     });
-    expect(merged).toEqual({ groups: { planet: true, star: true }, score: 100, metrics: { mag: -5 }, showScores: true, showMembers: false });
-    expect(mergeAnnotationSettings(p, 'nonsense')).toEqual(defaultAnnotationSettings(p));
+    expect(settings).toEqual({ groups: { planet: true, star: true }, score: 100, metrics: { mag: -5 }, showScores: true, showMembers: false });
+  });
+
+  it('a view with only visible is the payload defaults, and score null turns the score filter off', () => {
+    const p = payload([]);
+    expect(settingsFromView(p, { visible: true })).toEqual(defaultAnnotationSettings(p));
+    expect(settingsFromView(p, { visible: true, score: null }).score).toBeNull();
   });
 });
 
@@ -142,40 +146,5 @@ describe('isDrawablePayload', () => {
     expect(isDrawablePayload({ ...payload([]), version: 2 })).toBe(false);
     expect(isDrawablePayload({ ...payload([]), image: { width: 0, height: 1 } })).toBe(false);
     expect(isDrawablePayload(null)).toBe(false);
-  });
-});
-
-describe('annotation storage', () => {
-  function memory(): Storage {
-    const m = new Map<string, string>();
-    return {
-      getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v),
-      removeItem: (k: string) => void m.delete(k), clear: () => m.clear(), key: () => null, get length() { return m.size; },
-    } as Storage;
-  }
-
-  it('round-trips settings per source', () => {
-    const store = memory();
-    const p = payload([]);
-    writeAnnotationSettings('astro-id', { ...defaultAnnotationSettings(p), score: 10 }, store);
-    expect(store.getItem(ANNOTATION_SETTINGS_KEY + 'astro-id')).toContain('"score":10');
-    expect(readAnnotationSettings('astro-id', p, store).score).toBe(10);
-    expect(readAnnotationSettings('other', p, store).score).toBe(65);
-  });
-
-  it('survives storage that throws', () => {
-    const broken = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); } } as unknown as Storage;
-    const p = payload([]);
-    expect(readAnnotationSettings('x', p, broken)).toEqual(defaultAnnotationSettings(p));
-    expect(() => writeAnnotationSettings('x', defaultAnnotationSettings(p), broken)).not.toThrow();
-    expect(readAnnotationsEnabled(broken)).toBe(false);
-    expect(() => writeAnnotationsEnabled(true, broken)).not.toThrow();
-  });
-
-  it('remembers whether the overlay is on', () => {
-    const store = memory();
-    expect(readAnnotationsEnabled(store)).toBe(false);
-    writeAnnotationsEnabled(true, store);
-    expect(readAnnotationsEnabled(store)).toBe(true);
   });
 });
