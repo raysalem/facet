@@ -319,6 +319,29 @@
       ]
     },
     {
+      "id": "photo_overlays",
+      "summary": "Read, store or remove a plugin's overlay drawn on a photo (sky labels, for example)",
+      "tools": [
+        {
+          "name": "get_annotations",
+          "required_level": "readonly"
+        },
+        {
+          "name": "set_annotations",
+          "required_level": "edition"
+        },
+        {
+          "name": "clear_annotations",
+          "required_level": "edition"
+        }
+      ],
+      "when": [
+        "detail",
+        "gallery",
+        "selection"
+      ]
+    },
+    {
       "id": "junk_sweep",
       "summary": "Review junk-sweep candidates (shown on the junk page with show=true) and reject or keep them",
       "tools": [
