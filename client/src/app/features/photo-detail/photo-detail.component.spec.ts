@@ -387,12 +387,55 @@ describe('PhotoDetailComponent', () => {
     });
   });
 
-  it('keeps the location map short so the inspector stays compact', async () => {
-    const view = renderDetail();
-    view.componentInstance.photo.set(makePhoto({ path: samplePhoto.path, gps_latitude: 1, gps_longitude: 2 }));
-    view.detectChanges(); await view.whenStable(); view.detectChanges();
-    const map = (view.nativeElement as HTMLElement).querySelector<HTMLElement>('[data-photo-location] .rounded-lg')!;
-    expect(map.classList).toContain('h-24');
+  describe('location section', () => {
+    const KEY = 'facet_photo_location_open';
+    afterEach(() => localStorage.removeItem(KEY));
+    const settleTimers = () => new Promise<void>(resolve => setTimeout(resolve, 0));
+
+    it('is one folded line until opened, then shows exact coordinates and builds the short map once', async () => {
+      leafletMock.map.mockClear();
+      const view = renderDetail();
+      const photo = makePhoto({ path: samplePhoto.path, gps_latitude: 48.8583701, gps_longitude: 2.2944813 });
+      mockApi.get.mockImplementation((url: string) => of(url === '/photo' ? photo : {}));
+      view.componentInstance.photo.set(photo);
+      view.detectChanges(); await view.whenStable(); view.detectChanges(); await settleTimers();
+      const section = (view.nativeElement as HTMLElement).querySelector<HTMLElement>('[data-photo-location]')!;
+      const toggle = section.querySelector<HTMLButtonElement>('[data-location-toggle]')!;
+      const detail = section.querySelector<HTMLElement>('#photo-location-detail')!;
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      expect(toggle.getAttribute('aria-controls')).toBe('photo-location-detail');
+      expect(section.querySelector('[data-location-summary]')!.textContent!.trim()).toBe('48.8584, 2.2945');
+      expect(detail.hidden).toBe(true);
+      expect(leafletMock.map).not.toHaveBeenCalled();
+
+      toggle.click(); view.detectChanges(); await settleTimers();
+      expect(toggle.getAttribute('aria-expanded')).toBe('true');
+      expect(detail.hidden).toBe(false);
+      expect(detail.textContent).toContain('48.858370, 2.294481');
+      expect(detail.querySelector('.rounded-lg')!.classList).toContain('h-24');
+      expect(leafletMock.map).toHaveBeenCalledOnce();
+      expect(localStorage.getItem(KEY)).toBe('true');
+
+      leafletMockMap.remove.mockClear();
+      toggle.click(); view.detectChanges();
+      expect(detail.hidden).toBe(true);
+      expect(leafletMockMap.remove).toHaveBeenCalledOnce();
+      expect(localStorage.getItem(KEY)).toBe('false');
+      view.destroy();
+    });
+
+    it('names the place when it is known and reopens as the user left it', async () => {
+      localStorage.setItem(KEY, 'true');
+      const view = renderDetail();
+      const photo = makePhoto({ path: samplePhoto.path, gps_latitude: 1, gps_longitude: 2 });
+      mockApi.get.mockImplementation((url: string) => of(url === '/photo' ? photo : { display_name: 'Paris' }));
+      view.componentInstance.photo.set(photo);
+      view.detectChanges(); await view.whenStable(); view.detectChanges();
+      const section = (view.nativeElement as HTMLElement).querySelector<HTMLElement>('[data-photo-location]')!;
+      expect(section.querySelector('[data-location-summary]')!.textContent!.trim()).toBe('Paris');
+      expect(section.querySelector('[data-location-toggle]')!.getAttribute('aria-expanded')).toBe('true');
+      view.destroy();
+    });
   });
 
   it('refreshes rendered face boxes after every committed manual edit', async () => {
@@ -847,6 +890,7 @@ describe('PhotoDetailComponent', () => {
   });
 
   it('recreates the location map on a visible container after changing GPS photos', async () => {
+    localStorage.setItem('facet_photo_location_open', 'true');
     const view = renderDetail();
     let photo = makePhoto({ gps_latitude: 1, gps_longitude: 2 });
     mockApi.get.mockImplementation((url: string) => of(url === '/photo' ? photo : {}));
@@ -864,6 +908,7 @@ describe('PhotoDetailComponent', () => {
     expect(leafletMockMap.setView).toHaveBeenLastCalledWith([3, 4], 13);
     expect(leafletMock.map).toHaveBeenCalledTimes(2);
     view.destroy();
+    localStorage.removeItem('facet_photo_location_open');
   });
 
   it('renders NULL and zero extended metrics in the actual detail template', () => {

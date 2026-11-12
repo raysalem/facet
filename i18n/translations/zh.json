@@ -3291,6 +3291,7 @@
     "caption_error": "生成照片描述失败",
     "translating_caption": "正在翻译…",
     "location": "位置",
+    "location_map": "地图和精确坐标",
     "social_crop": "社交平台裁切",
     "set": {
       "ev_span": "曝光跨度（EV）",

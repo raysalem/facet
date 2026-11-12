@@ -3291,6 +3291,7 @@
     "caption_error": "Falha ao gerar legenda",
     "translating_caption": "Traduzindo...",
     "location": "Localização",
+    "location_map": "Mapa e coordenadas exatas",
     "social_crop": "Recorte social",
     "set": {
       "ev_span": "Intervalo EV",

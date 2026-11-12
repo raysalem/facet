@@ -82,6 +82,12 @@ interface PhotoTagOrigin {
   refinable: boolean;
 }
 
+const LOCATION_OPEN_KEY = 'facet_photo_location_open';
+
+function readLocationOpen(): boolean {
+  try { return localStorage.getItem(LOCATION_OPEN_KEY) === 'true'; } catch { return false; }
+}
+
 const SOCIAL_SOURCE_KEYS: Record<string, string> = {
   saliency: I18N.social_export.source.saliency,
   faces: I18N.social_export.source.faces,
@@ -603,20 +609,27 @@ function inDetectedSet(photo: Photo): boolean {
             }
 
             @if (p.gps_latitude !== null && p.gps_longitude !== null) {
+              <!-- One compact line until asked for: the map and exact coordinates open below it, remembered. -->
               <div data-photo-location>
-                <div class="flex items-center justify-between mb-2">
-                  <div class="text-xs text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.location | translate }}</div>
+                <div class="flex items-center gap-1">
+                  <button type="button" data-location-toggle aria-controls="photo-location-detail" [attr.aria-expanded]="locationOpen()"
+                          [matTooltip]="I18N.photo_detail.location_map | translate" (click)="toggleLocation()"
+                          class="flex min-h-7 min-w-0 flex-1 cursor-pointer items-center gap-1 rounded text-left text-xs text-[var(--mat-sys-on-surface-variant)] hover:bg-[var(--mat-sys-surface-container-high)] focus-visible:outline-2 focus-visible:outline-[var(--mat-sys-primary)] max-sm:min-h-11 pointer-coarse:min-h-11">
+                    <mat-icon class="!text-base !w-4 !h-4 !leading-4 shrink-0" aria-hidden="true">place</mat-icon>
+                    <span class="sr-only">{{ I18N.photo_detail.location | translate }}:</span>
+                    <span data-location-summary class="min-w-0 truncate tabular-nums">{{ locationName() || (p.gps_latitude | fixed:4) + ', ' + (p.gps_longitude | fixed:4) }}</span>
+                    <mat-icon class="!text-base !w-4 !h-4 !leading-4 ml-auto shrink-0" aria-hidden="true">{{ locationOpen() ? 'expand_less' : 'expand_more' }}</mat-icon>
+                  </button>
                   @if (auth.isEdition()) {
                     <button mat-icon-button class="!w-7 !h-7 max-sm:!w-11 max-sm:!h-11 pointer-coarse:!w-11 pointer-coarse:!h-11 !p-0" (click)="editGps(p)" [matTooltip]="I18N.photo_detail.edit_location | translate" [attr.aria-label]="I18N.photo_detail.edit_location | translate">
                       <mat-icon class="!text-base !w-4 !h-4 !leading-4">edit_location</mat-icon>
                     </button>
                   }
                 </div>
-                @if (locationName()) {
-                  <div class="text-sm font-medium mb-1">{{ locationName() }}</div>
-                }
-                <div class="text-xs text-[var(--mat-sys-on-surface-variant)] mb-2">{{ p.gps_latitude | fixed:6 }}, {{ p.gps_longitude | fixed:6 }}</div>
-                <div #locationMapContainer class="w-full h-24 rounded-lg overflow-hidden"></div>
+                <div id="photo-location-detail" class="mt-1 space-y-1" [hidden]="!locationOpen()">
+                  <div class="text-xs tabular-nums text-[var(--mat-sys-on-surface-variant)]">{{ p.gps_latitude | fixed:6 }}, {{ p.gps_longitude | fixed:6 }}</div>
+                  <div #locationMapContainer class="w-full h-24 rounded-lg overflow-hidden"></div>
+                </div>
               </div>
             }
 
@@ -1059,6 +1072,13 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
 
   // Location
   protected readonly locationName = signal('');
+  /** Whether the location's map and exact coordinates are open; folded by default, remembered per browser. */
+  protected readonly locationOpen = signal(readLocationOpen());
+
+  protected toggleLocation(): void {
+    this.locationOpen.update(open => !open);
+    try { localStorage.setItem(LOCATION_OPEN_KEY, String(this.locationOpen())); } catch { /* Storage blocked: the choice holds for this page only. */ }
+  }
   private locationNameEffect = effect(() => {
     const p = this.photo();
     if (!p || p.gps_latitude == null || p.gps_longitude == null) {
@@ -1080,6 +1100,8 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   private locationMapEffect = effect(() => {
     const container = this.locationMapContainer();
     const p = this.photo();
+    // The map is built only while the section is open, once it has its size, so it never measures a hidden box.
+    const open = this.locationOpen();
     if (this.locationMapTimeout !== null) {
       clearTimeout(this.locationMapTimeout);
       this.locationMapTimeout = null;
@@ -1089,7 +1111,7 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
       this.locationMap = null;
     }
 
-    if (!container || !p || p.gps_latitude == null || p.gps_longitude == null) return;
+    if (!open || !container || !p || p.gps_latitude == null || p.gps_longitude == null) return;
     this.locationMapTimeout = setTimeout(() => {
       this.locationMapTimeout = null;
       if (this.destroyRef.destroyed || this.locationMapContainer()?.nativeElement !== container.nativeElement || this.photo()?.path !== p.path) return;

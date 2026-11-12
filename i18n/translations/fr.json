@@ -3291,6 +3291,7 @@
     "caption_error": "Échec de la génération de la légende",
     "translating_caption": "Traduction en cours...",
     "location": "Localisation",
+    "location_map": "Carte et coordonnées exactes",
     "social_crop": "Recadrage social",
     "set": {
       "ev_span": "Écart EV",

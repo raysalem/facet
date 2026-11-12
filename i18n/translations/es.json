@@ -3287,6 +3287,7 @@
     "caption_error": "Error al generar la leyenda",
     "translating_caption": "Traduciendo...",
     "location": "Ubicación",
+    "location_map": "Mapa y coordenadas exactas",
     "edit_location": "Editar ubicación",
     "add_location": "Añadir ubicación",
     "gps_click_to_place": "Haz clic en el mapa para colocar un marcador",

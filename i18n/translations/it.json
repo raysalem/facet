@@ -3291,6 +3291,7 @@
     "caption_error": "Generazione della didascalia non riuscita",
     "translating_caption": "Traduzione in corso...",
     "location": "Posizione",
+    "location_map": "Mappa e coordinate esatte",
     "social_crop": "Ritaglio social",
     "set": {
       "ev_span": "Intervallo EV",

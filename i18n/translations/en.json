@@ -3316,6 +3316,7 @@
     "caption_error": "Failed to generate caption",
     "translating_caption": "Translating...",
     "location": "Location",
+    "location_map": "Map and exact coordinates",
     "social_crop": "Social crop",
     "set": {
       "ev_span": "EV span",

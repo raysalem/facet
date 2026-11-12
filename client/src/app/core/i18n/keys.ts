@@ -3330,6 +3330,7 @@ export const I18N = {
     caption_error: "photo_detail.caption_error",
     translating_caption: "photo_detail.translating_caption",
     location: "photo_detail.location",
+    location_map: "photo_detail.location_map",
     social_crop: "photo_detail.social_crop",
     set: {
       ev_span: "photo_detail.set.ev_span",

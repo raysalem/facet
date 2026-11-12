@@ -3287,6 +3287,7 @@
     "caption_error": "Beschreibung konnte nicht generiert werden",
     "translating_caption": "Übersetzen...",
     "location": "Standort",
+    "location_map": "Karte und genaue Koordinaten",
     "edit_location": "Standort bearbeiten",
     "add_location": "Standort hinzufügen",
     "gps_click_to_place": "Klicken Sie auf die Karte, um eine Markierung zu setzen",
