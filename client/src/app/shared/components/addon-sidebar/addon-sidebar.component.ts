@@ -57,7 +57,7 @@ import { i18nKeys } from '../../../core/i18n/keys';
         <iframe #frame class="block flex-1 w-full min-h-0 border-0 bg-[var(--mat-sys-surface)]"
                 [class.pointer-events-none]="resizing()"
                 [src]="src()" sandbox="allow-scripts" referrerpolicy="no-referrer"
-                [title]="open.addon.name" (load)="onFrameLoad()"></iframe>
+                [title]="open.addon.name"></iframe>
       }
     }
   `,
@@ -74,7 +74,11 @@ export class AddonSidebarComponent {
 
   protected readonly panel = this.service.panel;
   protected readonly resizing = signal(false);
-  /** 0 until the frame's current document sends a `ready` with our nonce; then a counter of readies. */
+  /**
+   * 0 until the frame sends a `ready` with our nonce; then a counter of readies. Not reset on the frame's `load`
+   * event: a page sends `ready` while it loads, before that event fires, so a reset there dropped every later
+   * request (Google Earth, Show in Facet). A reloaded page sends its own `ready`; a new panel resets (new nonce).
+   */
   private readonly handshake = signal(0);
   private readyCount = 0;
   private readonly url = toSignal(
@@ -101,10 +105,6 @@ export class AddonSidebarComponent {
       if (!open || this.handshake() === 0) return;
       untracked(() => this.post(buildContext(open.nonce, url, selection, open.scope)));
     });
-  }
-
-  protected onFrameLoad(): void {
-    this.handshake.set(0);
   }
 
   protected onMessage(event: MessageEvent): void {

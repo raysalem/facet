@@ -63,16 +63,22 @@ describe('add-on sidebar host', () => {
       scope: { kind: 'view', query: 'type=astro' } }), '*');
   });
 
-  it('re-sends the context when the selection changes and re-requires ready after a load', () => {
+  it('re-sends the context when the selection changes', () => {
     const posted = vi.spyOn(frame().contentWindow!, 'postMessage');
     send({ type: 'ready', v: 1, nonce: 'nonce-1' });
     fixture.detectChanges();
     selectedPaths.set(new Set(['/p/b.jpg']));
     fixture.detectChanges();
     expect(posted).toHaveBeenLastCalledWith(expect.objectContaining({ selection: ['/p/b.jpg'] }), '*');
+  });
+
+  it("keeps the handshake through the frame's load event (ready arrives first)", () => {
+    // A page sends ready while loading; the iframe's load event fires afterwards. Resetting there dropped
+    // every later request, so Google Earth / Maps and Show in Facet did nothing.
+    send({ type: 'ready', v: 1, nonce: 'nonce-1' });
     frame().dispatchEvent(new Event('load'));
     send({ type: 'close', v: 1, nonce: 'nonce-1' });
-    expect(close).not.toHaveBeenCalled();
+    expect(close).toHaveBeenCalled();
   });
 
   it("shows a supervised add-on that didn't start, with its log, and no frame", () => {
