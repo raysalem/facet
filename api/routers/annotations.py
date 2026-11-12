@@ -2,23 +2,24 @@
 
 A plugin (astro-id's plate solve, for example) writes one JSON payload per photo
 and source into the ``photo_annotations`` side table through
-``db.annotations.upsert_annotation``; there is no write route, because the
-payload is produced by the plugin, not typed by a user. Reads follow photo
-visibility; removing a source's overlay is edition-gated like every other write.
+``db.annotations.upsert_annotation``, in-process or through ``PUT`` (which the
+MCP ``set_annotations`` tool calls for an add-on, the source forced to the add-on id).
+Reads follow photo visibility; writing or removing a source's overlay is
+edition-gated like every other write.
 """
 
 import json
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from api.auth import CurrentUser, require_authenticated, require_edition
 from api.database import get_async_db, get_db
 from api.db_helpers import get_visibility_clause, retry_on_locked
-from api.models.annotations import (PhotoAnnotation, PhotoAnnotationDelete,
-                                    PhotoAnnotationsResponse)
+from api.models.annotations import (PhotoAnnotation, PhotoAnnotationDelete, PhotoAnnotationPut,
+                                    PhotoAnnotationSaved, PhotoAnnotationsResponse)
 from api.routers.faces import _require_writable_photo
-from db.annotations import PAYLOAD_VERSION, delete_annotation
+from db.annotations import PAYLOAD_VERSION, AnnotationError, delete_annotation, upsert_annotation
 
 logger = logging.getLogger(__name__)
 
@@ -70,3 +71,19 @@ def delete_photo_annotation(path: str, source: str, user: CurrentUser = Depends(
         removed = delete_annotation(conn, path, source)
         conn.commit()
     return {'success': True, 'removed': removed}
+
+
+@router.put('/api/photo/annotations', response_model=PhotoAnnotationSaved)
+@retry_on_locked()
+def put_photo_annotation(body: PhotoAnnotationPut, user: CurrentUser = Depends(require_edition)):
+    """Store (or replace) one source's annotations for a photo; 422 on a payload that fails validation."""
+    with get_db() as conn:
+        _require_writable_photo(conn, user, body.path)
+        try:
+            upsert_annotation(conn, body.path, body.source, body.payload)
+        except AnnotationError as ex:
+            raise HTTPException(status_code=422, detail=str(ex)) from None
+        except LookupError as ex:
+            raise HTTPException(status_code=404, detail=str(ex)) from None
+        conn.commit()
+    return {'success': True}

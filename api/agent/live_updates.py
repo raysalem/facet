@@ -34,6 +34,7 @@ PHOTO_EFFECT_TOOLS = frozenset({
     "batch_manual_tags", "clear_junk", "set_caption", "batch_gps", "album_add_photos", "album_remove_photos",
     "cull_apply", "delete_photos", "override_sequence", "clear_sequence_override", "override_category",
     "clear_category_override", "assign_faces", "culling.auto", "culling.confirm",
+    "annotations.set", "annotations.clear",
 })
 NO_PHOTO_EFFECT_TOOLS = frozenset({"create_album", "export_metadata", "scan_start", "update_weights", "restore_weights",
                                    "recompute_start",

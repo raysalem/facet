@@ -102,6 +102,10 @@ class TestGrantMatrix:
         "assign_faces": {"person_id": 999999, "face_ids": [1]},
         "set_caption": {"path": P[0], "caption": "x"}, "export_metadata": {"paths": [P[0]]},
         "set_gps": {"path_prefix": AGENT_DIR + "nope-folder/", "latitude": 1.0, "longitude": 2.0},
+        "get_annotations": {"path": AGENT_DIR + "nope1.jpg"},
+        "set_annotations": {"path": AGENT_DIR + "nope1.jpg", "source": "test-plugin",
+                            "payload": {"version": 1, "image": {"width": 1, "height": 1}, "items": []}},
+        "clear_annotations": {"path": AGENT_DIR + "nope1.jpg", "source": "test-plugin"},
         "override_sequence": {"paths": [AGENT_DIR + "nope1.jpg", AGENT_DIR + "nope2.jpg"], "kind": "panorama"},
         "clear_sequence_override": {"paths": [AGENT_DIR + "nope1.jpg"]},
         "override_category": {"path": AGENT_DIR + "nope1.jpg", "category": "portrait"},
@@ -120,7 +124,7 @@ class TestGrantMatrix:
     }
     READ_ONLY = ("junk_list", "scan_status", "comparison_status", "group_compare", "cull_report",
                  "explain_score", "category_weights", "preview_weights", "list_weight_snapshots",
-                 "recompute_status", "learned_weights", "misassigned_categories")
+                 "recompute_status", "learned_weights", "misassigned_categories", "get_annotations")
 
     def test_every_write_tool_has_args_and_a_level(self):
         assert set(self.ARGS) == set(WRITE_TOOL_LEVELS)

@@ -95,8 +95,9 @@ class TestPermissionTools:
                 assert tool is not None and not tool.annotations.destructive_hint, (permission, name)
                 assert not name.startswith("ui_"), (permission, name)
 
-    def test_annotations_write_maps_nothing_until_pr1(self):
-        assert ADDON_PERMISSION_TOOLS["annotations.write"] == frozenset()
+    def test_annotations_write_maps_the_annotation_tools(self):
+        assert ADDON_PERMISSION_TOOLS["annotations.write"] == {"get_annotations", "set_annotations",
+                                                                "clear_annotations"}
 
 
 class TestMcp:
@@ -167,6 +168,27 @@ class TestMcp:
         with sqlite3.connect(_TEST_DB_FILE.name) as conn:
             return conn.execute("SELECT gps_latitude, gps_longitude, gps_manually_set FROM photos WHERE path = ?",
                                 (path,)).fetchone()
+
+    def test_annotations_are_written_under_the_addon_id_only(self, addons, seeded, tmp_path):
+        _write(tmp_path, "annot", permissions=["photos.read", "annotations.write"])
+        env, headers = addons()
+        token = _mint(env, headers, "annot")["token"]
+        assert {"get_annotations", "set_annotations", "clear_annotations"} <= env.tool_names(token)
+        payload = {"version": 1, "image": {"width": 100, "height": 80},
+                   "items": [{"id": "deneb", "label": "Deneb", "group": "stars", "shape": "point", "x": 10, "y": 20}]}
+        refused = env.call(token, "set_annotations", {"path": SEEDED[0], "payload": payload, "source": "other"})
+        assert refused["error"] == "invalid_input", refused
+        done = env.call(token, "set_annotations", {"path": SEEDED[0], "payload": payload})
+        assert done["ok"] and done["data"]["source"] == "annot", done
+        got = env.call(token, "get_annotations", {"path": SEEDED[0]})
+        assert [a["source"] for a in got["data"]["annotations"]] == ["annot"], got
+        bad = env.call(token, "set_annotations", {"path": SEEDED[0], "payload": {"version": 9}})
+        assert not bad["ok"], bad
+        cleared = env.call(token, "clear_annotations", {"path": SEEDED[0]})
+        assert cleared["ok"] and cleared["data"]["removed"] is True, cleared
+        with sqlite3.connect(_TEST_DB_FILE.name) as conn:
+            assert conn.execute("SELECT COUNT(*) FROM photo_annotations WHERE photo_path = ?",
+                                (SEEDED[0],)).fetchone()[0] == 0
 
     def test_set_gps_scope_is_a_folder_or_an_album_never_photos(self, addons, seeded, monkeypatch):
         env, headers = addons()

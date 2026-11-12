@@ -70,6 +70,8 @@ ACTIONS: tuple[Action, ...] = (
            ("import_ai_edit",), _when("detail", "gallery", "selection")),
     Action("write_metadata", "Set a photo's caption or location, or write XMP sidecars next to the files",
            ("set_caption", "set_gps", "export_metadata"), _when("detail", "gallery", "selection")),
+    Action("photo_overlays", "Read, store or remove a plugin's overlay drawn on a photo (sky labels, for example)",
+           ("get_annotations", "set_annotations", "clear_annotations"), _when("detail", "gallery", "selection")),
     Action("junk_sweep", "Review junk-sweep candidates (shown on the junk page with show=true) and reject or keep them",
            ("junk_list", "junk_reject", "junk_clear"), ANY),
     Action("teach_preferences", "Open the comparison page so the user can teach Facet their taste",

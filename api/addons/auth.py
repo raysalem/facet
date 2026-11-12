@@ -56,8 +56,8 @@ ADDON_PERMISSION_TOOLS: Mapping[str, frozenset] = {
     # photo_manual_tags CHECK allows only 'user'/'xmp'. FORK-ONLY until upstream PR-3 (plugin tags,
     # source='plugin'): then this permission maps to the plugin-tag tools instead.
     "tags.write": frozenset({"add_tags", "remove_tags"}),
-    # TODO(PR-1): set_annotations / clear_annotations, source forced to the add-on id. Nothing until then.
-    "annotations.write": frozenset(),
+    # PR-1: the source is forced to the add-on id (tools_annotations), so an add-on only touches its own overlay.
+    "annotations.write": frozenset({"get_annotations", "set_annotations", "clear_annotations"}),
     "gps.write": frozenset({"set_gps"}),
 }
 
