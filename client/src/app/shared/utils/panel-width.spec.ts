@@ -24,7 +24,9 @@ describe('PanelWidth', () => {
     const panel = create(side), handle = target();
     panel.start(pointer('pointerdown', 100, handle));
     panel.move(pointer('pointermove', 150, handle));
+    expect(document.body.style.userSelect).toBe('none');
     panel.finish(pointer('pointerup', 150, handle));
+    expect(document.body.style.userSelect).toBe('');
     expect(panel.width()).toBe(expected);
     expect(localStorage.getItem(KEY)).toBe(String(expected));
   });

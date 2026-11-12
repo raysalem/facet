@@ -48,10 +48,10 @@ const MEASUREMENTS = [
     }
     </div>
     <details data-photo-assessment class="group min-w-0">
-      <summary class="flex list-none items-center gap-2 max-sm:min-h-11 pointer-coarse:min-h-11 cursor-pointer py-1.5 [&::-webkit-details-marker]:hidden"
+      <summary class="flex flex-wrap list-none items-center gap-x-2 max-sm:min-h-11 pointer-coarse:min-h-11 cursor-pointer py-1.5 [&::-webkit-details-marker]:hidden"
                [class]="explainable() ? 'pe-16 max-sm:pe-24 pointer-coarse:pe-24' : 'pe-8 max-sm:pe-12 pointer-coarse:pe-12'">
-        <span class="font-medium">{{ I18N.photo_detail.assessment.score | translate }} {{ photo().aggregate | assessmentValue }}</span>
-        <span class="opacity-75">{{ I18N.photo_detail.assessment.measurements | translate:{ available: availableCount(), total: measurements().length } }}</span>
+        <span class="font-medium whitespace-nowrap">{{ I18N.photo_detail.assessment.score | translate }} {{ photo().aggregate | assessmentValue }}</span>
+        <span class="opacity-75 whitespace-nowrap">{{ I18N.photo_detail.assessment.measurements | translate:{ available: availableCount(), total: measurements().length } }}</span>
         <mat-icon aria-hidden="true" class="ms-auto !h-5 !w-5 shrink-0 !text-xl transition-transform motion-reduce:transition-none group-open:rotate-180">expand_more</mat-icon>
       </summary>
       <div class="max-h-48 overflow-y-auto rounded border border-current/20 p-2">

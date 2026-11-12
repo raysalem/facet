@@ -151,7 +151,8 @@ describe('tag pivots through actual gallery, photo, menus, Router and HTTP', () 
         interruptedPage = http.expectOne(request => request.url === '/api/photos');
       }
       await harness.navigateByUrl('/photo?path=%2Ftrip%2Fa.jpg', PhotoDetailComponent);
-      http.match(request => request.url === '/api/photo').forEach(request => request.flush(photo));
+      // GET /api/photo names the add-on behind each manual tag (none here); a gallery row does not.
+      http.match(request => request.url === '/api/photo').forEach(request => request.flush({ ...photo, manual_tag_sources: {} }));
       http.match(request => request.url === '/api/stacks/by-photo').forEach(request => request.flush(null));
       await render();
       if (outcome === 'config-ready') {

@@ -372,13 +372,14 @@ describe('PhotoDetailComponent', () => {
       expect(handle.getAttribute('role')).toBe('separator');
       expect(handle.getAttribute('aria-label')).toBe('photo_detail.inspector_resize');
       expect(handle.className).toContain('hidden lg:block');
+      expect(handle.classList).toContain('w-3');
       const key = (name: string) => { handle.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true })); view.detectChanges(); };
       key('ArrowLeft'); expect(width(aside)).toBe('336px');
       expect(localStorage.getItem(KEY)).toBe('336');
       key('ArrowRight'); key('ArrowRight'); expect(width(aside)).toBe('304px');
       key('End'); expect(width(aside)).toBe('520px'); expect(handle.getAttribute('aria-valuenow')).toBe('520');
-      key('Home'); expect(width(aside)).toBe('260px');
-      key('ArrowRight'); expect(width(aside)).toBe('260px');
+      key('Home'); expect(width(aside)).toBe('288px');
+      key('ArrowRight'); expect(width(aside)).toBe('288px');
     });
 
     it('restores the stored width, clamped', async () => {
@@ -859,13 +860,18 @@ describe('PhotoDetailComponent', () => {
     expect(when.querySelector('[data-photo-date]')!.parentElement).toBe(when.querySelector('[data-photo-category]')!.parentElement);
     const exposure = when.querySelector<HTMLElement>('[data-photo-exposure]')!;
     // The image's pixel size closes the capture line; no readout bar under the image carries it any more.
-    expect([...exposure.querySelectorAll('span')].map(span => span.textContent!.trim())).toEqual(['Canon EOS R6', '85mm', 'f/2.8', '1/100', 'ISO 4000', '1920 × 1080']);
+    // Each item carries the "·" before it inside a clipped row, so a wrapped line never opens with one; W × H keeps its ?.
+    expect(exposure.classList).toContain('overflow-x-clip');
+    const items = [...exposure.querySelectorAll<HTMLElement>(':scope > div > span')];
+    expect(items.map(span => (span.querySelector('[data-photo-dimensions]') ?? span).textContent!.trim())).toEqual(['Canon EOS R6', '85mm', 'f/2.8', '1/100', 'ISO 4000', '1920 × 1080']);
+    const dimensions = items[items.length - 1];
+    expect(dimensions.classList).toContain('whitespace-nowrap');
     expect(exposure.getAttribute('aria-label')).toBe('photo_detail.capture_settings');
     expect((view.nativeElement as HTMLElement).querySelector('[data-image-readout]')).toBeNull();
     // The rendition help sits beside the dimensions, icon-only (the metric tabs keep their own).
     const helps = [...aside.querySelectorAll('app-context-help')].filter(help => !help.closest('app-photo-metrics-tabs'));
     expect(helps).toHaveLength(1);
-    expect(helps[0].parentElement).toBe(exposure);
+    expect(helps[0].parentElement).toBe(dimensions);
     const renditionHelp = helps[0].querySelector<HTMLButtonElement>('button')!;
     expect(renditionHelp.getAttribute('aria-label')).toBe('gallery.compare.rendition.sources');
     expect(renditionHelp.textContent!.trim()).toBe('help_outline');
@@ -3342,9 +3348,25 @@ describe('PhotoDetailComponent', () => {
         expect(chipTexts(el)).toEqual(['trip']);
       });
 
-      it('shows every manual tag as a chip when the payload names no sources', async () => {
+      it('reads the sources for a photo opened from a gallery row, which carries none', async () => {
+        const row = { ...astro, manual_tag_sources: undefined };
+        const el = await render(row, true, [addonsMock(vi.fn().mockResolvedValue({ addons: [{ id: 'astro-id', name: 'Astro' }] }))]);
+        // The page took the row as it was (no fetch); the add-on chip appears once /photo names the sources.
+        expect(mockApi.get).toHaveBeenCalledWith('/photo', { path: row.path });
+        mockApi.get.mockReturnValue(of(astro));
+        tagsView.componentInstance.photo.set({ ...row, path: '/photos/row.jpg' } as never); await settle();
+        await settle(); await settle();
+        expect(mockApi.get).toHaveBeenCalledWith('/photo', { path: '/photos/row.jpg' });
+        expect(chipTexts(el)).toEqual(['trip']);
+        expect(el.querySelector('[data-addon-tag-group]')!.textContent).toContain('Astro · 2');
+        const calls = mockApi.get.mock.calls.filter(([url, params]) => url === '/photo' && (params as { path: string }).path === '/photos/row.jpg').length;
+        tagsView.componentInstance.photo.set({ ...row, path: '/photos/row.jpg', star_rating: 4 } as never); await settle();
+        expect(mockApi.get.mock.calls.filter(([url, params]) => url === '/photo' && (params as { path: string }).path === '/photos/row.jpg').length).toBe(calls);
+      });
+
+      it('shows every manual tag as a chip when no add-on wrote any', async () => {
         const load = vi.fn();
-        const el = await render({ ...astro, manual_tag_sources: undefined }, true, [addonsMock(load)]);
+        const el = await render({ ...astro, manual_tag_sources: {} }, true, [addonsMock(load)]);
         expect(el.querySelector('[data-addon-tag-group]')).toBeNull();
         expect(chipTexts(el)).toEqual(['m42', 'orion', 'trip']);
         expect(load).not.toHaveBeenCalled();

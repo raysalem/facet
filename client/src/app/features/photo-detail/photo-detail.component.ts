@@ -398,7 +398,7 @@ function inDetectedSet(photo: Photo): boolean {
         <!-- Drag or arrow-key the inspector's left edge to trade image room for detail (lg+, remembered). -->
         <div role="separator" tabindex="0" aria-orientation="vertical" data-inspector-resize [attr.aria-label]="I18N.photo_detail.inspector_resize | translate"
           [attr.aria-valuemin]="inspectorWidth.min" [attr.aria-valuemax]="inspectorWidth.max" [attr.aria-valuenow]="inspectorWidth.width()"
-          class="relative z-10 hidden lg:block w-2 -mx-1 shrink-0 cursor-col-resize touch-none focus-visible:bg-[var(--mat-sys-primary)]"
+          class="relative z-10 hidden lg:block w-3 -mx-1.5 shrink-0 cursor-col-resize touch-none focus-visible:bg-[var(--mat-sys-primary)]"
           (pointerdown)="inspectorWidth.start($event)" (pointermove)="inspectorWidth.move($event)" (pointerup)="inspectorWidth.finish($event)"
           (pointercancel)="inspectorWidth.finish($event, true)" (lostpointercapture)="inspectorWidth.finish($event, true)" (keydown)="inspectorWidth.key($event)"></div>
 
@@ -424,9 +424,9 @@ function inDetectedSet(photo: Photo): boolean {
               <h2 id="photo-review-title" class="sr-only">{{ I18N.gallery.sidebar.tabs.review | translate }}</h2>
               <!-- Like the gallery rail: no title or rule above the review controls, the favourite beside the stars. -->
               <div data-photo-rating-row class="flex items-center gap-2">
-                <div role="group" [attr.aria-label]="I18N.photo_detail.rating | translate" class="flex flex-nowrap">
+                <div role="group" [attr.aria-label]="I18N.photo_detail.rating | translate" class="flex min-w-0 flex-1 flex-nowrap">
                   @for (star of stars; track star) {
-                    <button type="button" class="min-w-11 min-h-11 rounded inline-flex items-center justify-center hover:bg-[var(--mat-sys-surface-container-high)] cursor-pointer"
+                    <button type="button" class="min-w-9 max-w-11 flex-1 max-sm:min-w-11 pointer-coarse:min-w-11 min-h-11 rounded inline-flex items-center justify-center hover:bg-[var(--mat-sys-surface-container-high)] cursor-pointer"
                             [attr.aria-label]="(I18N.rating.set_rating | translate) + ': ' + star" [attr.aria-pressed]="p.star_rating === star" (click)="setRating(p.path, star)">
                       <mat-icon class="!text-xl !w-5 !h-5 !leading-5 !text-[var(--mat-sys-primary)]">{{ p.star_rating !== null && star <= p.star_rating! ? 'star' : 'star_border' }}</mat-icon>
                     </button>
@@ -491,17 +491,21 @@ function inDetectedSet(photo: Photo): boolean {
               }
             </div>
             @if (p.camera_model || p.focal_length || p.f_stop || p.shutter_speed || p.iso || (p.image_width && p.image_height)) {
-              <div data-photo-exposure role="group" [attr.aria-label]="I18N.photo_detail.capture_settings | translate"
-                   class="flex flex-wrap items-center gap-x-1.5 tabular-nums [&>span+span]:before:me-1.5 [&>span+span]:before:content-['·']">
+              <!-- Each item's "·" sits in the gap before it, so the one that would open a wrapped line is clipped. -->
+              <div data-photo-exposure role="group" [attr.aria-label]="I18N.photo_detail.capture_settings | translate" class="overflow-x-clip">
+                <div class="-ms-3 flex flex-wrap items-center tabular-nums [&>span]:relative [&>span]:ms-3 [&>span]:before:absolute [&>span]:before:-start-2 [&>span]:before:content-['·']">
                 @if (p.camera_model) { <span>{{ p.camera_model }}</span> }
                 @if (p.focal_length) { <span>{{ p.focal_length }}mm</span> }
                 @if (p.f_stop) { <span>f/{{ p.f_stop }}</span> }
                 @if (p.shutter_speed | shutterSpeed; as shutter) { <span>{{ shutter }}</span> }
                 @if (p.iso) { <span>ISO {{ p.iso }}</span> }
                 @if (p.image_width && p.image_height) {
-                  <span data-photo-dimensions>{{ p.image_width }} × {{ p.image_height }}</span>
-                  <app-context-help class="-my-1.5" [label]="I18N.gallery.compare.rendition.sources" [keys]="[I18N.photo_detail.rendition.note]" [iconOnly]="true" />
+                  <span class="inline-flex items-center gap-0.5 whitespace-nowrap">
+                    <span data-photo-dimensions>{{ p.image_width }} × {{ p.image_height }}</span>
+                    <app-context-help class="-my-1.5" [label]="I18N.gallery.compare.rendition.sources" [keys]="[I18N.photo_detail.rendition.note]" [iconOnly]="true" />
+                  </span>
                 }
+                </div>
               </div>
             }
           </div>
@@ -778,7 +782,7 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   private readonly photoActions = inject(PhotoActionsService);
   private readonly journal = inject(UserActivityJournal);
   /** The inspector's user-set width (lg+): the image comes first, the details panel gives way. */
-  protected readonly inspectorWidth = new PanelWidth({ storageKey: 'facet_photo_inspector_width', defaultWidth: 320, min: 260, max: 520, side: 'right' });
+  protected readonly inspectorWidth = new PanelWidth({ storageKey: 'facet_photo_inspector_width', defaultWidth: 320, min: 288, max: 520, side: 'right' });
   /** The image's rendition only needs a word while it is not ready yet or its source failed. */
   protected readonly renditionNotice = computed(() => this.displayedRendition().phase !== 'ready' || this.sourceRendition().phase !== 'ready');
   /** Add-on tag groups the user opened on this photo; every photo starts with them folded. */
@@ -788,7 +792,8 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   /** Manual tags split into the user's own (typed or imported) and one group per add-on that wrote some. */
   protected readonly tagGroups = computed(() => {
     const photo = this.photo();
-    const sources = photo?.manual_tag_sources ?? {};
+    const fetched = this.fetchedTagSources();
+    const sources = photo?.manual_tag_sources ?? (fetched && fetched.path === photo?.path ? fetched.sources : {});
     const own: string[] = [];
     const bySource = new Map<string, string[]>();
     for (const tag of photo?.manual_tags ?? []) {
@@ -802,6 +807,20 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
       own,
       addons: [...bySource].map(([source, tags]) => ({ source, tags, name: names.get(source) ?? source, expanded: expanded.has(source) })),
     };
+  });
+  /** Only `GET /api/photo` names a tag's add-on; a photo opened from a gallery, album or collection row carries no
+   *  `manual_tag_sources`, so they are read for it here (only when it has manual tags). */
+  private readonly fetchedTagSources = signal<{ path: string; sources: Readonly<Record<string, string>> } | null>(null);
+  private readonly tagSourcesPath = computed(() => {
+    const photo = this.photo();
+    return photo && photo.manual_tag_sources === undefined && photo.manual_tags.length ? photo.path : null;
+  });
+  private readonly tagSourcesEffect = effect(() => {
+    const path = this.tagSourcesPath();
+    if (!path || untracked(this.fetchedTagSources)?.path === path) return;
+    untracked(() => firstValueFrom(this.api.get<Photo>('/photo', { path }))
+      .then(fresh => { if (this.photo()?.path === path) this.fetchedTagSources.set({ path, sources: fresh.manual_tag_sources ?? {} }); })
+      .catch(() => undefined));
   });
   /** Add-on id -> its name ("Astro"), read from the add-on registry the first time a photo shows add-on tags. */
   private readonly addonNames = signal<ReadonlyMap<string, string>>(new Map());

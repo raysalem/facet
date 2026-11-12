@@ -15,7 +15,7 @@ const KEY_STEP = 16;
 
 /**
  * The user-resizable width of a side panel, for a `role="separator"` handle on its inner edge:
- * pointer drag (one pointer, rAF-throttled, Escape or a lost capture restores the starting width),
+ * pointer drag (one pointer, rAF-throttled, no text selection meanwhile, Escape or a lost capture restores the starting width),
  * Arrow/Home/End keys, and the committed width remembered per `storageKey`.
  * Construct it in an injection context (a field initializer); the template binds the handle's
  * pointer and key events to `start`, `move`, `finish` and `key`.
@@ -27,6 +27,8 @@ export class PanelWidth {
   private drag: { id: number; x: number; width: number; target: HTMLElement } | null = null;
   private frame: number | null = null;
   private pending: number | null = null;
+  /** The page's own user-select, put back when a drag ends: dragging must not select the panel's text. */
+  private userSelect = '';
 
   constructor(private readonly options: PanelWidthOptions) {
     this.min = options.min;
@@ -59,6 +61,8 @@ export class PanelWidth {
     const target = event.currentTarget as HTMLElement;
     target.focus();
     this.drag = { id: event.pointerId, x: event.clientX, width: this.width(), target };
+    this.userSelect = document.body.style.userSelect;
+    document.body.style.userSelect = 'none';
     try { target.setPointerCapture(event.pointerId); } catch { /* Synthetic pointer. */ }
   }
 
@@ -83,6 +87,7 @@ export class PanelWidth {
     if (this.frame !== null) cancelAnimationFrame(this.frame);
     this.frame = null;
     if (!drag) { this.pending = null; return; }
+    document.body.style.userSelect = this.userSelect;
     if (!cancel && this.pending !== null) this.width.set(this.clamp(this.pending));
     this.pending = null;
     if (cancel) this.width.set(drag.width);
