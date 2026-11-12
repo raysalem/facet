@@ -3844,6 +3844,7 @@
       "remove_tags": "已移除标签",
       "restore_weight_snapshot": "已恢复评分权重",
       "set_caption": "已设置说明",
+      "set_gps": "已设置位置",
       "set_favorite": "已更改收藏",
       "set_rating": "已评分",
       "set_rejected": "已拒绝",

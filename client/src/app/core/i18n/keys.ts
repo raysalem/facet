@@ -3883,6 +3883,7 @@ export const I18N = {
       remove_tags: "assistant_activity.tools.remove_tags",
       restore_weight_snapshot: "assistant_activity.tools.restore_weight_snapshot",
       set_caption: "assistant_activity.tools.set_caption",
+      set_gps: "assistant_activity.tools.set_gps",
       set_favorite: "assistant_activity.tools.set_favorite",
       set_rating: "assistant_activity.tools.set_rating",
       set_rejected: "assistant_activity.tools.set_rejected",
