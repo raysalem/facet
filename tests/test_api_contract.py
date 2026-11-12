@@ -804,6 +804,7 @@ class TestWireTypeIsActuallyChecked:
 # ---------------------------------------------------------------------------
 
 GENERATED_SCHEMA = CLIENT_SRC / 'core' / 'api' / 'schema.d.ts'
+_OBJECT_FIELD = re.compile(r'^ {12}([a-z_][a-zA-Z0-9_]*)\??: \{$')
 
 # (client interface, field) pairs the paired response model legitimately does
 # not declare, each with the reason it is absent. Every entry is asserted to
@@ -827,7 +828,8 @@ def _generated_schema_fields(name: str) -> set[str]:
     match = re.search(r'\n        %s: \{\n(.*?)\n        \};' % re.escape(name), source, re.S)
     assert match, f"schema {name} not found in {GENERATED_SCHEMA} — run `cd client && npm run gen:api`"
     body = re.sub(r'/\*\*.*?\*/', '', match.group(1), flags=re.S)
-    return {m.group(1) for line in body.splitlines() if (m := _FIELD.match(line))}
+    # A field whose type is an inline object (a `dict[str, str]`) opens a block on its own line.
+    return {m.group(1) for line in body.splitlines() if (m := _FIELD.match(line) or _OBJECT_FIELD.match(line))}
 
 
 class TestHandWrittenModelMatchesGeneratedSchema:
