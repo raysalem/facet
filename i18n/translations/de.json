@@ -3460,6 +3460,7 @@
     "remove_action": "Entfernen",
     "remove_tag": "Schlagwort {tag} entfernen",
     "manual": "Manuelles Schlagwort",
+    "addon_group": "Schlagwörter von {name}: {count}",
     "error": "Das Schlagwort konnte nicht geändert werden. Bitte prüfen und erneut versuchen.",
     "already_present": "Dieser Tag ist bereits am Foto vorhanden."
   },

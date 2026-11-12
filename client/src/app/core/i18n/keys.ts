@@ -3499,6 +3499,7 @@ export const I18N = {
     remove_action: "manual_tags.remove_action",
     remove_tag: "manual_tags.remove_tag",
     manual: "manual_tags.manual",
+    addon_group: "manual_tags.addon_group",
     error: "manual_tags.error",
     already_present: "manual_tags.already_present",
   },

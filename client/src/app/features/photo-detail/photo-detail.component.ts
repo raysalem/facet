@@ -9,8 +9,8 @@ import { PhotoProvenanceComponent } from './photo-provenance.component';
 import { PhotoRelatedFilesComponent } from './photo-related-files.component';
 import { TimelineFeedCache } from '../timeline/timeline-feed-cache.service';
 import { ContextHelpComponent } from '../../shared/components/context-help/context-help.component';
-import { Component, inject, signal, computed, effect, untracked, OnInit, HostListener, DestroyRef, ElementRef, viewChild, ChangeDetectionStrategy, Injector, afterNextRender } from '@angular/core';
-import { Location } from '@angular/common';
+import { Component, inject, signal, computed, linkedSignal, effect, untracked, OnInit, HostListener, DestroyRef, ElementRef, viewChild, ChangeDetectionStrategy, Injector, afterNextRender } from '@angular/core';
+import { Location, NgTemplateOutlet } from '@angular/common';
 import { ActivatedRoute, Router, NavigationStart, NavigationEnd } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatExpansionModule } from '@angular/material/expansion';
@@ -65,6 +65,7 @@ import { I18N, i18nKeys } from '../../core/i18n/keys';
 import { isPageShortcutBlocked } from '../../shared/utils/keyboard';
 import { privateImageSessionKey } from '../../shared/utils/private-image-session';
 import { KeyboardMappingService } from '../../core/services/keyboard-mapping.service';
+import { AddonsService } from '../../core/services/addons.service';
 import { PanelWidth } from '../../shared/utils/panel-width';
 import type { CategoryOverrideResult } from './category-override-dialog.component';
 import { StackNavigatorComponent } from './stack-navigator.component';
@@ -106,7 +107,7 @@ function inDetectedSet(photo: Photo): boolean {
 @Component({
   selector: 'app-photo-detail',
   imports: [ControlPopoverComponent, PhotoCollectionSidebarComponent, ContextHelpComponent, PhotoProvenanceComponent, PhotoRelatedFilesComponent,
-    StackNavigatorComponent,
+    StackNavigatorComponent, NgTemplateOutlet,
     ZoomPanDirective,
     PhotoObjectLayerComponent,
     PhotoAnnotationLayerComponent,
@@ -530,7 +531,7 @@ function inDetectedSet(photo: Photo): boolean {
                               [matMenuTriggerFor]="tagNavigationMenu" [matMenuTriggerData]="{ tag: tag }">{{ tag }}</button>
                     </span>
                   }
-                  @for (tag of p.manual_tags; track tag) {
+                  <ng-template #manualTagChip let-tag>
                     <span data-testid="manual-tag-chip"
                           class="inline-flex min-w-0 max-w-full items-center rounded-full border border-dashed border-[var(--facet-accent-text)] text-[var(--facet-accent-text)] text-xs">
                       <button class="inline-flex items-center min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 max-sm:min-w-11 pointer-coarse:min-w-11 min-w-0 gap-1 pl-2 pr-2 py-0.5 cursor-pointer hover:opacity-80 transition-opacity"
@@ -549,6 +550,23 @@ function inDetectedSet(photo: Photo): boolean {
                         </button>
                       }
                     </span>
+                  </ng-template>
+                  @for (tag of tagGroups().own; track tag) {
+                    <ng-container [ngTemplateOutlet]="manualTagChip" [ngTemplateOutletContext]="{ $implicit: tag }" />
+                  }
+                  <!-- An add-on's tags fold into one muted chip per add-on, collapsed until asked for. -->
+                  @for (group of tagGroups().addons; track group.source) {
+                    <button type="button" data-addon-tag-group [attr.data-source]="group.source" [attr.aria-expanded]="group.expanded"
+                            class="inline-flex min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 items-center gap-0.5 rounded-full border border-[var(--mat-sys-outline-variant)] px-2 py-0.5 text-xs text-[var(--mat-sys-on-surface-variant)] cursor-pointer hover:bg-[var(--mat-sys-surface-container-high)]"
+                            [attr.aria-label]="I18N.manual_tags.addon_group | translate:{ name: group.name, count: group.tags.length }" (click)="toggleTagSource(group.source)">
+                      <span aria-hidden="true">{{ group.name }} · {{ group.tags.length }}</span>
+                      <mat-icon class="!text-sm !w-3.5 !h-3.5 !leading-3.5" aria-hidden="true">{{ group.expanded ? 'expand_less' : 'chevron_right' }}</mat-icon>
+                    </button>
+                    @if (group.expanded) {
+                      @for (tag of group.tags; track tag) {
+                        <ng-container [ngTemplateOutlet]="manualTagChip" [ngTemplateOutletContext]="{ $implicit: tag }" />
+                      }
+                    }
                   }
                   @if (auth.isEdition() && !tagInputOpen()) {
                     <button type="button" data-add-tag class="inline-flex min-h-6 items-center gap-0.5 rounded-full border border-dashed border-[var(--mat-sys-outline)] px-2 py-0.5 text-xs text-[var(--mat-sys-on-surface-variant)] cursor-pointer hover:bg-[var(--mat-sys-surface-container-high)] max-sm:min-h-11 pointer-coarse:min-h-11"
@@ -750,6 +768,49 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   protected readonly inspectorWidth = new PanelWidth({ storageKey: 'facet_photo_inspector_width', defaultWidth: 320, min: 260, max: 520, side: 'right' });
   /** The image's rendition only needs a word while it is not ready yet or its source failed. */
   protected readonly renditionNotice = computed(() => this.displayedRendition().phase !== 'ready' || this.sourceRendition().phase !== 'ready');
+  /** Add-on tag groups the user opened on this photo; every photo starts with them folded. */
+  private readonly expandedTagSources = linkedSignal<string | undefined, ReadonlySet<string>>({
+    source: () => this.photo()?.path, computation: () => new Set<string>(),
+  });
+  /** Manual tags split into the user's own (typed or imported) and one group per add-on that wrote some. */
+  protected readonly tagGroups = computed(() => {
+    const photo = this.photo();
+    const sources = photo?.manual_tag_sources ?? {};
+    const own: string[] = [];
+    const bySource = new Map<string, string[]>();
+    for (const tag of photo?.manual_tags ?? []) {
+      const source = sources[tag];
+      if (!source) own.push(tag);
+      else bySource.set(source, [...(bySource.get(source) ?? []), tag]);
+    }
+    const names = this.addonNames();
+    const expanded = this.expandedTagSources();
+    return {
+      own,
+      addons: [...bySource].map(([source, tags]) => ({ source, tags, name: names.get(source) ?? source, expanded: expanded.has(source) })),
+    };
+  });
+  /** Add-on id -> its name ("Astro"), read from the add-on registry the first time a photo shows add-on tags. */
+  private readonly addonNames = signal<ReadonlyMap<string, string>>(new Map());
+  private addonNamesRequested = false;
+  private readonly addonNamesEffect = effect(() => {
+    if (this.addonNamesRequested || !this.tagGroups().addons.length) return;
+    this.addonNamesRequested = true;
+    // Resolved only now: a page without add-on tags never starts the add-on service.
+    const addons = this.injector.get(AddonsService);
+    untracked(async () => {
+      const list = addons.list() ?? (addons.available() ? await addons.load() : null);
+      if (list) this.addonNames.set(new Map(list.addons.map(addon => [addon.id, addon.name])));
+    });
+  });
+
+  protected toggleTagSource(source: string): void {
+    this.expandedTagSources.update(open => {
+      const next = new Set(open);
+      if (!next.delete(source)) next.add(source);
+      return next;
+    });
+  }
   private readonly keymap = inject(KeyboardMappingService);
   private readonly stacks = inject(PhotoStackService);
   private readonly stackNavigator = viewChild(StackNavigatorComponent);

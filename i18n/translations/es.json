@@ -3460,6 +3460,7 @@
     "remove_action": "Quitar",
     "remove_tag": "Quitar la etiqueta {tag}",
     "manual": "Etiqueta manual",
+    "addon_group": "Etiquetas de {name}: {count}",
     "error": "No se pudo modificar la etiqueta. Compruébala e inténtalo de nuevo.",
     "already_present": "Esta etiqueta ya está en la foto."
   },

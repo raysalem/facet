@@ -21,6 +21,7 @@ import { PhotoAnnotationsState } from './photo-annotations.state';
 import { ApiService } from '../../core/services/api.service';
 import { PhotoActionsService } from '../../core/services/photo-actions.service';
 import { AuthService } from '../../core/services/auth.service';
+import { AddonsService } from '../../core/services/addons.service';
 import { I18nService } from '../../core/services/i18n.service';
 import { I18N } from '../../core/i18n/keys';
 import { KeyboardMappingService, KEYMAP_STORAGE_KEY } from '../../core/services/keyboard-mapping.service';
@@ -3170,7 +3171,7 @@ describe('PhotoDetailComponent', () => {
     async function settle() {
       tagsView.detectChanges(); TestBed.inject(ApplicationRef).tick(); await tagsView.whenStable();
     }
-    async function render(photo: Record<string, unknown>, edition: boolean) {
+    async function render(photo: Record<string, unknown>, edition: boolean, extraProviders: unknown[] = []) {
       mockAuth.isEdition.set(edition);
       mockApi.get.mockReturnValue(of(photo));
       TestBed.resetTestingModule();
@@ -3184,6 +3185,7 @@ describe('PhotoDetailComponent', () => {
           { provide: AuthService, useValue: mockAuth },
           { provide: MatDialog, useValue: mockDialog },
           { provide: I18nService, useValue: { t: (k: string) => k, locale: () => 'en', translations: signal({}) } },
+          ...extraProviders as never[],
         ],
       });
       const fixture = TestBed.createComponent(PhotoDetailComponent);
@@ -3258,6 +3260,50 @@ describe('PhotoDetailComponent', () => {
         actions[0].click();
         expect(mockRouter.navigate).toHaveBeenLastCalledWith(['/'], { info: GALLERY_REVISIT, queryParams: { tag_groups: JSON.stringify({ all: [tag] }) } });
       }
+    });
+
+    describe('add-on tags', () => {
+      const astro = { ...untagged, tags_list: ['sky'], manual_tags: ['m42', 'orion', 'trip'], manual_tag_sources: { m42: 'astro-id', orion: 'astro-id' } };
+      const addonsMock = (load = vi.fn()) => ({ provide: AddonsService, useValue: { list: signal(null), available: () => true, load } });
+      const chipTexts = (el: HTMLElement) => [...el.querySelectorAll('[data-testid="manual-tag-chip"]')].map(chip => chip.querySelector('button span:last-child')!.textContent!.trim());
+
+      it('folds an add-on\'s tags into one collapsed chip named after the add-on, keeping the user\'s own chips', async () => {
+        const load = vi.fn().mockResolvedValue({ addons: [{ id: 'astro-id', name: 'Astro' }] });
+        const el = await render(astro, true, [addonsMock(load)]);
+        await settle();
+        expect(el.querySelectorAll('[data-testid="ai-tag-chip"]').length).toBe(1);
+        expect(chipTexts(el)).toEqual(['trip']);
+        const group = el.querySelector<HTMLButtonElement>('[data-addon-tag-group]')!;
+        expect(load).toHaveBeenCalledTimes(1);
+        expect(group.textContent).toContain('Astro · 2');
+        expect(group.getAttribute('aria-expanded')).toBe('false');
+        expect(group.getAttribute('aria-label')).toBe('manual_tags.addon_group');
+        group.click(); await settle();
+        expect(group.getAttribute('aria-expanded')).toBe('true');
+        expect(chipTexts(el)).toEqual(['trip', 'm42', 'orion']);
+        expect(el.querySelectorAll('[data-testid="manual-tag-remove"]').length).toBe(3);
+        group.click(); await settle();
+        expect(chipTexts(el)).toEqual(['trip']);
+      });
+
+      it('names the group by the add-on id while the registry is unavailable, and folds again on the next photo', async () => {
+        const el = await render(astro, false, [{ provide: AddonsService, useValue: { list: signal(null), available: () => false, load: vi.fn() } }]);
+        const group = el.querySelector<HTMLButtonElement>('[data-addon-tag-group]')!;
+        expect(group.textContent).toContain('astro-id · 2');
+        group.click(); await settle();
+        expect(chipTexts(el)).toEqual(['trip', 'm42', 'orion']);
+        tagsView.componentInstance.photo.set({ ...astro, path: '/photos/next.jpg' } as never); await settle();
+        expect(el.querySelector('[data-addon-tag-group]')!.getAttribute('aria-expanded')).toBe('false');
+        expect(chipTexts(el)).toEqual(['trip']);
+      });
+
+      it('shows every manual tag as a chip when the payload names no sources', async () => {
+        const load = vi.fn();
+        const el = await render({ ...astro, manual_tag_sources: undefined }, true, [addonsMock(load)]);
+        expect(el.querySelector('[data-addon-tag-group]')).toBeNull();
+        expect(chipTexts(el)).toEqual(['m42', 'orion', 'trip']);
+        expect(load).not.toHaveBeenCalled();
+      });
     });
   });
 

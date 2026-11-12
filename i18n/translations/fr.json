@@ -3460,6 +3460,7 @@
     "remove_action": "Retirer",
     "remove_tag": "Retirer le mot-clé {tag}",
     "manual": "Mot-clé manuel",
+    "addon_group": "Mots-clés de {name} : {count}",
     "error": "Impossible de modifier le mot-clé. Vérifiez-le et réessayez.",
     "already_present": "Ce tag est déjà sur la photo."
   },
