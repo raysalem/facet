@@ -30,6 +30,7 @@ import { i18nKeys } from '../../../core/i18n/keys';
   host: {
     class: 'relative flex shrink-0 flex-col border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-low)] max-w-[80vw]',
     '[style.width.px]': 'service.width()',
+    '[class.lg:!hidden]': 'service.dockHidden()',
     '[attr.data-addon-sidebar]': 'panel()?.addon?.id ?? null',
     '(window:message)': 'onMessage($event)',
   },

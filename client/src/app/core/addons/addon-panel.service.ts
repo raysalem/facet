@@ -45,6 +45,11 @@ export class AddonPanelService {
   readonly panel = signal<OpenPanel | null>(null);
   readonly openError = signal<string | null>(null);
   readonly width = signal(readWidth());
+  /**
+   * A page that shows its own panels in the dock's place (the photo page's rail) hides the dock at `lg`
+   * and up while one of those is shown. The frame stays mounted, so the add-on keeps its state.
+   */
+  readonly dockHidden = signal(false);
 
   async open(addon: PanelAddon, scope: PanelScope): Promise<boolean> {
     this.openError.set(null);

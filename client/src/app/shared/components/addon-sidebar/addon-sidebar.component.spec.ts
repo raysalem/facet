@@ -14,6 +14,7 @@ describe('add-on sidebar host', () => {
   let fixture: ComponentFixture<AddonSidebarComponent>;
   let root: HTMLElement;
   const panel = signal<OpenPanel | null>(null);
+  const dockHidden = signal(false);
   const selectedPaths = signal(new Set<string>());
   const close = vi.fn();
   const execute = vi.fn(async () => ({ ok: true }));
@@ -21,12 +22,12 @@ describe('add-on sidebar host', () => {
   const events = new Subject<unknown>();
 
   beforeEach(() => {
-    close.mockReset(); execute.mockClear(); report.mockClear();
+    close.mockReset(); execute.mockClear(); report.mockClear(); dockHidden.set(false);
     panel.set({ addon: { id: 'astro', name: 'Astro', icon: 'star' }, nonce: 'nonce-1', src: '/addons/astro/ui/?nonce=nonce-1',
       scope: { kind: 'view', query: 'type=astro' } });
     selectedPaths.set(new Set(['/p/a.jpg']));
     TestBed.configureTestingModule({ imports: [AddonSidebarComponent], providers: [
-      { provide: AddonPanelService, useValue: { panel, width: signal(380), close, setWidth: vi.fn() } },
+      { provide: AddonPanelService, useValue: { panel, width: signal(380), dockHidden, close, setWidth: vi.fn() } },
       { provide: GalleryStore, useValue: { selectionScope: signal('paths'), selectedPaths } },
       { provide: WebMcpToolRegistry, useValue: { load: vi.fn(async () => undefined), execute } },
       { provide: AssistantChangesService, useValue: { report } },
@@ -39,6 +40,16 @@ describe('add-on sidebar host', () => {
   });
 
   function frame(): HTMLIFrameElement { return root.querySelector('iframe')!; }
+
+  it('hides the dock at lg and up while a page shows its own panel there, keeping the frame mounted', () => {
+    const first = frame();
+    dockHidden.set(true); fixture.detectChanges();
+    expect(root.classList).toContain('lg:!hidden');
+    expect(frame()).toBe(first);
+    dockHidden.set(false); fixture.detectChanges();
+    expect(root.classList).not.toContain('lg:!hidden');
+    expect(frame()).toBe(first);
+  });
   function send(data: unknown, source: unknown = frame().contentWindow): void {
     window.dispatchEvent(new MessageEvent('message', { data, source: source as Window }));
   }
