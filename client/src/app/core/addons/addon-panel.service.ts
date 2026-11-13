@@ -50,6 +50,12 @@ export class AddonPanelService {
    * and up while one of those is shown. The frame stays mounted, so the add-on keeps its state.
    */
   readonly dockHidden = signal(false);
+  /**
+   * Whether the open add-on is the panel the user is looking at, so a page built later (photo to gallery,
+   * back from the Add-ons page) starts on the add-on's tab instead of hiding it. An open sets it; a rail
+   * that picks one of its own panels, or closes them all, clears it.
+   */
+  readonly addonShown = signal(false);
 
   async open(addon: PanelAddon, scope: PanelScope): Promise<boolean> {
     this.openError.set(null);
@@ -79,6 +85,7 @@ export class AddonPanelService {
       if (detail && typeof detail === 'object' && 'status' in detail) {
         // It did not start: show that in the sidebar, with the log tail the server sent.
         this.closeQuietly();
+        this.addonShown.set(true);
         this.panel.set({ addon, nonce: '', src: '', scope,
           failure: { error: typeof detail.error === 'string' ? detail.error : null,
             log: Array.isArray(detail.log_tail) ? detail.log_tail.filter((l: unknown) => typeof l === 'string').join('\n') : '' } });
@@ -105,11 +112,13 @@ export class AddonPanelService {
     // Only ever frame the add-on proxy: the src comes from our own server, but check its shape anyway.
     if (!opened.src.startsWith(`/addons/${addon.id}/`)) throw new Error('Unexpected add-on panel source');
     this.closeQuietly();
+    this.addonShown.set(true);
     this.panel.set({ addon, nonce: opened.nonce, src: opened.src, scope: opened.scope as PanelScope });
   }
 
   close(): void {
     this.closeQuietly();
+    this.addonShown.set(false);
     this.panel.set(null);
   }
 

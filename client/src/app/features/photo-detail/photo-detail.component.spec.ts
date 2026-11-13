@@ -356,6 +356,11 @@ describe('PhotoDetailComponent', () => {
   });
 
   describe('right rail', () => {
+    // The rail's tab semantics are the lg column's (below lg an add-on is a plain toggle): see panel-rail's spec.
+    beforeEach(() => vi.stubGlobal('matchMedia', (media: string) => ({
+      matches: media === '(min-width: 1024px)', media, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {},
+    })));
+    afterEach(() => vi.unstubAllGlobals());
     async function render(photo = makePhoto({ path: samplePhoto.path })) {
       const view = renderDetail();
       mockApi.get.mockImplementation((url: string) => of(url === '/photo' ? photo : {}));
@@ -455,6 +460,24 @@ describe('PhotoDetailComponent', () => {
       expect(root.querySelector('[data-rail-addon]')).toBeNull();
       view.destroy();
       expect(panels.dockHidden()).toBe(false);
+    });
+
+    it('opens on the add-on when it was the panel shown on the page before (Add-ons page Open, then back)', async () => {
+      localStorage.setItem('facet_photo_rail_tab', 'content');
+      const first = await render();
+      const panels = TestBed.inject(AddonPanelService);
+      // Opened elsewhere (the Add-ons page has no rail), then this photo page is built anew.
+      first.view.destroy();
+      panels.panel.set({ addon: { id: 'astro', name: 'Astro', icon: 'star' }, nonce: 'n1', src: '/addons/astro/', scope: { kind: 'view' } });
+      panels.addonShown.set(true);
+      const view = TestBed.createComponent(PhotoDetailComponent);
+      view.componentInstance.photo.set(makePhoto({ path: samplePhoto.path }));
+      view.detectChanges(); await view.whenStable(); TestBed.flushEffects(); view.detectChanges();
+      const root = view.nativeElement as HTMLElement;
+      expect(root.querySelector('[data-rail-addon="astro"]')!.getAttribute('aria-selected')).toBe('true');
+      expect(panels.dockHidden()).toBe(false);
+      expect(root.querySelector('[data-photo-inspector]')!.classList).toContain('lg:!hidden');
+      view.destroy();
     });
 
     it('folds every panel and the add-on to the side with the X or Escape, and an icon brings one back', async () => {

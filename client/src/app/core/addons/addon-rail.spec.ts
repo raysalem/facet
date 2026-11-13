@@ -8,13 +8,14 @@ describe('AddonRail', () => {
   const KEY = 'addon_rail_spec';
   const panel = signal<OpenPanel | null>(null);
   const dockHidden = signal(false);
+  const addonShown = signal(false);
   const openForCurrentView = vi.fn(async () => true);
   const astro = { id: 'astro', name: 'Astro', icon: 'star' };
 
   beforeEach(() => {
-    panel.set(null); dockHidden.set(false); openForCurrentView.mockClear();
+    panel.set(null); dockHidden.set(false); addonShown.set(false); openForCurrentView.mockClear();
     TestBed.configureTestingModule({ providers: [
-      { provide: AddonPanelService, useValue: { panel, dockHidden, openForCurrentView } },
+      { provide: AddonPanelService, useValue: { panel, dockHidden, addonShown, openForCurrentView } },
       { provide: AuthService, useValue: { hasFeature: () => false } },
     ] });
   });
@@ -55,7 +56,7 @@ describe('AddonRail', () => {
 
   it('closes every panel and the add-on with closeAll or Escape, also on a page that starts with a panel', () => {
     const close = vi.fn(() => panel.set(null));
-    TestBed.overrideProvider(AddonPanelService, { useValue: { panel, dockHidden, openForCurrentView, close } });
+    TestBed.overrideProvider(AddonPanelService, { useValue: { panel, dockHidden, addonShown, openForCurrentView, close } });
     const rail = create('view');
     TestBed.tick();
     open('n1');
@@ -75,7 +76,7 @@ describe('AddonRail', () => {
     // A page with a default panel still reopens closed.
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [
-      { provide: AddonPanelService, useValue: { panel, dockHidden, openForCurrentView } },
+      { provide: AddonPanelService, useValue: { panel, dockHidden, addonShown, openForCurrentView } },
       { provide: AuthService, useValue: { hasFeature: () => false } },
     ] });
     expect(create('view').tab()).toBeNull();
@@ -87,6 +88,52 @@ describe('AddonRail', () => {
     rail.selectAddon(astro);
     expect(openForCurrentView).toHaveBeenCalledWith(astro);
     expect(rail.tab()).toBe('view');
+  });
+
+  it('starts a newly built rail on the add-on when it is the panel being looked at (photo to gallery, back from Add-ons)', () => {
+    panel.set({ addon: astro, nonce: 'n1', src: '/addons/astro/', scope: { kind: 'view' } });
+    addonShown.set(true);
+    localStorage.setItem(KEY, 'view');
+    for (const defaultTab of ['view', null] as const) {
+      const rail = create(defaultTab);
+      TestBed.tick();
+      expect(rail.tab()).toBe('addon:astro');
+      expect(rail.addonActive()).toBe(true);
+      expect(dockHidden()).toBe(false);
+    }
+  });
+
+  it('leaves a remembered add-on tab when the open add-on is not the panel being looked at', () => {
+    panel.set({ addon: astro, nonce: 'n1', src: '/addons/astro/', scope: { kind: 'view' } });
+    localStorage.setItem(KEY, 'addon:astro');
+    expect(create('view').tab()).toBe('view');
+    localStorage.setItem(KEY, 'addon:astro');
+    const rail = create(null);
+    TestBed.tick();
+    expect(rail.tab()).toBeNull();
+    expect(dockHidden()).toBe(true);
+  });
+
+  it('records whether the add-on is the shown panel, so the next page can start from it', () => {
+    const rail = create('view');
+    TestBed.tick();
+    open('n1');
+    expect(addonShown()).toBe(true);
+    rail.select('view'); TestBed.tick();
+    expect(addonShown()).toBe(false);
+    rail.selectAddon(astro); TestBed.tick();
+    expect(addonShown()).toBe(true);
+  });
+
+  it('on return from parking, starts on an add-on opened meanwhile before deciding the dock (no flash)', () => {
+    const rail = create(null);
+    TestBed.tick();
+    rail.release();
+    panel.set({ addon: astro, nonce: 'n2', src: '/addons/astro/', scope: { kind: 'view' } });
+    addonShown.set(true);
+    rail.resume();
+    expect(rail.tab()).toBe('addon:astro');
+    expect(dockHidden()).toBe(false);
   });
 
   it('hands the dock back while its page is parked and takes it again on return', () => {

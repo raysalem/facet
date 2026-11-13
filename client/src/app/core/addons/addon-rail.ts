@@ -61,6 +61,7 @@ export class AddonRail<T extends string> {
     const isPageTab = (value: string | null): value is T => value !== null && (options.tabs as readonly string[]).includes(value);
     this.tab.set(stored === '' ? null : isPageTab(stored) || stored?.startsWith(ADDON_PREFIX) ? stored : options.defaultTab);
     this.pageTab.set(isPageTab(stored) ? stored : options.defaultTab);
+    this.adoptPanel();
 
     effect(() => {
       if (this.registryRequested || (!this.auth.hasFeature('addons') && !options.needsRegistry?.())) return;
@@ -88,11 +89,27 @@ export class AddonRail<T extends string> {
       const hidden = !this.addonActive();
       if (this.active) this.panels.dockHidden.set(hidden);
     });
+    // Whether the add-on is what the user looks at outlives this page: the next page's rail starts from it.
+    effect(() => {
+      const shown = this.addonActive();
+      if (this.active && this.panels.panel()) untracked(() => this.panels.addonShown.set(shown));
+    });
     effect(() => {
       const tab = this.tab();
       try { localStorage.setItem(options.storageKey, tab ?? ''); } catch { /* Storage blocked: the pick holds for this page only. */ }
     });
     inject(DestroyRef).onDestroy(() => this.release());
+  }
+
+  /**
+   * Start from the open panel: on its tab when the add-on is the panel being looked at (opened on another
+   * page, or from the Add-ons page), and off a remembered add-on tab when it is not.
+   */
+  private adoptPanel(): void {
+    const open = this.panels.panel();
+    this.lastPanel = open ? `${open.addon.id}|${open.nonce}` : null;
+    if (open && this.panels.addonShown()) this.tab.set(ADDON_PREFIX + open.addon.id);
+    else if (this.tab()?.startsWith(ADDON_PREFIX)) this.tab.set(this.options.defaultTab === null ? null : this.pageTab());
   }
 
   private read(): string | null {
@@ -157,6 +174,9 @@ export class AddonRail<T extends string> {
   /** The parked page is back: it owns the dock again. */
   resume(): void {
     this.active = true;
+    // Effects did not run while parked: catch up with a panel opened, picked or closed meanwhile before
+    // deciding the dock, so it does not show for a frame on the stale tab.
+    this.adoptPanel();
     this.panels.dockHidden.set(!this.addonActive());
   }
 }

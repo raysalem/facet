@@ -1,5 +1,4 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
-import { Location } from '@angular/common';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -151,7 +150,18 @@ export class AddonsPageComponent implements OnInit {
   protected readonly panels = inject(AddonPanelService);
   private readonly imports = inject(AddonImportNotifier);
   private readonly router = inject(Router);
-  private readonly location = inject(Location);
+  /**
+   * The in-app page this one was opened from, recorded on entry. Not the browser's previous history entry:
+   * after a deep link or a Back onto /addons that can be another site, and after a sign-in it is /login.
+   * None when /addons was reached by Back/Forward, loaded first, or came from the login page.
+   */
+  private readonly returnUrl = ((): string | null => {
+    const navigation = this.router.currentNavigation();
+    const previous = navigation?.trigger === 'popstate' ? null : navigation?.previousNavigation?.finalUrl;
+    if (!previous) return null;
+    const page = previous.root.children['primary']?.segments[0]?.path;
+    return page === 'login' || page === 'addons' ? null : this.router.serializeUrl(previous);
+  })();
   /** The add-on a Start/Stop/Open is in flight for. */
   protected readonly busy = signal<string | null>(null);
   protected readonly logs = signal<Record<string, string>>({});
@@ -218,10 +228,10 @@ export class AddonsPageComponent implements OnInit {
   /**
    * The panel lives in the shell and survives navigation, so after opening it go back to the page the user
    * came from (the photo they were on, the gallery view): the panel then works on that, not on this page.
-   * Only within the app: a first page load of /addons has nowhere to go back to.
+   * Only to the in-app page recorded on entry (`returnUrl`); otherwise the page stays.
    */
   private returnToPreviousPage(): void {
-    if (this.router.lastSuccessfulNavigation()?.previousNavigation) this.location.back();
+    if (this.returnUrl) void this.router.navigateByUrl(this.returnUrl);
   }
 
   protected async mint(id: string): Promise<void> {

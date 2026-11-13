@@ -988,7 +988,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
       }
     </div>
     @if (lgDesktop.isDesktop()) {
-      <app-panel-rail data-gallery-rail [rail]="rail" [tabs]="railTabs" [label]="I18N.gallery.rail.label | translate" idPrefix="gallery" />
+      <app-panel-rail data-gallery-rail [rail]="rail" [tabs]="railTabs" [wide]="true" [label]="I18N.gallery.rail.label | translate" idPrefix="gallery" />
       <aside id="gallery-panel-view" data-gallery-panel="view" role="tabpanel" aria-labelledby="gallery-rail-view" [hidden]="!viewPanelOpen()" (keydown)="closePanels($event)"
         class="w-80 shrink-0 overflow-y-auto border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] px-4 py-2 text-sm">
         <div data-panel-header class="flex items-center gap-2">

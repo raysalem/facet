@@ -28,6 +28,8 @@ import { i18nKeys } from '../../../core/i18n/keys';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [MatButtonModule, MatIconModule, MatTooltipModule, TranslatePipe],
   host: {
+    // A page rail's add-on tab points here (aria-controls).
+    id: 'addon-dock',
     class: 'relative flex shrink-0 flex-col border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-low)] max-w-[80vw]',
     '[style.width.px]': 'service.width()',
     '[class.lg:!hidden]': 'service.dockHidden()',

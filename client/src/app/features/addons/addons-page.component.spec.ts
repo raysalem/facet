@@ -5,8 +5,7 @@ import { AddonsService, type AddonList } from '../../core/services/addons.servic
 import { I18nService } from '../../core/services/i18n.service';
 import { AddonPanelService } from '../../core/addons/addon-panel.service';
 import { AddonImportNotifier } from '../../core/addons/addon-import-notifier.service';
-import { Location } from '@angular/common';
-import { Router } from '@angular/router';
+import { DefaultUrlSerializer, Router } from '@angular/router';
 
 function listing(): AddonList {
   return {
@@ -36,8 +35,12 @@ describe('Add-ons page', () => {
   let start: ReturnType<typeof vi.fn>;
   let stop: ReturnType<typeof vi.fn>;
   let log: ReturnType<typeof vi.fn>;
-  let back: ReturnType<typeof vi.fn>;
-  const lastNavigation = signal<{ previousNavigation: object | null } | null>(null);
+  let navigateByUrl: ReturnType<typeof vi.fn>;
+  const urls = new DefaultUrlSerializer();
+  /** The navigation onto /addons, as the router reports it while the page is built. */
+  const navigation = signal<{ trigger: string; previousNavigation: { finalUrl: ReturnType<DefaultUrlSerializer['parse']> } | null } | null>(null);
+  const cameFrom = (url: string | null, trigger = 'imperative') =>
+    navigation.set({ trigger, previousNavigation: url === null ? null : { finalUrl: urls.parse(url) } });
 
   beforeEach(() => {
     list.set(null); loadError.set(false);
@@ -50,14 +53,13 @@ describe('Add-ons page', () => {
     start = vi.fn(async () => undefined);
     stop = vi.fn(async () => undefined);
     log = vi.fn(async () => ['line one', 'line two']);
-    back = vi.fn();
-    lastNavigation.set({ previousNavigation: {} });
+    navigateByUrl = vi.fn(async () => true);
+    cameFrom('/photo?path=%2Fp%2Fa.jpg');
     TestBed.configureTestingModule({ imports: [AddonsPageComponent], providers: [
       { provide: AddonsService, useValue: { list, loadError, load, mintToken, revokeTokens, start, stop, log } },
       { provide: AddonPanelService, useValue: { openForCurrentView, openError } },
       { provide: AddonImportNotifier, useValue: { openRun } },
-      { provide: Location, useValue: { back } },
-      { provide: Router, useValue: { lastSuccessfulNavigation: lastNavigation } },
+      { provide: Router, useValue: { currentNavigation: navigation, navigateByUrl, serializeUrl: (tree: ReturnType<DefaultUrlSerializer['parse']>) => urls.serialize(tree) } },
       { provide: I18nService, useValue: { t: (key: string, params?: Record<string, unknown>) => key + (params ? ' ' + Object.values(params).join(' ') : ''), translations: signal({}), currentLang: signal('en') } },
     ] });
     fixture = TestBed.createComponent(AddonsPageComponent);
@@ -103,26 +105,42 @@ describe('Add-ons page', () => {
     expect(root.querySelector('[role="alert"]')?.textContent).toContain('The add-on is not running');
   });
 
-  it('goes back to the page the user came from once the panel is open, so it works on that photo or view', async () => {
+  it('returns to the in-app page the user came from once the panel is open, so it works on that photo or view', async () => {
     await settle();
     (root.querySelector('[data-addon="astro"] [data-addon-open]') as HTMLButtonElement).click();
     await settle();
-    expect(back).toHaveBeenCalledOnce();
+    expect(navigateByUrl).toHaveBeenCalledExactlyOnceWith('/photo?path=%2Fp%2Fa.jpg');
     (root.querySelector('[data-pending-open]') as HTMLButtonElement).click();
     await settle();
-    expect(back).toHaveBeenCalledTimes(2);
+    expect(navigateByUrl).toHaveBeenCalledTimes(2);
   });
 
-  it('stays when the panel did not open or the add-ons page was the first page loaded', async () => {
+  it('stays when the panel did not open', async () => {
     await settle();
     openForCurrentView.mockResolvedValueOnce(false);
     (root.querySelector('[data-addon="astro"] [data-addon-open]') as HTMLButtonElement).click();
     await settle();
-    lastNavigation.set({ previousNavigation: null });
-    (root.querySelector('[data-addon="astro"] [data-addon-open]') as HTMLButtonElement).click();
-    await settle();
-    expect(back).not.toHaveBeenCalled();
+    expect(navigateByUrl).not.toHaveBeenCalled();
   });
+
+  // Each of these has no in-app page to return to; Location.back() would have left the app or gone to /login.
+  for (const [what, url, trigger] of [
+    ['loaded first', null, 'imperative'],
+    ['reached by browser Back or Forward', '/photo?path=%2Fp%2Fa.jpg', 'popstate'],
+    ['reached through the login page', '/login?returnUrl=%2Faddons', 'imperative'],
+  ] as const) {
+    it('stays when /addons was ' + what, async () => {
+      fixture.destroy();
+      cameFrom(url, trigger);
+      fixture = TestBed.createComponent(AddonsPageComponent);
+      fixture.detectChanges();
+      root = fixture.nativeElement;
+      await settle();
+      (root.querySelector('[data-addon="astro"] [data-addon-open]') as HTMLButtonElement).click();
+      await settle();
+      expect(navigateByUrl).not.toHaveBeenCalled();
+    });
+  }
 
   it('lists after-import runs nobody opened and opens one with its import scope', async () => {
     await settle();
