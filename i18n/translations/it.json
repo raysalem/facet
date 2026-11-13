@@ -1768,6 +1768,12 @@
       "tooltip_mode": "Come si aprono i dettagli di una foto: al passaggio del mouse, al clic, nel pannello laterale o mai",
       "tile_fit": "Ritaglia le miniature a quadrato, o mostra ogni foto nelle sue proporzioni originali",
       "reset_display": "Ripristina layout, dimensione delle miniature e dettagli delle foto predefiniti. Filtri, ordinamento e selezione restano invariati."
+    },
+    "rail": {
+      "label": "Pannelli della galleria",
+      "view": "Vista e filtri",
+      "filters_one": "{count} filtro",
+      "filters": "{count} filtri"
     }
   },
   "composition_patterns": {

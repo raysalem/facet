@@ -402,77 +402,74 @@ describe('GalleryComponent', () => {
     fixture.destroy();
   });
 
-  describe('collection header stickiness', () => {
-    function render() {
+  describe('collection header and rail', () => {
+    afterEach(() => localStorage.removeItem('facet_gallery_rail_tab'));
+    function render(wide: boolean) {
       const fixture = TestBed.createComponent(GalleryComponent);
       fixture.detectChanges();
-      const markers = Array.from(fixture.nativeElement.querySelectorAll('[data-collection-header]')) as HTMLElement[];
-      return { fixture, bar: markers[0], criteria: markers[1], markers };
+      TestBed.tick();
+      // After the first render: setup reads the real media query.
+      (fixture.componentInstance as unknown as { lgDesktop: { setMatches(v: boolean): void } }).lgDesktop.setMatches(wide);
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+      const markers = Array.from(root.querySelectorAll('[data-collection-header]')) as HTMLElement[];
+      return { fixture, root, bar: markers[0], markers };
     }
 
-    it('pins the bar row at every width and the criteria row only from lg, below the measured bar', () => {
-      const { fixture, bar, criteria, markers } = render();
+    it('below lg keeps the criteria row under the pinned bar, unpinned, with no rail', () => {
+      const { fixture, root, bar, markers } = render(false);
       expect(markers).toHaveLength(2);
+      const criteria = markers[1];
       expect(bar.tagName).toBe('HEADER');
       expect(bar.classList).toContain('sticky');
       expect(bar.classList).toContain('top-0');
       expect(criteria.tagName).toBe('APP-GALLERY-CRITERIA');
-      expect(bar.contains(criteria)).toBe(false);
       expect(bar.nextElementSibling).toBe(criteria);
-      expect(criteria.classList).toContain('lg:sticky');
-      expect(criteria.classList).not.toContain('sticky');
-      expect(criteria.classList).toContain('lg:z-40');
-      expect(criteria.className).toContain('bg-[var(--mat-sys-surface-container-lowest)]');
-      const instance = fixture.componentInstance as unknown as { collectionBarHeight: WritableSignal<number> };
-      instance.collectionBarHeight.set(61);
+      expect(criteria.className).not.toContain('sticky');
+      expect(root.querySelector('app-panel-rail')).toBeNull();
+      fixture.destroy();
+    });
+
+    it('from lg moves the criteria into the View panel of the rail, closed by default so the grid keeps the width', () => {
+      const { fixture, root, bar } = render(true);
+      expect(bar.nextElementSibling?.tagName).not.toBe('APP-GALLERY-CRITERIA');
+      const panel = root.querySelector<HTMLElement>('[data-gallery-panel="view"]')!;
+      expect(panel.hidden).toBe(true);
+      expect(panel.querySelector('app-gallery-criteria')).not.toBeNull();
+      const tab = root.querySelector<HTMLButtonElement>('app-panel-rail [data-rail-tab="view"]')!;
+      expect(tab.getAttribute('aria-selected')).toBe('false');
+      expect(tab.getAttribute('tabindex')).toBe('0');
+      tab.click(); fixture.detectChanges(); TestBed.flushEffects();
+      expect(panel.hidden).toBe(false);
+      expect(tab.getAttribute('aria-selected')).toBe('true');
+      expect(localStorage.getItem('facet_gallery_rail_tab')).toBe('view');
+      // A second click on the picked icon closes the panel again.
+      tab.click(); fixture.detectChanges(); TestBed.flushEffects();
+      expect(panel.hidden).toBe(true);
+      fixture.destroy();
+    });
+
+    it('sums the active filters on the count line, a link that opens View', () => {
+      const { fixture, root } = render(true);
+      expect(root.querySelector('[data-collection-filter-summary]')).toBeNull();
+      mockStore.filters.set({ ...DEFAULT_FILTERS, camera: 'X100V', lens: '23mm' });
       fixture.detectChanges();
-      expect(criteria.style.top).toBe('61px');
+      const summary = root.querySelector<HTMLButtonElement>('[data-collection-filter-summary]')!;
+      expect(summary.textContent!.trim()).toBe('gallery.rail.filters');
+      summary.click(); fixture.detectChanges();
+      expect(root.querySelector<HTMLElement>('[data-gallery-panel="view"]')!.hidden).toBe(false);
+      expect(summary.getAttribute('aria-expanded')).toBe('true');
       fixture.destroy();
     });
 
-    it('measures the criteria row with an observer of its own and pads the scroll by it from lg', () => {
-      const observers: { callback: ResizeObserverCallback; targets: Element[] }[] = [];
-      const spy = vi.spyOn(globalThis, 'ResizeObserver').mockImplementation(function (callback: ResizeObserverCallback) {
-        const record = { callback, targets: [] as Element[] };
-        observers.push(record);
-        return { observe: (target: Element) => record.targets.push(target), unobserve: vi.fn(), disconnect: vi.fn() } as unknown as ResizeObserver;
-      });
-      try {
-        const { fixture, criteria } = render();
-        TestBed.tick();
-        const criteriaObserver = observers.find(o => o.targets.includes(criteria));
-        expect(criteriaObserver).toBeDefined();
-        expect(criteriaObserver!.targets).toEqual([criteria]);
-        criteria.getBoundingClientRect = () => ({ height: 48 }) as DOMRect;
-        criteriaObserver!.callback([{ target: criteria } as unknown as ResizeObserverEntry], {} as ResizeObserver);
-        const instance = fixture.componentInstance as unknown as { collectionCriteriaHeight(): number; lgDesktop: { setMatches(v: boolean): void } };
-        expect(instance.collectionCriteriaHeight()).toBe(48);
-        const content = fixture.nativeElement.querySelector('mat-sidenav-content') as HTMLElement;
-        instance.lgDesktop.setMatches(true);
-        fixture.detectChanges();
-        expect(content.style.scrollPaddingTop).toBe('48px');
-        instance.lgDesktop.setMatches(false);
-        fixture.detectChanges();
-        expect(content.style.scrollPaddingTop).toBe('0px');
+    it('pads the scroll by the pinned bar alone at every width', () => {
+      for (const wide of [false, true]) {
+        const { fixture } = render(wide);
+        const instance = fixture.componentInstance as unknown as { collectionBarHeight: WritableSignal<number>; collectionHeaderHeight(): number };
+        instance.collectionBarHeight.set(61);
+        expect(instance.collectionHeaderHeight()).toBe(61);
         fixture.destroy();
-      } finally {
-        spy.mockRestore();
       }
-    });
-
-    it('pads the scroll by the bar below lg and by bar plus criteria from lg', () => {
-      const { fixture } = render();
-      const instance = fixture.componentInstance as unknown as {
-        collectionBarHeight: WritableSignal<number>; collectionCriteriaHeight: WritableSignal<number>;
-        collectionHeaderHeight(): number; lgDesktop: { setMatches(v: boolean): void };
-      };
-      instance.collectionBarHeight.set(61);
-      instance.collectionCriteriaHeight.set(48);
-      instance.lgDesktop.setMatches(false);
-      expect(instance.collectionHeaderHeight()).toBe(61);
-      instance.lgDesktop.setMatches(true);
-      expect(instance.collectionHeaderHeight()).toBe(109);
-      fixture.destroy();
     });
   });
 

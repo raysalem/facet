@@ -9,6 +9,9 @@ import { MovableToolbarDirective, TOOLBAR_POSITION_EVENT } from '../../shared/di
 import { GalleryReviewNavigationService } from './gallery-review-navigation.service';
 import { GalleryViewControlsComponent } from './gallery-view-controls.component';
 import { GalleryCriteriaComponent } from './gallery-criteria.component';
+import { galleryFilterChips } from './gallery-filter-chips';
+import { AddonRail } from '../../core/addons/addon-rail';
+import { PanelRailComponent } from '../../shared/components/panel-rail/panel-rail.component';
 import { StackActionsService } from './stack-actions.service';
 import { STACK_EDITOR_HISTORY } from './stack-editor-history';
 import {
@@ -138,7 +141,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
     PhotoTooltipComponent,
     SlideshowComponent,
     GalleryFilterSidebarComponent,
-    GalleryViewControlsComponent, GalleryCriteriaComponent,
+    GalleryViewControlsComponent, GalleryCriteriaComponent, PanelRailComponent,
     PhotoCardComponent,
     GalleryPhotoMenuComponent,
     PhotoSkeletonComponent,
@@ -225,7 +228,10 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
     </ng-template>
 
 
-    <div #noticeHost class="relative h-full">
+    <!-- lg and up: the grid area, then the rail and the panel it picks (View here; an add-on's panel is the
+         shell's dock to the right, never moved). No panel by default, so the grid keeps the width. -->
+    <div class="flex h-full min-h-0">
+    <div #noticeHost class="relative h-full min-w-0 flex-1">
     <mat-sidenav-container class="h-full !overflow-clip">
       <!-- One end drawer, two occupants. Material allows a single drawer per
            side, which is also the behaviour we want: the details rail and the
@@ -295,6 +301,10 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
               {{ (pinned() ? store.total() : store.photoTotal()) | pluralKey:I18N.gallery.photo_count_one:I18N.gallery.photo_count | translate:{ count: pinned() ? store.total() : store.photoTotal() } }}
             }
           </p>
+          @if (lgDesktop.isDesktop() && activeFilterCount()) {
+            <button type="button" data-collection-filter-summary class="m-0 cursor-pointer p-0 text-left text-xs leading-5 tabular-nums text-[var(--mat-sys-primary)] underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-[var(--mat-sys-primary)]"
+              [attr.aria-expanded]="viewPanelOpen()" aria-controls="gallery-panel-view" (click)="rail.select('view')">{{ activeFilterCount() | pluralKey:I18N.gallery.rail.filters_one:I18N.gallery.rail.filters | translate:{ count: activeFilterCount() } }}</button>
+          }
           </div>
           <div data-collection-query role="search" [attr.aria-label]="I18N.gallery.search_placeholder | translate" class="order-last flex w-full min-w-0 flex-wrap items-center gap-1 @min-[960px]:order-none @min-[960px]:w-auto @min-[960px]:min-w-44 @min-[1120px]:min-w-56 @min-[960px]:flex-1 @min-[1280px]:max-w-[32rem] @min-[1600px]:max-w-[40rem] @min-[480px]:@max-[639px]:col-start-1 @min-[480px]:@max-[639px]:row-start-2" [class.!hidden]="compactCollectionControls() && !mediumCollectionControls() && !mobileSearchOpen() && !store.filters().search">
             <ng-container [ngTemplateOutlet]="galleryToolbar" />
@@ -338,17 +348,18 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
               <ng-container [ngTemplateOutlet]="collectionSettings.displayLayoutSettings()" />
               <ng-container [ngTemplateOutlet]="collectionStackControls" />
               <ng-container [ngTemplateOutlet]="collectionSettings.displaySettings()" />
-              <ng-container [ngTemplateOutlet]="collectionCriteria.shortcuts()" />
+              <ng-container [ngTemplateOutlet]="criteria()?.shortcuts() ?? null" />
             </ng-template>
           </div>
           </div>
         </header>
-        <!-- The criteria row is the header's second half but not its sticky one: it can grow to several
-             wrapped rows, which below lg would bury the grid under the pinned chrome. It carries the
-             marker too, so the focus guards that treat the header as part of the gallery see it. -->
-        <app-gallery-criteria #collectionCriteria data-collection-header [portShortcuts]="true" [consolidatedSettings]="true" [searchPresented]="true"
-            [style.top.px]="collectionBarHeight()"
-            class="block min-w-0 border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] px-2 md:px-4 lg:sticky lg:z-40 has-[>:not(:empty)]:border-b has-[>:not(:empty)]:pb-1" />
+        <!-- Below lg the criteria row stays under the header (not sticky: it can grow to several wrapped rows,
+             which would bury the grid under the pinned chrome); from lg it is the rail's View panel. It carries
+             the marker too, so the focus guards that treat the header as part of the gallery see it. -->
+        @if (!lgDesktop.isDesktop()) {
+          <app-gallery-criteria data-collection-header [portShortcuts]="true" [consolidatedSettings]="true" [searchPresented]="true"
+              class="block min-w-0 border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] px-2 md:px-4 has-[>:not(:empty)]:border-b has-[>:not(:empty)]:pb-1" />
+        }
 
         <!-- Set-scope chip: the photo-detail "open this set in the gallery" action.
              Never reflected in the URL (sequence_group_id is renumbered on every
@@ -976,6 +987,16 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
         </div>
       }
     </div>
+    @if (lgDesktop.isDesktop()) {
+      <app-panel-rail data-gallery-rail [rail]="rail" [tabs]="railTabs" [label]="I18N.gallery.rail.label | translate" idPrefix="gallery" />
+      <aside id="gallery-panel-view" data-gallery-panel="view" role="tabpanel" aria-labelledby="gallery-rail-view" [hidden]="!viewPanelOpen()"
+        class="w-80 shrink-0 overflow-y-auto border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] px-4 py-2 text-sm">
+        <h2 class="m-0 py-1 text-sm font-medium">{{ I18N.gallery.rail.view | translate }}</h2>
+        <!-- What the criteria row showed over the grid: the album and its rules, the active filters, people, similarity. -->
+        <app-gallery-criteria data-collection-header [portShortcuts]="true" [consolidatedSettings]="true" [searchPresented]="true" class="block min-w-0" />
+      </aside>
+    }
+    </div>
 
     <!-- Scroll-to-top button: rides on top of the notice stack while one is up, so the two never share the corner -->
     <ng-template #scrollTopFab let-fabClass>
@@ -1122,7 +1143,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
   private readonly pageHelp = inject(PageHelpService);
   private readonly viewControls = viewChild(GalleryViewControlsComponent);
   private readonly collectionPopovers = viewChildren(ControlPopoverComponent);
-  private readonly criteria = viewChild(GalleryCriteriaComponent);
+  protected readonly criteria = viewChild(GalleryCriteriaComponent);
   private readonly liveAnnouncer = inject(LiveAnnouncer);
   private reviewCloseFocus: (() => void) | null = null;
   private reviewGeneration = 0;
@@ -1170,14 +1191,19 @@ export class GalleryComponent implements OnInit, OnDestroy {
 
   private resizeObserver: ResizeObserver | null = null;
   private readonly collectionHeader = viewChild<ElementRef<HTMLElement>>('collectionHeader');
-  private readonly collectionCriteria = viewChild('collectionCriteria', { read: ElementRef<HTMLElement> });
-  private criteriaObserver: ResizeObserver | null = null;
-  /** The sticky bar row alone: also where the criteria row pins itself below. */
+  /** The sticky bar row: what sticks over the top of the scrolling content, and so the scroll padding. */
   protected readonly collectionBarHeight = signal(0);
-  protected readonly collectionCriteriaHeight = signal(0);
-  /** What sticks over the top of the scrolling content, and so the scroll padding: the bar below lg, bar and criteria from lg. */
-  protected readonly collectionHeaderHeight = computed(() =>
-    this.collectionBarHeight() + (this.lgDesktop.isDesktop() ? this.collectionCriteriaHeight() : 0));
+  protected readonly collectionHeaderHeight = this.collectionBarHeight.asReadonly();
+  /** The right rail (lg and up): View, or an add-on's panel; none by default so the grid keeps the width. */
+  protected readonly rail: AddonRail<'view'> = new AddonRail<'view'>({ storageKey: 'facet_gallery_rail_tab', tabs: ['view'], defaultTab: null });
+  protected readonly railTabs = [{ id: 'view', icon: 'filter_alt', label: I18N.gallery.rail.view }] as const;
+  protected readonly viewPanelOpen = computed(() => this.rail.tab() === 'view');
+  /** The active filters the View panel lists, counted for the slim summary on the count line. */
+  protected readonly activeFilterCount = computed(() => {
+    if (this.pinned()) return 0;
+    this.i18n.translations();
+    return galleryFilterChips(this.store, key => this.i18n.t(key)).length;
+  });
   private readonly scrollDirective = viewChild(InfiniteScrollDirective);
   private readonly filterSidebar = viewChild(GalleryFilterSidebarComponent);
   private readonly filterDrawer = viewChild<MatSidenav>('filterDrawer');
@@ -2028,6 +2054,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
     this.outlet?.detachEvents.pipe(takeUntilDestroyed()).subscribe(component => {
       if (component !== this) return;
       this.parked = true;
+      this.rail.release();
       this.store.parkListingReads();
       this.disarmNoticeCollapse();
       // Pending filter edits would otherwise replace the photo URL.
@@ -2050,6 +2077,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
     this.outlet?.attachEvents.pipe(takeUntilDestroyed()).subscribe(component => {
       if (component !== this) return;
       this.parked = false;
+      this.rail.resume();
       this.resumeInitialization?.();
       if (!this.awaitingInitialScope) void this.store.resumeListingReads();
       // Returning from a photo restarts the notice countdown: the reviewer is
@@ -2378,7 +2406,6 @@ export class GalleryComponent implements OnInit, OnDestroy {
     this.setGalleryChrome(false);
     this.saveViewSnapshot();
     this.resizeObserver?.disconnect();
-    this.criteriaObserver?.disconnect();
     this.desktop.cleanup();
     this.railWide.cleanup();
     this.lgDesktop.cleanup();
@@ -3169,12 +3196,6 @@ export class GalleryComponent implements OnInit, OnDestroy {
       if (Number.isFinite(rem) && rem > 0) this.rootFontSize.set(rem);
     };
     measureListRow();
-    // Created first: a second observer would otherwise be the last constructed, and tests (and any
-    // reader) take the last callback for the one that measures the content width.
-    this.criteriaObserver = new ResizeObserver(entries => {
-      if (this.parked) return;
-      for (const entry of entries) this.collectionCriteriaHeight.set(entry.target.getBoundingClientRect().height);
-    });
     this.resizeObserver = new ResizeObserver(entries => {
       // A parked gallery measures 0; keep its layout for the return.
       if (this.parked) return;
@@ -3201,11 +3222,6 @@ export class GalleryComponent implements OnInit, OnDestroy {
     if (header) {
       this.collectionBarHeight.set(header.getBoundingClientRect().height);
       this.resizeObserver.observe(header);
-    }
-    const criteria = this.collectionCriteria()?.nativeElement;
-    if (criteria) {
-      this.collectionCriteriaHeight.set(criteria.getBoundingClientRect().height);
-      this.criteriaObserver.observe(criteria);
     }
   }
 

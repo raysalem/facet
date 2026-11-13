@@ -1768,6 +1768,12 @@
       "tooltip_mode": "Wie sich die Details eines Fotos öffnen: beim Überfahren, per Klick, in der Seitenleiste oder gar nicht",
       "tile_fit": "Schneidet Miniaturbilder quadratisch zu oder zeigt jedes Foto im Originalformat",
       "reset_display": "Stellt Standardlayout, Miniaturbildgröße und Fotodetails wieder her. Filter, Sortierung und Auswahl bleiben erhalten."
+    },
+    "rail": {
+      "label": "Galeriebereiche",
+      "view": "Ansicht und Filter",
+      "filters_one": "{count} Filter",
+      "filters": "{count} Filter"
     }
   },
   "composition_patterns": {

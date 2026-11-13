@@ -1808,6 +1808,12 @@ export const I18N = {
       tile_fit: "gallery.display_tips.tile_fit",
       reset_display: "gallery.display_tips.reset_display",
     },
+    rail: {
+      label: "gallery.rail.label",
+      view: "gallery.rail.view",
+      filters_one: "gallery.rail.filters_one",
+      filters: "gallery.rail.filters",
+    },
   },
   composition_patterns: {
     none: "composition_patterns.none",

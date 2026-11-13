@@ -1768,6 +1768,12 @@
       "tooltip_mode": "Comment s’ouvrent les détails d’une photo : au survol, au clic, dans le panneau latéral, ou jamais",
       "tile_fit": "Recadre les vignettes en carré, ou montre chaque photo dans son ratio d’origine",
       "reset_display": "Rétablit la disposition, la taille des vignettes et les détails des photos par défaut. Les filtres, le tri et la sélection restent inchangés."
+    },
+    "rail": {
+      "label": "Panneaux de la galerie",
+      "view": "Vue et filtres",
+      "filters_one": "{count} filtre",
+      "filters": "{count} filtres"
     }
   },
   "composition_patterns": {

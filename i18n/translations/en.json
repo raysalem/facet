@@ -1793,6 +1793,12 @@
       "tooltip_mode": "How a photo's details open: on hover, on click, in the side panel, or not at all",
       "tile_fit": "Crop thumbnails to squares, or show each photo in its original aspect ratio",
       "reset_display": "Restore the default layout, thumbnail size and photo details. Filters, sort and selection stay as they are."
+    },
+    "rail": {
+      "label": "Gallery panels",
+      "view": "View and filters",
+      "filters_one": "{count} filter",
+      "filters": "{count} filters"
     }
   },
   "composition_patterns": {

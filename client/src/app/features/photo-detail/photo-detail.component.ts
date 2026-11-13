@@ -66,6 +66,7 @@ import { isPageShortcutBlocked } from '../../shared/utils/keyboard';
 import { privateImageSessionKey } from '../../shared/utils/private-image-session';
 import { KeyboardMappingService } from '../../core/services/keyboard-mapping.service';
 import { AddonRail } from '../../core/addons/addon-rail';
+import { PanelRailComponent } from '../../shared/components/panel-rail/panel-rail.component';
 import { galleryFilterChips } from '../gallery/gallery-filter-chips';
 import { PanelWidth } from '../../shared/utils/panel-width';
 import type { CategoryOverrideResult } from './category-override-dialog.component';
@@ -115,7 +116,7 @@ function inDetectedSet(photo: Photo): boolean {
 @Component({
   selector: 'app-photo-detail',
   imports: [ControlPopoverComponent, PhotoCollectionSidebarComponent, ContextHelpComponent, PhotoProvenanceComponent, PhotoRelatedFilesComponent,
-    StackNavigatorComponent, NgTemplateOutlet,
+    StackNavigatorComponent, NgTemplateOutlet, PanelRailComponent,
     ZoomPanDirective,
     PhotoObjectLayerComponent,
     PhotoAnnotationLayerComponent,
@@ -394,32 +395,7 @@ function inDetectedSet(photo: Photo): boolean {
 
         <!-- The rail picks one panel: Content, Ranking, View, or an add-on. An add-on's frame stays in the shell's
              dock at the far right (moving a frame reloads it), so the panel slot is always the far-right column. -->
-        <!-- The keys bubble here from the tabs, which are the focusable elements. -->
-        <!-- eslint-disable-next-line @angular-eslint/template/interactive-supports-focus -->
-        <div data-photo-rail role="tablist" [attr.aria-label]="I18N.photo_detail.rail.label | translate" (keydown)="rail.key($event)"
-          class="flex shrink-0 items-center gap-1 border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-1 max-lg:border-y lg:w-11 lg:flex-col lg:border-l">
-          @for (tab of facetRailTabs; track tab.id) {
-            <button type="button" role="tab" [id]="'photo-rail-' + tab.id" [attr.aria-controls]="'photo-panel-' + tab.id" [attr.data-rail-tab]="tab.id"
-              [attr.aria-selected]="rail.tab() === tab.id" [attr.tabindex]="rail.tab() === tab.id ? 0 : -1"
-              [matTooltip]="tab.label | translate" matTooltipPosition="left" [attr.aria-label]="tab.label | translate" (click)="rail.select(tab.id)"
-              class="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-[var(--mat-sys-on-surface-variant)] hover:bg-[var(--mat-sys-surface-container-high)] focus-visible:outline-2 focus-visible:outline-[var(--mat-sys-primary)] max-sm:h-11 max-sm:w-11 pointer-coarse:h-11 pointer-coarse:w-11"
-              [class.!bg-[var(--mat-sys-secondary-container)]]="rail.tab() === tab.id" [class.!text-[var(--mat-sys-on-secondary-container)]]="rail.tab() === tab.id">
-              <mat-icon aria-hidden="true">{{ tab.icon }}</mat-icon>
-            </button>
-          }
-          @if (rail.addons().length) {
-            <span aria-hidden="true" class="shrink-0 bg-[var(--mat-sys-outline-variant)] max-lg:mx-1 max-lg:h-6 max-lg:w-px lg:my-1 lg:h-px lg:w-6"></span>
-            @for (addon of rail.addons(); track addon.id) {
-              <button type="button" role="tab" [attr.data-rail-addon]="addon.id"
-                [attr.aria-selected]="rail.tab() === 'addon:' + addon.id" [attr.tabindex]="rail.tab() === 'addon:' + addon.id ? 0 : -1"
-                [matTooltip]="addon.name" matTooltipPosition="left" [attr.aria-label]="addon.name" (click)="rail.selectAddon(addon)"
-                class="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-[var(--mat-sys-on-surface-variant)] hover:bg-[var(--mat-sys-surface-container-high)] focus-visible:outline-2 focus-visible:outline-[var(--mat-sys-primary)] max-sm:h-11 max-sm:w-11 pointer-coarse:h-11 pointer-coarse:w-11"
-                [class.!bg-[var(--mat-sys-secondary-container)]]="rail.tab() === 'addon:' + addon.id" [class.!text-[var(--mat-sys-on-secondary-container)]]="rail.tab() === 'addon:' + addon.id">
-                <mat-icon aria-hidden="true">{{ addon.icon }}</mat-icon>
-              </button>
-            }
-          }
-        </div>
+        <app-panel-rail data-photo-rail [rail]="rail" [tabs]="facetRailTabs" [label]="I18N.photo_detail.rail.label | translate" idPrefix="photo" />
 
         <!-- Drag or arrow-key the panel's left edge to trade image room for detail (lg+, remembered). -->
         <div role="separator" tabindex="0" aria-orientation="vertical" data-inspector-resize [attr.aria-label]="I18N.photo_detail.inspector_resize | translate"
