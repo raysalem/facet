@@ -44,7 +44,7 @@ let PhotoDetailComponent: typeof import('./photo-detail.component').PhotoDetailC
 describe('PhotoDetailComponent', () => {
   // The open metric tab is remembered across tests otherwise.
   afterEach(() => {
-    localStorage.removeItem('facet_photo_detail_tab');
+    for (const key of ['facet_photo_detail_tab', 'facet_photo_detail_tab_grade', 'facet_photo_detail_tab_camera']) localStorage.removeItem(key);
     localStorage.removeItem('facet_photo_rail_tab');
     history.replaceState(null, '', location.href);
   });
@@ -367,41 +367,47 @@ describe('PhotoDetailComponent', () => {
       return { view, root, panel, tab };
     }
 
-    it('starts on Content, shows one panel at a time and remembers the pick', async () => {
-      const { view, panel, tab } = await render();
-      expect(tab('content').getAttribute('aria-selected')).toBe('true');
-      expect(tab('content').getAttribute('tabindex')).toBe('0');
-      expect(tab('ranking').getAttribute('tabindex')).toBe('-1');
-      expect(tab('ranking').getAttribute('aria-label')).toBe('photo_detail.rail.ranking');
-      expect([panel('content').hidden, panel('ranking').hidden, panel('view').hidden]).toEqual([false, true, true]);
-      expect(panel('content').getAttribute('aria-labelledby')).toBe(tab('content').id);
-      expect(panel('ranking').querySelector('[data-photo-review]')).not.toBeNull();
+    it('starts on Grade, shows one panel at a time and remembers the pick', async () => {
+      const { view, root, panel, tab } = await render();
+      expect([...root.querySelectorAll('[data-rail-tab]')].map(button => button.getAttribute('data-rail-tab'))).toEqual(['grade', 'camera', 'content', 'view']);
+      expect(tab('grade').getAttribute('aria-selected')).toBe('true');
+      expect(tab('grade').getAttribute('tabindex')).toBe('0');
+      expect(tab('camera').getAttribute('tabindex')).toBe('-1');
+      expect(tab('camera').getAttribute('aria-label')).toBe('photo_detail.rail.camera');
+      expect([panel('grade').hidden, panel('camera').hidden, panel('content').hidden, panel('view').hidden]).toEqual([false, true, true, true]);
+      expect(panel('grade').getAttribute('aria-labelledby')).toBe(tab('grade').id);
+      expect(panel('grade').querySelector('[data-photo-review]')).not.toBeNull();
       expect(panel('content').querySelector('[data-photo-when]')).not.toBeNull();
-      tab('ranking').click(); view.detectChanges(); TestBed.flushEffects();
-      expect([panel('content').hidden, panel('ranking').hidden]).toEqual([true, false]);
-      expect(localStorage.getItem('facet_photo_rail_tab')).toBe('ranking');
+      tab('camera').click(); view.detectChanges(); TestBed.flushEffects();
+      expect([panel('grade').hidden, panel('camera').hidden]).toEqual([true, false]);
+      expect(localStorage.getItem('facet_photo_rail_tab')).toBe('camera');
       view.destroy();
       TestBed.resetTestingModule();
       const again = await render();
-      expect(again.tab('ranking').getAttribute('aria-selected')).toBe('true');
+      expect(again.tab('camera').getAttribute('aria-selected')).toBe('true');
+      // A value the rail no longer has (an older build's 'ranking') opens the default, no alias.
+      again.view.destroy();
+      TestBed.resetTestingModule();
+      localStorage.setItem('facet_photo_rail_tab', 'ranking');
+      expect((await render()).tab('grade').getAttribute('aria-selected')).toBe('true');
     });
 
     it('moves focus along the rail with the arrow keys, keeping them from the photo navigation', async () => {
       const { root, tab } = await render();
       document.body.appendChild(root);
       try {
-        tab('content').focus();
+        tab('grade').focus();
         const event = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true });
         const outside = vi.fn(); document.addEventListener('keydown', outside);
-        tab('content').dispatchEvent(event);
+        tab('grade').dispatchEvent(event);
         document.removeEventListener('keydown', outside);
-        expect(document.activeElement).toBe(tab('ranking'));
+        expect(document.activeElement).toBe(tab('camera'));
         expect(event.defaultPrevented).toBe(true);
         expect(outside).not.toHaveBeenCalled();
-        tab('ranking').dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true }));
+        tab('camera').dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true }));
         expect(document.activeElement).toBe(tab('view'));
-        // Moving focus does not pick: Content is still shown.
-        expect(tab('content').getAttribute('aria-selected')).toBe('true');
+        // Moving focus does not pick: Grade is still shown.
+        expect(tab('grade').getAttribute('aria-selected')).toBe('true');
       } finally { root.remove(); }
     });
 
@@ -487,6 +493,7 @@ describe('PhotoDetailComponent', () => {
 
   describe('location section', () => {
     const KEY = 'facet_photo_location_open';
+    beforeEach(() => localStorage.setItem('facet_photo_rail_tab', 'content'));
     afterEach(() => localStorage.removeItem(KEY));
     const settleTimers = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 
@@ -885,7 +892,7 @@ describe('PhotoDetailComponent', () => {
   });
 
   it('lays the inspector out like the gallery rail: untitled Review, then the metric tabs, no accordions', async () => {
-    localStorage.setItem('facet_photo_detail_tab', 'technical');
+    localStorage.setItem('facet_photo_detail_tab_camera', 'technical');
     const view = renderDetail();
     const photo = makePhoto({ camera_model: 'X100V', iso: 200, persons: [{ id: 1, name: 'Alice' }], unassigned_faces: 2 });
     mockApi.get.mockImplementation((url: string) => of(url === '/photo' ? photo : {}));
@@ -904,11 +911,17 @@ describe('PhotoDetailComponent', () => {
     expect(row.querySelector('[role="group"][aria-label="photo_detail.rating"]')).not.toBeNull();
     expect(row.querySelector(':scope > button[aria-label="rating.favorite"]')).not.toBeNull();
     expect(row.querySelector('[role="group"] button[aria-label="rating.favorite"]')).toBeNull();
-    const tabs = aside.querySelector<HTMLElement>('app-photo-metrics-tabs')!;
+    const tabs = aside.querySelector<HTMLElement>('[data-photo-panel="grade"] app-photo-metrics-tabs')!;
     expect(tabs).not.toBeNull();
     expect(review.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(tabs.querySelectorAll('[role="tab"]')).toHaveLength(5);
-    expect(tabs.querySelector('[role="tab"][aria-selected="true"]')?.getAttribute('aria-label')).toBe('photo_detail.technical');
+    expect([...tabs.querySelectorAll('[role="tab"]')].map(tab => tab.getAttribute('aria-label'))).toEqual(['photo_detail.quality', 'photo_detail.composition']);
+    expect(tabs.querySelector('app-photo-assessment')).not.toBeNull();
+    const camera = aside.querySelector<HTMLElement>('[data-photo-panel="camera"] app-photo-metrics-tabs')!;
+    expect([...camera.querySelectorAll('[role="tab"]')].map(tab => tab.getAttribute('aria-label'))).toEqual(['photo_detail.exif', 'photo_detail.technical', 'tooltip.histogram']);
+    expect(camera.querySelector('app-photo-assessment')).toBeNull();
+    // Each panel remembers its own sub-tab.
+    expect(camera.querySelector('[role="tab"][aria-selected="true"]')?.getAttribute('aria-label')).toBe('photo_detail.technical');
+    expect(tabs.querySelector('[role="tab"][aria-selected="true"]')?.getAttribute('aria-label')).toBe('photo_detail.quality');
     const people = aside.querySelector<HTMLElement>('[data-photo-people]')!;
     expect(people.tagName).toBe('SECTION');
     expect(people.textContent).toContain('Alice');
@@ -950,7 +963,8 @@ describe('PhotoDetailComponent', () => {
       }
     };
     inOrder('content', ['[data-photo-when]', '[data-photo-describe]', '[data-photo-location]', '[data-file-details]']);
-    inOrder('ranking', ['[data-photo-review]', 'app-photo-metrics-tabs', '[data-photo-set]']);
+    inOrder('grade', ['[data-photo-review]', 'app-photo-metrics-tabs', '[data-photo-set]']);
+    inOrder('camera', ['[data-photo-capture]', 'app-photo-metrics-tabs']);
     const describe = aside.querySelector<HTMLElement>('[data-photo-describe]')!;
     expect(aside.querySelector('[data-photo-describe] [data-photo-location]')).toBeNull();
     const fields = ['[data-photo-caption]', '[data-testid="tags-section"]', '[data-photo-people]']
@@ -961,10 +975,12 @@ describe('PhotoDetailComponent', () => {
     }
     expect(aside.querySelector('[data-photo-review]')!.className).toContain('lg:sticky');
     expect(aside.querySelector('[data-photo-set-strip]')!.className).toContain('lg:grid-cols-5');
-    // Date and category share one line; the capture settings sit under it, always visible.
+    // Date and category share one line in Content; the capture settings show once, in Camera.
     const when = aside.querySelector<HTMLElement>('[data-photo-when]')!;
     expect(when.querySelector('[data-photo-date]')!.parentElement).toBe(when.querySelector('[data-photo-category]')!.parentElement);
-    const exposure = when.querySelector<HTMLElement>('[data-photo-exposure]')!;
+    expect(when.querySelector('[data-photo-exposure]')).toBeNull();
+    expect(aside.querySelectorAll('[data-photo-exposure]')).toHaveLength(1);
+    const exposure = aside.querySelector<HTMLElement>('[data-photo-panel="camera"] [data-photo-exposure]')!;
     // The image's pixel size closes the capture line; no readout bar under the image carries it any more.
     // Each item carries the "·" before it inside a clipped row, so a wrapped line never opens with one; W × H keeps its ?.
     expect(exposure.classList).toContain('overflow-x-clip');
@@ -1003,6 +1019,7 @@ describe('PhotoDetailComponent', () => {
 
   it('recreates the location map on a visible container after changing GPS photos', async () => {
     localStorage.setItem('facet_photo_location_open', 'true');
+    localStorage.setItem('facet_photo_rail_tab', 'content');
     const view = renderDetail();
     let photo = makePhoto({ gps_latitude: 1, gps_longitude: 2 });
     mockApi.get.mockImplementation((url: string) => of(url === '/photo' ? photo : {}));

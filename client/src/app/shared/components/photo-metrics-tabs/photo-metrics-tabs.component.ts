@@ -7,7 +7,7 @@ import { Photo, hasExifFields } from '../../models/photo.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { FEATURE_MARK, MarkTonePipe } from '../../pipes/mark-tone.pipe';
 import { HistogramSurface } from '../../../core/services/histogram-preferences.service';
-import { METRICS_TABS, MetricsTab, MetricsTabState } from '../../../core/services/metrics-tab-state.service';
+import { METRICS_TABS, MetricsPanel, MetricsTab, MetricsTabState } from '../../../core/services/metrics-tab-state.service';
 import { HistogramMode } from '../../utils/histogram';
 import { MetricDistribution } from '../../utils/metric-distribution';
 import { PhotoAssessmentComponent } from '../photo-assessment/photo-assessment.component';
@@ -32,30 +32,38 @@ import { PhotoAssessmentComponent } from '../photo-assessment/photo-assessment.c
   host: { class: 'block' },
   template: `
     @let p = photo();
-    <app-photo-assessment [photo]="p" [range]="ranges()['aggregate']" [explainable]="explainable()" (explain)="explain.emit()" />
+    @if (assessment()) { <app-photo-assessment [photo]="p" [range]="ranges()['aggregate']" [explainable]="explainable()" (explain)="explain.emit()" /> }
     <!-- One group per tab set: when the EXIF tab comes or goes under an unchanged
          index, a kept group reselects whichever tab was active instead of the remembered one. -->
-    @for (withExif of [hasExif()]; track withExif) {
+    @for (tabSet of [metricsTabsKey()]; track tabSet) {
       <mat-tab-group class="min-w-0 [&_.mdc-tab]:!min-w-0 [&_.mdc-tab]:!px-2 [&_.mdc-tab--active_mat-icon]:!text-[var(--mat-sys-primary)]" mat-stretch-tabs="true"
                      animationDuration="0ms" [selectedIndex]="metricsTabIndex()" (selectedIndexChange)="selectMetricsTab($event)">
       <!-- EXIF section -->
-      @if (hasExif()) {
+      @if (shown().exif) {
         <mat-tab [aria-label]="'photo_detail.exif' | translate">
           <ng-template mat-tab-label><mat-icon aria-hidden="true" [matTooltip]="'photo_detail.exif' | translate">photo_camera</mat-icon></ng-template><app-photo-metric-section kind="exif" [photo]="p" [populated]="populated()" [histogramSrcSize]="histogramSrcSize()" [histogramHeight]="histogramHeight()" [histogramSurface]="histogramSurface()" [histogramDefaultMode]="histogramDefaultMode()" [indicatorPercent]="indicatorPercent()" /></mat-tab>
       }
 
-      <mat-tab [aria-label]="'photo_detail.quality' | translate">
-        <ng-template mat-tab-label><span aria-hidden="true" class="text-xl" [class]="'quality' | markTone" [matTooltip]="'photo_detail.quality' | translate">{{ featureMark }}</span></ng-template><app-photo-metric-section kind="quality" [photo]="p" [populated]="populated()" [histogramSrcSize]="histogramSrcSize()" [histogramHeight]="histogramHeight()" [histogramSurface]="histogramSurface()" [histogramDefaultMode]="histogramDefaultMode()" [indicatorPercent]="indicatorPercent()" /></mat-tab>
+      @if (shown().quality) {
+        <mat-tab [aria-label]="'photo_detail.quality' | translate">
+          <ng-template mat-tab-label><span aria-hidden="true" class="text-xl" [class]="'quality' | markTone" [matTooltip]="'photo_detail.quality' | translate">{{ featureMark }}</span></ng-template><app-photo-metric-section kind="quality" [photo]="p" [populated]="populated()" [histogramSrcSize]="histogramSrcSize()" [histogramHeight]="histogramHeight()" [histogramSurface]="histogramSurface()" [histogramDefaultMode]="histogramDefaultMode()" [indicatorPercent]="indicatorPercent()" /></mat-tab>
+      }
 
       <!-- Composition section -->
-      <mat-tab [aria-label]="'photo_detail.composition' | translate">
-        <ng-template mat-tab-label><mat-icon aria-hidden="true" [matTooltip]="'photo_detail.composition' | translate">grid_on</mat-icon></ng-template><app-photo-metric-section kind="composition" [photo]="p" [populated]="populated()" [histogramSrcSize]="histogramSrcSize()" [histogramHeight]="histogramHeight()" [histogramSurface]="histogramSurface()" [histogramDefaultMode]="histogramDefaultMode()" [indicatorPercent]="indicatorPercent()" /></mat-tab>
+      @if (shown().composition) {
+        <mat-tab [aria-label]="'photo_detail.composition' | translate">
+          <ng-template mat-tab-label><mat-icon aria-hidden="true" [matTooltip]="'photo_detail.composition' | translate">grid_on</mat-icon></ng-template><app-photo-metric-section kind="composition" [photo]="p" [populated]="populated()" [histogramSrcSize]="histogramSrcSize()" [histogramHeight]="histogramHeight()" [histogramSurface]="histogramSurface()" [histogramDefaultMode]="histogramDefaultMode()" [indicatorPercent]="indicatorPercent()" /></mat-tab>
+      }
 
       <!-- Technical section -->
-      <mat-tab [aria-label]="'photo_detail.technical' | translate">
-        <ng-template mat-tab-label><mat-icon aria-hidden="true" [matTooltip]="'photo_detail.technical' | translate">tune</mat-icon></ng-template><app-photo-metric-section kind="technical" [photo]="p" [populated]="populated()" [histogramSrcSize]="histogramSrcSize()" [histogramHeight]="histogramHeight()" [histogramSurface]="histogramSurface()" [histogramDefaultMode]="histogramDefaultMode()" [indicatorPercent]="indicatorPercent()" /></mat-tab>
-      <mat-tab [aria-label]="'tooltip.histogram' | translate">
-        <ng-template mat-tab-label><mat-icon aria-hidden="true" [matTooltip]="'tooltip.histogram' | translate">equalizer</mat-icon></ng-template><app-photo-metric-section kind="histogram" [photo]="p" [populated]="populated()" [histogramSrcSize]="histogramSrcSize()" [histogramHeight]="histogramHeight()" [histogramSurface]="histogramSurface()" [histogramDefaultMode]="histogramDefaultMode()" [indicatorPercent]="indicatorPercent()" /></mat-tab>
+      @if (shown().technical) {
+        <mat-tab [aria-label]="'photo_detail.technical' | translate">
+          <ng-template mat-tab-label><mat-icon aria-hidden="true" [matTooltip]="'photo_detail.technical' | translate">tune</mat-icon></ng-template><app-photo-metric-section kind="technical" [photo]="p" [populated]="populated()" [histogramSrcSize]="histogramSrcSize()" [histogramHeight]="histogramHeight()" [histogramSurface]="histogramSurface()" [histogramDefaultMode]="histogramDefaultMode()" [indicatorPercent]="indicatorPercent()" /></mat-tab>
+      }
+      @if (shown().histogram) {
+        <mat-tab [aria-label]="'tooltip.histogram' | translate">
+          <ng-template mat-tab-label><mat-icon aria-hidden="true" [matTooltip]="'tooltip.histogram' | translate">equalizer</mat-icon></ng-template><app-photo-metric-section kind="histogram" [photo]="p" [populated]="populated()" [histogramSrcSize]="histogramSrcSize()" [histogramHeight]="histogramHeight()" [histogramSurface]="histogramSurface()" [histogramDefaultMode]="histogramDefaultMode()" [indicatorPercent]="indicatorPercent()" /></mat-tab>
+      }
       </mat-tab-group>
     }
   `,
@@ -78,6 +86,12 @@ export class PhotoMetricsTabsComponent {
   readonly explain = output<void>();
 
   protected readonly hasExif = computed(() => hasExifFields(this.photo()));
+  /** Which tabs this instance offers, in order (the photo page splits them over Grade and Camera). */
+  readonly sections = input<readonly MetricsTab[]>(METRICS_TABS);
+  /** The AI score line above the tabs. */
+  readonly assessment = input(true);
+  /** Which remembered tab this instance follows. */
+  readonly panel = input<MetricsPanel>('');
 
   /**
    * The open tab, by name rather than index: a photo without EXIF has one tab
@@ -85,15 +99,21 @@ export class PhotoMetricsTabsComponent {
    */
   private readonly tabState = inject(MetricsTabState);
   private readonly metricsTabs = computed<MetricsTab[]>(() =>
-    this.hasExif() ? [...METRICS_TABS] : METRICS_TABS.filter(tab => tab !== 'exif'));
-  protected readonly metricsTabIndex = computed(() => Math.max(0, this.metricsTabs().indexOf(this.tabState.tab())));
+    METRICS_TABS.filter(tab => this.sections().includes(tab) && (tab !== 'exif' || this.hasExif())));
+  protected readonly metricsTabsKey = computed(() => this.metricsTabs().join());
+  protected readonly shown = computed(() => {
+    const tabs = this.metricsTabs();
+    return Object.fromEntries(METRICS_TABS.map(tab => [tab, tabs.includes(tab)])) as Record<MetricsTab, boolean>;
+  });
+  private readonly selectedTab = computed(() => this.tabState.tabFor(this.panel())());
+  protected readonly metricsTabIndex = computed(() => Math.max(0, this.metricsTabs().indexOf(this.selectedTab())));
 
   protected selectMetricsTab(index: number): void {
     const tabs = this.metricsTabs();
     // The group echoes back the index a missing remembered tab (EXIF, on a photo
     // without any) was clamped to; that is not the user's choice, so keep it.
-    if (!tabs.includes(this.tabState.tab()) && index === this.metricsTabIndex()) return;
+    if (!tabs.includes(this.selectedTab()) && index === this.metricsTabIndex()) return;
     const tab = tabs[index];
-    if (tab) this.tabState.select(tab);
+    if (tab) this.tabState.select(tab, this.panel());
   }
 }

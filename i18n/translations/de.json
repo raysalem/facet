@@ -3429,8 +3429,9 @@
     "details": "Fotodetails",
     "rail": {
       "label": "Fotobereiche",
+      "grade": "Bewertung",
+      "camera": "Kamera",
       "content": "Inhalt",
-      "ranking": "Bewertung",
       "view": "Ansicht"
     },
     "view": {

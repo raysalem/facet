@@ -1,31 +1,52 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, WritableSignal, signal } from '@angular/core';
 
 const METRICS_TAB_KEY = 'facet_photo_detail_tab';
 export const METRICS_TABS = ['exif', 'quality', 'composition', 'technical', 'histogram'] as const;
 export type MetricsTab = typeof METRICS_TABS[number];
+/**
+ * Which set of metric tabs: '' is the full set (the gallery's details), `grade` and `camera` are the
+ * photo panels' halves (scores to judge by, and how the photo was shot). Each remembers its own tab.
+ */
+export type MetricsPanel = '' | 'grade' | 'camera';
+const PANEL_DEFAULTS: Record<MetricsPanel, MetricsTab> = { '': 'exif', grade: 'quality', camera: 'exif' };
 
-function storedMetricsTab(): MetricsTab {
+function storageKey(panel: MetricsPanel): string {
+  return panel ? `${METRICS_TAB_KEY}_${panel}` : METRICS_TAB_KEY;
+}
+
+function storedMetricsTab(panel: MetricsPanel): MetricsTab {
   try {
-    const stored = localStorage.getItem(METRICS_TAB_KEY);
-    return METRICS_TABS.find(tab => tab === stored) ?? 'exif';
+    const stored = localStorage.getItem(storageKey(panel));
+    return METRICS_TABS.find(tab => tab === stored) ?? PANEL_DEFAULTS[panel];
   } catch {
-    return 'exif';
+    return PANEL_DEFAULTS[panel];
   }
 }
 
 /**
- * The open metric tab, one per app rather than per component: the gallery is
- * kept alive behind photo detail, so a tab chosen there must reach the
- * gallery's panel on Back, not only the next component created.
+ * The open metric tab, one per app (and per panel) rather than per component: the gallery is
+ * kept alive behind photo detail, so a tab chosen there must reach the gallery's panel on Back,
+ * not only the next component created.
  */
 @Injectable({ providedIn: 'root' })
 export class MetricsTabState {
-  readonly tab = signal<MetricsTab>(storedMetricsTab());
+  private readonly tabs = new Map<MetricsPanel, WritableSignal<MetricsTab>>();
+  /** The full set's tab. */
+  readonly tab = this.tabFor('');
 
-  select(tab: MetricsTab): void {
-    this.tab.set(tab);
+  tabFor(panel: MetricsPanel): WritableSignal<MetricsTab> {
+    let tab = this.tabs.get(panel);
+    if (!tab) {
+      tab = signal(storedMetricsTab(panel));
+      this.tabs.set(panel, tab);
+    }
+    return tab;
+  }
+
+  select(tab: MetricsTab, panel: MetricsPanel = ''): void {
+    this.tabFor(panel).set(tab);
     try {
-      localStorage.setItem(METRICS_TAB_KEY, tab);
+      localStorage.setItem(storageKey(panel), tab);
     } catch {
       // Storage blocked: the tab still switches, it is just not remembered.
     }

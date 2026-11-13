@@ -3468,8 +3468,9 @@ export const I18N = {
     details: "photo_detail.details",
     rail: {
       label: "photo_detail.rail.label",
+      grade: "photo_detail.rail.grade",
+      camera: "photo_detail.rail.camera",
       content: "photo_detail.rail.content",
-      ranking: "photo_detail.rail.ranking",
       view: "photo_detail.rail.view",
     },
     view: {

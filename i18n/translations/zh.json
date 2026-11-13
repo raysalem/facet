@@ -3429,8 +3429,9 @@
     "details": "照片详情",
     "rail": {
       "label": "照片面板",
+      "grade": "评分",
+      "camera": "相机",
       "content": "内容",
-      "ranking": "评分",
       "view": "视图"
     },
     "view": {

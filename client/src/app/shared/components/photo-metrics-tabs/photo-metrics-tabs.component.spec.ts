@@ -47,6 +47,30 @@ describe('PhotoMetricsTabsComponent', () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
+  it('offers only the sections of its panel and remembers the tab of that panel apart from the full set', () => {
+    localStorage.setItem(`${TAB_KEY}_camera`, 'histogram');
+    TestBed.configureTestingModule({
+      imports: [PhotoMetricsTabsComponent],
+      providers: [{ provide: I18nService, useValue: { t: (key: string) => key, translations: () => ({}) } }],
+    });
+    fixture = TestBed.createComponent(PhotoMetricsTabsComponent);
+    fixture.componentRef.setInput('photo', makePhoto({ camera_model: 'X100V' }));
+    fixture.componentRef.setInput('histogramHeight', 80);
+    fixture.componentRef.setInput('sections', ['exif', 'technical', 'histogram']);
+    fixture.componentRef.setInput('assessment', false);
+    fixture.componentRef.setInput('panel', 'camera');
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    expect([...root.querySelectorAll('[role="tab"]')].map(tab => tab.getAttribute('aria-label'))).toEqual(['photo_detail.exif', 'photo_detail.technical', 'tooltip.histogram']);
+    expect(root.querySelector('app-photo-assessment')).toBeNull();
+    expect(selectedIndex()).toBe(2);
+    fixture.debugElement.query(By.directive(MatTabGroup)).componentInstance.selectedIndexChange.emit(1);
+    fixture.detectChanges();
+    expect(localStorage.getItem(`${TAB_KEY}_camera`)).toBe('technical');
+    expect(TestBed.inject(MetricsTabState).tab()).toBe('exif');
+    localStorage.removeItem(`${TAB_KEY}_camera`);
+  });
+
   it('opens the EXIF tab when the stored tab is unknown', () => {
     localStorage.setItem(TAB_KEY, 'bogus');
     render(makePhoto({ camera_model: 'X100V' }));

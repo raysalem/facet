@@ -3429,8 +3429,9 @@
     "details": "Detalles de la foto",
     "rail": {
       "label": "Paneles de la foto",
+      "grade": "Valoración",
+      "camera": "Cámara",
       "content": "Contenido",
-      "ranking": "Valoración",
       "view": "Vista"
     },
     "view": {

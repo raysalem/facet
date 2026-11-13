@@ -3454,8 +3454,9 @@
     "details": "Photo details",
     "rail": {
       "label": "Photo panels",
+      "grade": "Grade",
+      "camera": "Camera",
       "content": "Content",
-      "ranking": "Ranking",
       "view": "View"
     },
     "view": {

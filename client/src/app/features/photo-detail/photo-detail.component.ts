@@ -66,6 +66,7 @@ import { isPageShortcutBlocked } from '../../shared/utils/keyboard';
 import { privateImageSessionKey } from '../../shared/utils/private-image-session';
 import { KeyboardMappingService } from '../../core/services/keyboard-mapping.service';
 import { AddonRail } from '../../core/addons/addon-rail';
+import type { MetricsTab } from '../../core/services/metrics-tab-state.service';
 import { PanelRailComponent } from '../../shared/components/panel-rail/panel-rail.component';
 import { galleryFilterChips } from '../gallery/gallery-filter-chips';
 import { PanelWidth } from '../../shared/utils/panel-width';
@@ -87,7 +88,7 @@ interface PhotoTagOrigin {
 const LOCATION_OPEN_KEY = 'facet_photo_location_open';
 /** The key an add-on's objects chip opens under, beside its tag group's own key. */
 const OBJECTS = 'objects:';
-type FacetTab = 'content' | 'ranking' | 'view';
+type FacetTab = 'grade' | 'camera' | 'content' | 'view';
 
 /**
  * Model D fields of `GET /api/photo` (no share token): the summary tags each add-on wrote, and how many
@@ -433,9 +434,135 @@ function inDetectedSet(photo: Photo): boolean {
                 <app-category-explainer [path]="p.path" [targetCategory]="target" />
               }
           </ng-template>
+          <!-- Grade, "do I keep it": the decision first, then the scores that inform it, then the set to compare with. -->
+          <section id="photo-panel-grade" data-photo-panel="grade" role="tabpanel" aria-labelledby="photo-rail-grade" [hidden]="rail.pageTab() !== 'grade'" class="space-y-4">
+            <!-- Account review controls -->
+            @if (canReview()) {
+              <section data-photo-review aria-labelledby="photo-review-title" class="space-y-1 bg-[var(--mat-sys-surface-container-lowest)] lg:sticky lg:-top-4 lg:z-10 lg:-mx-4 lg:-mt-4 lg:px-4 lg:pt-4 lg:pb-2">
+                <h2 id="photo-review-title" class="sr-only">{{ I18N.gallery.sidebar.tabs.review | translate }}</h2>
+                <!-- Like the gallery rail: no title or rule above the review controls, the favourite beside the stars. -->
+                <div data-photo-rating-row class="flex items-center gap-2">
+                  <div role="group" [attr.aria-label]="I18N.photo_detail.rating | translate" class="flex min-w-0 flex-1 flex-nowrap">
+                    @for (star of stars; track star) {
+                      <button type="button" class="min-w-9 max-w-11 flex-1 max-sm:min-w-11 pointer-coarse:min-w-11 min-h-11 rounded inline-flex items-center justify-center hover:bg-[var(--mat-sys-surface-container-high)] cursor-pointer"
+                              [attr.aria-label]="(I18N.rating.set_rating | translate) + ': ' + star" [attr.aria-pressed]="p.star_rating === star" (click)="setRating(p.path, star)">
+                        <mat-icon class="!text-xl !w-5 !h-5 !leading-5 !text-[var(--mat-sys-primary)]">{{ p.star_rating !== null && star <= p.star_rating! ? 'star' : 'star_border' }}</mat-icon>
+                      </button>
+                    }
+                  </div>
+                  <button mat-icon-button class="ml-auto max-sm:!h-11 max-sm:!w-11 pointer-coarse:!h-11 pointer-coarse:!w-11" (click)="toggleFavorite(p.path)"
+                    [matTooltip]="(p.is_favorite ? I18N.rating.remove_favorite : I18N.rating.add_favorite) | translate"
+                    [attr.aria-label]="I18N.rating.favorite | translate" [attr.aria-pressed]="!!p.is_favorite">
+                    <mat-icon class="!text-[var(--facet-favorite)]">{{ p.is_favorite ? 'favorite' : 'favorite_border' }}</mat-icon>
+                  </button>
+                </div>
+                <div data-photo-decisions role="group" [attr.aria-label]="I18N.gallery.sidebar.review.decision | translate" class="flex items-stretch divide-x divide-[var(--mat-sys-outline-variant)] overflow-hidden rounded border border-[var(--mat-sys-outline-variant)]">
+                  @if (canDecide()) {
+                    <button type="button" data-photo-keep class="inline-flex min-h-11 min-w-0 flex-1 cursor-pointer focus-visible:!outline-2 focus-visible:!-outline-offset-4 focus-visible:!outline-current items-center justify-center gap-1 px-1 text-xs hover:bg-[var(--mat-sys-surface-container-high)]" [class.!bg-[var(--facet-review-kept)]]="p.is_kept" [class.!text-[var(--facet-review-on-kept)]]="p.is_kept"
+                      (click)="reviewPhoto(p.is_kept ? 'undecided' : 'kept')" [attr.aria-pressed]="!!p.is_kept">
+                      <mat-icon aria-hidden="true" class="!w-5 !h-5 !text-xl">{{ p.is_kept ? 'flag' : 'outlined_flag' }}</mat-icon>{{ I18N.review.keep | translate }}
+                    </button>
+                    <button type="button" data-photo-undecided class="inline-flex min-h-11 min-w-0 flex-1 cursor-pointer focus-visible:!outline-2 focus-visible:!-outline-offset-4 focus-visible:!outline-current items-center justify-center px-1 text-xs hover:bg-[var(--mat-sys-surface-container-high)]" [class.!bg-[var(--mat-sys-secondary-container)]]="!p.is_kept && !p.is_rejected" [class.!text-[var(--mat-sys-on-secondary-container)]]="!p.is_kept && !p.is_rejected"
+                      (click)="reviewPhoto('undecided')" [attr.aria-pressed]="!p.is_kept && !p.is_rejected">
+                      <span class="min-w-0 break-words hyphens-auto">{{ I18N.gallery.metadata.undecided | translate }}</span>
+                    </button>
+                  }
+                  <button type="button" data-photo-reject class="inline-flex min-h-11 min-w-0 flex-1 cursor-pointer focus-visible:!outline-2 focus-visible:!-outline-offset-4 focus-visible:!outline-current items-center justify-center gap-1 px-1 text-xs hover:bg-[var(--mat-sys-surface-container-high)]" [class.!bg-[var(--mat-sys-error-container)]]="p.is_rejected" [class.!text-[var(--mat-sys-on-error-container)]]="p.is_rejected"
+                    (click)="toggleRejected(p.path)" [attr.aria-pressed]="!!p.is_rejected">
+                    <mat-icon aria-hidden="true" class="!w-5 !h-5 !text-xl">{{ p.is_rejected ? 'thumb_down' : 'thumb_down_off_alt' }}</mat-icon>{{ I18N.gallery.selection.reject | translate }}
+                  </button>
+                </div>
+              </section>
+            }
+
+            <!-- A better shot in its group changes the decision, so it sits with it. -->
+            @if (keeperHint()?.has_better) {
+              <p data-photo-better-shot class="m-0 inline-flex items-center gap-1 px-2 py-0.5 bg-black/60 text-amber-300 rounded-full text-xs font-medium">
+                <mat-icon class="!text-sm !w-4 !h-4 !leading-4" aria-hidden="true">arrow_circle_up</mat-icon>
+                {{ I18N.culling.reason.better_shot | translate }}
+              </p>
+            }
+
+            <!-- The scores to judge by: the AI score line, Quality and Composition. "Why this score?" opens the critique. -->
+            <app-photo-metrics-tabs panel="grade" [sections]="GRADE_METRICS" [photo]="p" [ranges]="store.metricRangesByColumn()"
+                                    [populated]="store.config()?.populated_scores"
+                                    [histogramHeight]="HISTOGRAM_PANEL_HEIGHT"
+                                    [histogramDefaultMode]="histogramDefaultMode()"
+                                    [indicatorPercent]="clippingIndicatorPercent()"
+                                    [explainable]="!!store.config()?.features?.show_critique" (explain)="openCritique(p)" />
+
+            <!-- Set section (bracket/panorama/hdr_panorama/burst/duplicate) -->
+            @if (photoSet(); as set) {
+              @if (set.kind) {
+                <div data-photo-set class="pt-1">
+                  <div class="flex items-center gap-2 flex-wrap mb-2 text-sm">
+                    <mat-icon class="!text-base !w-4 !h-4 !leading-4 opacity-70">{{ set.kind | photoSetKindIcon }}</mat-icon>
+                    <span class="font-medium">{{ set.kind | photoSetKindLabel | translate }}</span>
+                    <span data-set-file-count class="text-xs text-[var(--mat-sys-on-surface-variant)]" [matTooltip]="I18N.photo_detail.set.count_help | translate">{{ (set.count === 1 ? I18N.photo_detail.set.files_count : I18N.photo_detail.set.files_count_plural) | translate:{ count: set.count } }}</span>
+                    @if (setBlinkCount(); as blinks) {
+                      <span class="text-xs text-[var(--mat-sys-on-surface-variant)]">· {{ I18N.gallery.hidden_banner.reason_blinks | translate:{ n: blinks } }}</span>
+                    }
+                    @if (set.ev_span !== null) {
+                      <span class="text-xs text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.set.ev_span | translate }}: {{ set.ev_span | fixed:1 }} EV</span>
+                    }
+                    <button mat-icon-button class="!w-7 !h-7 max-sm:!w-11 max-sm:!h-11 pointer-coarse:!w-11 pointer-coarse:!h-11 !p-0 !inline-flex !items-center !justify-center ml-auto" (click)="openSetInGallery()"
+                            [matTooltip]="I18N.photo_detail.set.open_in_gallery | translate" [attr.aria-label]="I18N.photo_detail.set.open_in_gallery | translate">
+                      <mat-icon class="!text-base !w-4 !h-4 !leading-4">photo_library</mat-icon>
+                    </button>
+                  </div>
+                  <div data-photo-set-strip class="grid grid-cols-[repeat(auto-fill,minmax(4rem,1fr))] gap-2 lg:grid-cols-5">
+                    @for (member of setStripMembers(); track member.path) {
+                      <button class="relative rounded-lg overflow-hidden aspect-square w-full min-w-0 cursor-pointer hover:opacity-80 transition-opacity ring-[var(--mat-sys-primary)]"
+                              [class.ring-2]="member.path === p.path"
+                              [attr.aria-label]="(I18N.photo_detail.set.member_position | translate:{ position: $index + 1, count: set.members.length }) + (member.ev_offset !== null ? ', ' + (member.ev_offset | evOffset) : '') + (member.ai_edit_of ? ', ' + (I18N.photo_detail.ai_edit.badge | translate) : '') + (member.is_blink ? ', ' + (I18N.ui.badges.blink | translate) : '')"
+                              (click)="openSetMember(member.path)">
+                        <img [src]="member.path | thumbnailUrl:96:member.preview_revision" alt="" class="w-full h-full object-cover" />
+                        @if (member.ev_offset !== null) {
+                          <span class="absolute bottom-0 inset-x-0 text-center text-[0.625rem] leading-4 bg-black/60 text-white">{{ member.ev_offset | evOffset }}</span>
+                        } @else if (member.ai_edit_of) {
+                          <span class="absolute bottom-0 inset-x-0 text-center text-[0.625rem] leading-4 font-bold bg-black/70 text-white" data-ai-label>✨ {{ I18N.photo_detail.ai_edit.badge_short | translate }}</span>
+                        }
+                        @if (member.is_blink) {
+                          <span class="absolute top-0 inset-x-0 text-center text-[0.625rem] leading-4 font-bold bg-yellow-600 text-white">{{ I18N.ui.badges.blink | translate }}</span>
+                        }
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+            }
+          </section>
+          <!-- Camera, "how was it shot": the capture line, then EXIF, Technical and the histogram with its clipping. -->
+          <section id="photo-panel-camera" data-photo-panel="camera" role="tabpanel" aria-labelledby="photo-rail-camera" [hidden]="rail.pageTab() !== 'camera'" class="space-y-4">
+            <div data-photo-capture class="text-xs text-[var(--mat-sys-on-surface-variant)]">
+            @if (p.camera_model || p.focal_length || p.f_stop || p.shutter_speed || p.iso || (p.image_width && p.image_height)) {
+              <!-- Each item's "·" sits in the gap before it, so the one that would open a wrapped line is clipped. -->
+              <div data-photo-exposure role="group" [attr.aria-label]="I18N.photo_detail.capture_settings | translate" class="overflow-x-clip">
+                <div class="-ms-3 flex flex-wrap items-center tabular-nums [&>span]:relative [&>span]:ms-3 [&>span]:before:absolute [&>span]:before:-start-2 [&>span]:before:content-['·']">
+                @if (p.camera_model) { <span>{{ p.camera_model }}</span> }
+                @if (p.focal_length) { <span>{{ p.focal_length }}mm</span> }
+                @if (p.f_stop) { <span>f/{{ p.f_stop }}</span> }
+                @if (p.shutter_speed | shutterSpeed; as shutter) { <span>{{ shutter }}</span> }
+                @if (p.iso) { <span>ISO {{ p.iso }}</span> }
+                @if (p.image_width && p.image_height) {
+                  <span class="inline-flex items-center gap-0.5 whitespace-nowrap">
+                    <span data-photo-dimensions>{{ p.image_width }} × {{ p.image_height }}</span>
+                    <app-context-help class="-my-1.5" [label]="I18N.gallery.compare.rendition.sources" [keys]="[I18N.photo_detail.rendition.note]" [iconOnly]="true" />
+                  </span>
+                }
+                </div>
+              </div>
+            }
+            </div>
+            <app-photo-metrics-tabs panel="camera" [sections]="CAMERA_METRICS" [assessment]="false" [photo]="p" [ranges]="store.metricRangesByColumn()"
+                                    [populated]="store.config()?.populated_scores"
+                                    [histogramHeight]="HISTOGRAM_PANEL_HEIGHT"
+                                    [histogramDefaultMode]="histogramDefaultMode()"
+                                    [indicatorPercent]="clippingIndicatorPercent()" />
+          </section>
           <!-- Content: the photo's own facts, most used first; location and file details folded at the bottom. -->
           <section id="photo-panel-content" data-photo-panel="content" role="tabpanel" aria-labelledby="photo-rail-content" [hidden]="rail.pageTab() !== 'content'" class="space-y-4">
-            <!-- Capture date and scoring category on one line, the capture settings under it -->
+            <!-- Capture date and scoring category on one line -->
             <div data-photo-when class="space-y-1 text-xs text-[var(--mat-sys-on-surface-variant)]">
               <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
                 @if (p.date_taken || auth.isEdition()) {
@@ -461,24 +588,6 @@ function inDetectedSet(photo: Photo): boolean {
                   </span>
                 }
               </div>
-              @if (p.camera_model || p.focal_length || p.f_stop || p.shutter_speed || p.iso || (p.image_width && p.image_height)) {
-                <!-- Each item's "·" sits in the gap before it, so the one that would open a wrapped line is clipped. -->
-                <div data-photo-exposure role="group" [attr.aria-label]="I18N.photo_detail.capture_settings | translate" class="overflow-x-clip">
-                  <div class="-ms-3 flex flex-wrap items-center tabular-nums [&>span]:relative [&>span]:ms-3 [&>span]:before:absolute [&>span]:before:-start-2 [&>span]:before:content-['·']">
-                  @if (p.camera_model) { <span>{{ p.camera_model }}</span> }
-                  @if (p.focal_length) { <span>{{ p.focal_length }}mm</span> }
-                  @if (p.f_stop) { <span>f/{{ p.f_stop }}</span> }
-                  @if (p.shutter_speed | shutterSpeed; as shutter) { <span>{{ shutter }}</span> }
-                  @if (p.iso) { <span>ISO {{ p.iso }}</span> }
-                  @if (p.image_width && p.image_height) {
-                    <span class="inline-flex items-center gap-0.5 whitespace-nowrap">
-                      <span data-photo-dimensions>{{ p.image_width }} × {{ p.image_height }}</span>
-                      <app-context-help class="-my-1.5" [label]="I18N.gallery.compare.rendition.sources" [keys]="[I18N.photo_detail.rendition.note]" [iconOnly]="true" />
-                    </span>
-                  }
-                  </div>
-                </div>
-              }
             </div>
 
             <!-- Describe: caption, tags and people; an editor adds a missing one from the compact actions -->
@@ -705,105 +814,6 @@ function inDetectedSet(photo: Photo): boolean {
               <app-photo-related-files [photo]="p" (logicalApplied)="onLogicalAssetApplied($event)" />
             </mat-accordion>
           </section>
-          <!-- Ranking: the decision first, then the evidence for it. -->
-          <section id="photo-panel-ranking" data-photo-panel="ranking" role="tabpanel" aria-labelledby="photo-rail-ranking" [hidden]="rail.pageTab() !== 'ranking'" class="space-y-4">
-            <!-- Account review controls -->
-            @if (canReview()) {
-              <section data-photo-review aria-labelledby="photo-review-title" class="space-y-1 bg-[var(--mat-sys-surface-container-lowest)] lg:sticky lg:-top-4 lg:z-10 lg:-mx-4 lg:-mt-4 lg:px-4 lg:pt-4 lg:pb-2">
-                <h2 id="photo-review-title" class="sr-only">{{ I18N.gallery.sidebar.tabs.review | translate }}</h2>
-                <!-- Like the gallery rail: no title or rule above the review controls, the favourite beside the stars. -->
-                <div data-photo-rating-row class="flex items-center gap-2">
-                  <div role="group" [attr.aria-label]="I18N.photo_detail.rating | translate" class="flex min-w-0 flex-1 flex-nowrap">
-                    @for (star of stars; track star) {
-                      <button type="button" class="min-w-9 max-w-11 flex-1 max-sm:min-w-11 pointer-coarse:min-w-11 min-h-11 rounded inline-flex items-center justify-center hover:bg-[var(--mat-sys-surface-container-high)] cursor-pointer"
-                              [attr.aria-label]="(I18N.rating.set_rating | translate) + ': ' + star" [attr.aria-pressed]="p.star_rating === star" (click)="setRating(p.path, star)">
-                        <mat-icon class="!text-xl !w-5 !h-5 !leading-5 !text-[var(--mat-sys-primary)]">{{ p.star_rating !== null && star <= p.star_rating! ? 'star' : 'star_border' }}</mat-icon>
-                      </button>
-                    }
-                  </div>
-                  <button mat-icon-button class="ml-auto max-sm:!h-11 max-sm:!w-11 pointer-coarse:!h-11 pointer-coarse:!w-11" (click)="toggleFavorite(p.path)"
-                    [matTooltip]="(p.is_favorite ? I18N.rating.remove_favorite : I18N.rating.add_favorite) | translate"
-                    [attr.aria-label]="I18N.rating.favorite | translate" [attr.aria-pressed]="!!p.is_favorite">
-                    <mat-icon class="!text-[var(--facet-favorite)]">{{ p.is_favorite ? 'favorite' : 'favorite_border' }}</mat-icon>
-                  </button>
-                </div>
-                <div data-photo-decisions role="group" [attr.aria-label]="I18N.gallery.sidebar.review.decision | translate" class="flex items-stretch divide-x divide-[var(--mat-sys-outline-variant)] overflow-hidden rounded border border-[var(--mat-sys-outline-variant)]">
-                  @if (canDecide()) {
-                    <button type="button" data-photo-keep class="inline-flex min-h-11 min-w-0 flex-1 cursor-pointer focus-visible:!outline-2 focus-visible:!-outline-offset-4 focus-visible:!outline-current items-center justify-center gap-1 px-1 text-xs hover:bg-[var(--mat-sys-surface-container-high)]" [class.!bg-[var(--facet-review-kept)]]="p.is_kept" [class.!text-[var(--facet-review-on-kept)]]="p.is_kept"
-                      (click)="reviewPhoto(p.is_kept ? 'undecided' : 'kept')" [attr.aria-pressed]="!!p.is_kept">
-                      <mat-icon aria-hidden="true" class="!w-5 !h-5 !text-xl">{{ p.is_kept ? 'flag' : 'outlined_flag' }}</mat-icon>{{ I18N.review.keep | translate }}
-                    </button>
-                    <button type="button" data-photo-undecided class="inline-flex min-h-11 min-w-0 flex-1 cursor-pointer focus-visible:!outline-2 focus-visible:!-outline-offset-4 focus-visible:!outline-current items-center justify-center px-1 text-xs hover:bg-[var(--mat-sys-surface-container-high)]" [class.!bg-[var(--mat-sys-secondary-container)]]="!p.is_kept && !p.is_rejected" [class.!text-[var(--mat-sys-on-secondary-container)]]="!p.is_kept && !p.is_rejected"
-                      (click)="reviewPhoto('undecided')" [attr.aria-pressed]="!p.is_kept && !p.is_rejected">
-                      <span class="min-w-0 break-words hyphens-auto">{{ I18N.gallery.metadata.undecided | translate }}</span>
-                    </button>
-                  }
-                  <button type="button" data-photo-reject class="inline-flex min-h-11 min-w-0 flex-1 cursor-pointer focus-visible:!outline-2 focus-visible:!-outline-offset-4 focus-visible:!outline-current items-center justify-center gap-1 px-1 text-xs hover:bg-[var(--mat-sys-surface-container-high)]" [class.!bg-[var(--mat-sys-error-container)]]="p.is_rejected" [class.!text-[var(--mat-sys-on-error-container)]]="p.is_rejected"
-                    (click)="toggleRejected(p.path)" [attr.aria-pressed]="!!p.is_rejected">
-                    <mat-icon aria-hidden="true" class="!w-5 !h-5 !text-xl">{{ p.is_rejected ? 'thumb_down' : 'thumb_down_off_alt' }}</mat-icon>{{ I18N.gallery.selection.reject | translate }}
-                  </button>
-                </div>
-              </section>
-            }
-
-            <!-- A better shot in its group changes the decision, so it sits with it. -->
-            @if (keeperHint()?.has_better) {
-              <p data-photo-better-shot class="m-0 inline-flex items-center gap-1 px-2 py-0.5 bg-black/60 text-amber-300 rounded-full text-xs font-medium">
-                <mat-icon class="!text-sm !w-4 !h-4 !leading-4" aria-hidden="true">arrow_circle_up</mat-icon>
-                {{ I18N.culling.reason.better_shot | translate }}
-              </p>
-            }
-
-            <!-- Metric tabs: EXIF | Quality | Composition | Technical | Histogram, as in the gallery rail,
-                 sharing its remembered tab. "Why this score?" opens the same critique dialog. -->
-            <app-photo-metrics-tabs [photo]="p" [ranges]="store.metricRangesByColumn()"
-                                    [populated]="store.config()?.populated_scores"
-                                    [histogramHeight]="HISTOGRAM_PANEL_HEIGHT"
-                                    [histogramDefaultMode]="histogramDefaultMode()"
-                                    [indicatorPercent]="clippingIndicatorPercent()"
-                                    [explainable]="!!store.config()?.features?.show_critique" (explain)="openCritique(p)" />
-
-            <!-- Set section (bracket/panorama/hdr_panorama/burst/duplicate) -->
-            @if (photoSet(); as set) {
-              @if (set.kind) {
-                <div data-photo-set class="pt-1">
-                  <div class="flex items-center gap-2 flex-wrap mb-2 text-sm">
-                    <mat-icon class="!text-base !w-4 !h-4 !leading-4 opacity-70">{{ set.kind | photoSetKindIcon }}</mat-icon>
-                    <span class="font-medium">{{ set.kind | photoSetKindLabel | translate }}</span>
-                    <span data-set-file-count class="text-xs text-[var(--mat-sys-on-surface-variant)]" [matTooltip]="I18N.photo_detail.set.count_help | translate">{{ (set.count === 1 ? I18N.photo_detail.set.files_count : I18N.photo_detail.set.files_count_plural) | translate:{ count: set.count } }}</span>
-                    @if (setBlinkCount(); as blinks) {
-                      <span class="text-xs text-[var(--mat-sys-on-surface-variant)]">· {{ I18N.gallery.hidden_banner.reason_blinks | translate:{ n: blinks } }}</span>
-                    }
-                    @if (set.ev_span !== null) {
-                      <span class="text-xs text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.set.ev_span | translate }}: {{ set.ev_span | fixed:1 }} EV</span>
-                    }
-                    <button mat-icon-button class="!w-7 !h-7 max-sm:!w-11 max-sm:!h-11 pointer-coarse:!w-11 pointer-coarse:!h-11 !p-0 !inline-flex !items-center !justify-center ml-auto" (click)="openSetInGallery()"
-                            [matTooltip]="I18N.photo_detail.set.open_in_gallery | translate" [attr.aria-label]="I18N.photo_detail.set.open_in_gallery | translate">
-                      <mat-icon class="!text-base !w-4 !h-4 !leading-4">photo_library</mat-icon>
-                    </button>
-                  </div>
-                  <div data-photo-set-strip class="grid grid-cols-[repeat(auto-fill,minmax(4rem,1fr))] gap-2 lg:grid-cols-5">
-                    @for (member of setStripMembers(); track member.path) {
-                      <button class="relative rounded-lg overflow-hidden aspect-square w-full min-w-0 cursor-pointer hover:opacity-80 transition-opacity ring-[var(--mat-sys-primary)]"
-                              [class.ring-2]="member.path === p.path"
-                              [attr.aria-label]="(I18N.photo_detail.set.member_position | translate:{ position: $index + 1, count: set.members.length }) + (member.ev_offset !== null ? ', ' + (member.ev_offset | evOffset) : '') + (member.ai_edit_of ? ', ' + (I18N.photo_detail.ai_edit.badge | translate) : '') + (member.is_blink ? ', ' + (I18N.ui.badges.blink | translate) : '')"
-                              (click)="openSetMember(member.path)">
-                        <img [src]="member.path | thumbnailUrl:96:member.preview_revision" alt="" class="w-full h-full object-cover" />
-                        @if (member.ev_offset !== null) {
-                          <span class="absolute bottom-0 inset-x-0 text-center text-[0.625rem] leading-4 bg-black/60 text-white">{{ member.ev_offset | evOffset }}</span>
-                        } @else if (member.ai_edit_of) {
-                          <span class="absolute bottom-0 inset-x-0 text-center text-[0.625rem] leading-4 font-bold bg-black/70 text-white" data-ai-label>✨ {{ I18N.photo_detail.ai_edit.badge_short | translate }}</span>
-                        }
-                        @if (member.is_blink) {
-                          <span class="absolute top-0 inset-x-0 text-center text-[0.625rem] leading-4 font-bold bg-yellow-600 text-white">{{ I18N.ui.badges.blink | translate }}</span>
-                        }
-                      </button>
-                    }
-                  </div>
-                </div>
-              }
-            }
-          </section>
           <section id="photo-panel-view" data-photo-panel="view" role="tabpanel" aria-labelledby="photo-rail-view" [hidden]="rail.pageTab() !== 'view'" class="flex min-h-0 flex-col gap-3 lg:h-full">
             <!-- What you are looking through: the collection, its filters, the way back to it, its photos. -->
             @if (collectionSidebarAvailable()) {
@@ -944,12 +954,15 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   });
   /** The right rail: Content, Ranking, View or an add-on's panel, remembered per browser. */
   protected readonly rail: AddonRail<FacetTab> = new AddonRail<FacetTab>({
-    storageKey: 'facet_photo_rail_tab', tabs: ['content', 'ranking', 'view'], defaultTab: 'content',
+    storageKey: 'facet_photo_rail_tab', tabs: ['grade', 'camera', 'content', 'view'], defaultTab: 'grade',
     needsRegistry: () => this.tagGroups().addons.length > 0,
   });
+  protected readonly GRADE_METRICS: readonly MetricsTab[] = ['quality', 'composition'];
+  protected readonly CAMERA_METRICS: readonly MetricsTab[] = ['exif', 'technical', 'histogram'];
   protected readonly facetRailTabs = [
+    { id: 'grade', icon: 'star_half', label: I18N.photo_detail.rail.grade },
+    { id: 'camera', icon: 'photo_camera', label: I18N.photo_detail.rail.camera },
     { id: 'content', icon: 'info', label: I18N.photo_detail.rail.content },
-    { id: 'ranking', icon: 'star_half', label: I18N.photo_detail.rail.ranking },
     { id: 'view', icon: 'filter_alt', label: I18N.photo_detail.rail.view },
   ] as const;
   /** Add-on id -> its name ("Astro"), for the add-on tag groups. */
