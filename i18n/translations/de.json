@@ -3289,9 +3289,9 @@
       "yours": "Eigene"
     },
     "detections": {
-      "summary": "{name} · {count} Objekte",
-      "summary_one": "{name} · {count} Objekt",
-      "label": "Von {name} gefundene Objekte: {count}",
+      "summary": "{name} · {count} Erkennungen",
+      "summary_one": "{name} · {count} Erkennung",
+      "label": "Erkennungen von {name}: {count}",
       "search": "Fotos mit {label} zeigen"
     },
     "rating": "Bewertung",

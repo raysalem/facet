@@ -3293,9 +3293,9 @@
       "yours": "Les vôtres"
     },
     "detections": {
-      "summary": "{name} · {count} objets",
-      "summary_one": "{name} · {count} objet",
-      "label": "Objets trouvés par {name} : {count}",
+      "summary": "{name} · {count} détections",
+      "summary_one": "{name} · {count} détection",
+      "label": "Détections de {name} : {count}",
       "search": "Afficher les photos avec {label}"
     },
     "rating": "Note",

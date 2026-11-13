@@ -3289,9 +3289,9 @@
       "yours": "Tuyas"
     },
     "detections": {
-      "summary": "{name} · {count} objetos",
-      "summary_one": "{name} · {count} objeto",
-      "label": "Objetos encontrados por {name}: {count}",
+      "summary": "{name} · {count} detecciones",
+      "summary_one": "{name} · {count} detección",
+      "label": "Detecciones de {name}: {count}",
       "search": "Mostrar fotos con {label}"
     },
     "rating": "Valoración",

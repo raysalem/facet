@@ -939,15 +939,16 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
       labelled: [!!photo?.tags_list.length, own.length > 0, addons.length > 0].filter(Boolean).length > 1,
     };
   });
-  /** Only `GET /api/photo` names a tag's add-on; a photo opened from a gallery, album or collection row carries no
-   *  `manual_tag_sources`, so they are read for it here (only when it has manual tags). */
+  /** Only `GET /api/photo` names a tag's add-on and carries its detections; a photo opened from a gallery, album or
+   *  collection row has neither, so they are read for it here (when it has manual tags, or add-ons are on). */
   private readonly fetchedTagSources = signal<{
     path: string; sources: Readonly<Record<string, string>>;
     pluginTags: AddonPhotoFields['plugin_tags']; detections: AddonPhotoFields['detections'];
   } | null>(null);
   private readonly tagSourcesPath = computed(() => {
     const photo = this.photo();
-    return photo && photo.manual_tag_sources === undefined && photo.manual_tags.length ? photo.path : null;
+    // An add-on can index detections without writing a tag, so with add-ons on every row photo is read once.
+    return photo && photo.manual_tag_sources === undefined && (photo.manual_tags.length || this.auth.hasFeature('addons')) ? photo.path : null;
   });
   private readonly tagSourcesEffect = effect(() => {
     const path = this.tagSourcesPath();
@@ -998,7 +999,9 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   protected toggleDetections(source: string): void {
     this.toggleTagSource(OBJECTS + source);
     const path = this.photo()?.path;
-    if (!path || this.detectionLabels().has(source)) return;
+    // Read on opening; a failed read is tried again on the next open.
+    const known = this.detectionLabels().get(source);
+    if (!path || !this.expandedTagSources().has(OBJECTS + source) || (known !== undefined && known !== 'failed')) return;
     const settle = (value: DetectionLabels) => {
       if (this.photo()?.path === path) this.detectionLabels.update(map => new Map(map).set(source, value));
     };
@@ -1010,6 +1013,8 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
 
   /** The gallery on every photo where an add-on found this label. */
   protected navigateDetection(label: string): void {
+    // As for tags: the chip must not take another viewer (a different account, a share link) into this library.
+    if (!this.isCurrentViewer()) return;
     this.router.navigate(['/'], { info: GALLERY_REVISIT, queryParams: { detected: label } });
   }
 

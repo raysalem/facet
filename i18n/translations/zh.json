@@ -3293,9 +3293,9 @@
       "yours": "我的"
     },
     "detections": {
-      "summary": "{name} · {count} 个对象",
-      "summary_one": "{name} · {count} 个对象",
-      "label": "{name} 找到的对象：{count}",
+      "summary": "{name} · {count} 次检测",
+      "summary_one": "{name} · {count} 次检测",
+      "label": "{name} 的检测：{count}",
       "search": "显示包含 {label} 的照片"
     },
     "rating": "星级",

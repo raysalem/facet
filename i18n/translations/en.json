@@ -3318,9 +3318,9 @@
       "yours": "Yours"
     },
     "detections": {
-      "summary": "{name} · {count} objects",
-      "summary_one": "{name} · {count} object",
-      "label": "Objects {name} found: {count}",
+      "summary": "{name} · {count} detections",
+      "summary_one": "{name} · {count} detection",
+      "label": "Detections by {name}: {count}",
       "search": "Show photos with {label}"
     },
     "rating": "Rating",

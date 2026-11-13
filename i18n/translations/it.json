@@ -3293,9 +3293,9 @@
       "yours": "Tuoi"
     },
     "detections": {
-      "summary": "{name} · {count} oggetti",
-      "summary_one": "{name} · {count} oggetto",
-      "label": "Oggetti trovati da {name}: {count}",
+      "summary": "{name} · {count} rilevamenti",
+      "summary_one": "{name} · {count} rilevamento",
+      "label": "Rilevamenti di {name}: {count}",
       "search": "Mostra le foto con {label}"
     },
     "rating": "Valutazione",

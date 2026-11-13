@@ -3600,6 +3600,51 @@ describe('PhotoDetailComponent', () => {
           expect(mockApi.get.mock.calls.filter(([url]) => url === '/photo/detections')).toHaveLength(1);
         });
 
+        it('reads the detections of a gallery-row photo without manual tags when add-ons are on', async () => {
+          const row = { ...untagged, manual_tag_sources: undefined };
+          mockAuth.hasFeature = (key: string) => key === 'addons';
+          try {
+            const el = await render(row, false, [addonsMock()]);
+            mockApi.get.mockReturnValue(of({ ...row, detections: [{ source: 'astro-id', count: 2 }] }));
+            tagsView.componentInstance.photo.set({ ...row, path: '/photos/row-objects.jpg' } as never); await settle();
+            await settle(); await settle();
+            expect(mockApi.get).toHaveBeenCalledWith('/photo', { path: '/photos/row-objects.jpg' });
+            expect(el.querySelector('[data-addon-objects]')!.textContent).toContain('photo_detail.detections.summary');
+          } finally {
+            mockAuth.hasFeature = () => false;
+          }
+          // Without add-ons a row photo with no manual tags is taken as it is.
+          mockApi.get.mockClear();
+          await render(row, false);
+          tagsView.componentInstance.photo.set({ ...row, path: '/photos/row-plain.jpg' } as never); await settle();
+          expect(mockApi.get).not.toHaveBeenCalledWith('/photo', { path: '/photos/row-plain.jpg' });
+        });
+
+        it('reads the labels again when a failed read is reopened', async () => {
+          const el = await render(solved, false, [addonsMock()]);
+          mockApi.get.mockImplementation((url: string) => url === '/photo/detections' ? throwError(() => new Error('offline')) : of(solved));
+          const objects = el.querySelector<HTMLButtonElement>('[data-addon-objects]')!;
+          objects.click(); await settle(); await settle();
+          expect(el.querySelector('[data-addon-objects] ~ [role="alert"]')).not.toBeNull();
+          mockApi.get.mockImplementation((url: string) => of(url === '/photo/detections' ? { detections: [{ label: 'M31', grp: 'dso', source: 'astro-id' }] } : solved));
+          // Folding it does not read; opening it again does.
+          objects.click(); await settle();
+          expect(mockApi.get.mock.calls.filter(([url]) => url === '/photo/detections')).toHaveLength(1);
+          objects.click(); await settle(); await settle();
+          expect(mockApi.get.mock.calls.filter(([url]) => url === '/photo/detections')).toHaveLength(2);
+          expect([...el.querySelectorAll('[data-detection-chip]')].map(chip => chip.textContent!.trim())).toEqual(['M31']);
+        });
+
+        it('does not take another viewer into the library from a label', async () => {
+          const el = await render(solved, false, [addonsMock()]);
+          mockApi.get.mockImplementation((url: string) => of(url === '/photo/detections' ? { detections: [{ label: 'M42', grp: 'dso', source: 'astro-id' }] } : solved));
+          el.querySelector<HTMLButtonElement>('[data-addon-objects]')!.click(); await settle(); await settle();
+          mockRouter.navigate.mockClear();
+          mockAuth.status.set({ user_id: 'bob' });
+          el.querySelector<HTMLButtonElement>('[data-detection-chip]')!.click();
+          expect(mockRouter.navigate).not.toHaveBeenCalled();
+        });
+
         it('shows the add-ons row for detections alone, with no tags', async () => {
           const el = await render({ ...untagged, detections: [{ source: 'astro-id', count: 1 }] }, false, [addonsMock()]);
           expect(el.querySelector('[data-testid="tags-section"]')).not.toBeNull();
