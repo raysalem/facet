@@ -1168,6 +1168,12 @@ describe('GalleryFilterSidebarComponent', () => {
         expect(store['setFilterDrawerOpen']).toHaveBeenCalledWith(false);
       });
 
+      it('leaves Close to a host panel that has its own (the rail\'s Filter panel at lg)', () => {
+        fixture.componentRef.setInput('closable', false);
+        fixture.detectChanges();
+        expect((fixture.nativeElement as HTMLElement).querySelector('[data-test="close"]')).toBeNull();
+      });
+
       it('shows no Reset and no badge without active filters, but keeps Close', () => {
         expect((fixture.nativeElement as HTMLElement).querySelector('[data-test="reset"]')).toBeNull();
         expect((fixture.nativeElement as HTMLElement).querySelector('[data-test="active-count"]')).toBeNull();

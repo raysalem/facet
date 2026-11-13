@@ -8,6 +8,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { GALLERY_REVISIT, GalleryReuseStrategy } from '../../core/gallery-reuse.strategy';
 import { ActivatedRoute, Event as RouterEvent, NavigationEnd, NavigationStart, provideRouter, RouteReuseStrategy, Router, RouterOutlet } from '@angular/router';
 import { By } from '@angular/platform-browser';
+import { AddonPanelService } from '../../core/addons/addon-panel.service';
 import { ControlPopoverComponent } from '../../shared/components/control-popover/control-popover.component';
 import { PhotoCardComponent } from '../../shared/components/photo-card/photo-card.component';
 import { KeyboardMappingService, KEYMAP_STORAGE_KEY } from '../../core/services/keyboard-mapping.service';
@@ -81,6 +82,13 @@ const keydown = (target: Element, key: string, keyCode: number) => {
   target.dispatchEvent(event);
   return event;
 };
+
+/** Read the media queries a >=1280 px viewport answers yes to (stub matchMedia first): the details dock and the lg rail. */
+function widenRail(component: unknown): void {
+  const gallery = component as { railWide: { setup(): void }; lgDesktop: { setup(): void } };
+  gallery.railWide.setup();
+  gallery.lgDesktop.setup();
+}
 
 describe('GalleryComponent', () => {
   let component: GalleryComponent;
@@ -430,26 +438,65 @@ describe('GalleryComponent', () => {
       fixture.destroy();
     });
 
-    it('from lg moves the criteria into the View panel of the rail, closed by default so the grid keeps the width', () => {
+    it('from lg moves the criteria and the filter controls into the Filter panel of the rail, closed by default so the grid keeps the width', () => {
+      mockStore.setFilterDrawerOpen.mockImplementation((open: boolean) => mockStore.filterDrawerOpen.set(open));
       const { fixture, root, bar } = render(true);
       expect(bar.nextElementSibling?.tagName).not.toBe('APP-GALLERY-CRITERIA');
-      const panel = root.querySelector<HTMLElement>('[data-gallery-panel="view"]')!;
+      const panel = root.querySelector<HTMLElement>('[data-gallery-panel="filter"]')!;
       expect(panel.hidden).toBe(true);
       expect(panel.querySelector('app-gallery-criteria')).not.toBeNull();
-      const tab = root.querySelector<HTMLButtonElement>('app-panel-rail [data-rail-tab="view"]')!;
+      expect(panel.querySelector('[data-filter-controls]')).not.toBeNull();
+      // Only the Filter tab without "Show details: Side panel" on a wide window.
+      expect([...root.querySelectorAll('app-panel-rail [data-rail-tab]')].map(tab => tab.getAttribute('data-rail-tab'))).toEqual(['filter']);
+      const tab = root.querySelector<HTMLButtonElement>('app-panel-rail [data-rail-tab="filter"]')!;
       expect(tab.getAttribute('aria-selected')).toBe('false');
       expect(tab.getAttribute('tabindex')).toBe('0');
       tab.click(); fixture.detectChanges(); TestBed.flushEffects();
       expect(panel.hidden).toBe(false);
       expect(tab.getAttribute('aria-selected')).toBe('true');
-      expect(localStorage.getItem('facet_gallery_rail_tab')).toBe('view');
+      expect(localStorage.getItem('facet_gallery_rail_tab')).toBe('filter');
+      // The drawer flag follows, so the toolbar's Filters button shows it pressed.
+      expect(mockStore.setFilterDrawerOpen).toHaveBeenLastCalledWith(true);
       // A second click on the picked icon closes the panel again.
       tab.click(); fixture.detectChanges(); TestBed.flushEffects();
       expect(panel.hidden).toBe(true);
+      expect(mockStore.setFilterDrawerOpen).toHaveBeenLastCalledWith(false);
       fixture.destroy();
     });
 
-    it('sums the active filters on the count line, a link that opens View', () => {
+    it('from lg the Filters button (the drawer flag) opens and closes the Filter panel, and the drawer stays shut', () => {
+      const { fixture, root } = render(true);
+      const drawer = fixture.debugElement.query(By.directive(MatSidenav)).componentInstance as MatSidenav;
+      const open = vi.spyOn(drawer, 'open');
+      mockStore.filterDrawerOpen.set(true); fixture.detectChanges(); TestBed.flushEffects(); fixture.detectChanges();
+      expect(root.querySelector<HTMLElement>('[data-gallery-panel="filter"]')!.hidden).toBe(false);
+      expect(open).not.toHaveBeenCalled();
+      expect(drawer.opened).toBe(false);
+      expect(root.querySelector('mat-sidenav app-gallery-criteria, mat-sidenav [data-test="close"]')).toBeNull();
+      mockStore.filterDrawerOpen.set(false); fixture.detectChanges(); TestBed.flushEffects(); fixture.detectChanges();
+      expect(root.querySelector<HTMLElement>('[data-gallery-panel="filter"]')!.hidden).toBe(true);
+      fixture.destroy();
+    });
+
+    it('widening past lg with the filters drawer open shows them in the Filter panel instead, and back', () => {
+      mockStore.filterDrawerOpen.set(true);
+      const { fixture, root } = render(false);
+      const drawer = fixture.debugElement.query(By.directive(MatSidenav)).componentInstance as MatSidenav;
+      TestBed.flushEffects(); fixture.detectChanges();
+      expect(drawer.opened).toBe(true);
+      const lg = (fixture.componentInstance as unknown as { lgDesktop: { setMatches(v: boolean): void } }).lgDesktop;
+      lg.setMatches(true); fixture.detectChanges(); TestBed.flushEffects(); fixture.detectChanges();
+      expect(drawer.opened).toBe(false);
+      expect(root.querySelector<HTMLElement>('[data-gallery-panel="filter"]')!.hidden).toBe(false);
+      // The drawer closing because the panel took over is not the user closing the filters.
+      expect(mockStore.setFilterDrawerOpen).not.toHaveBeenCalledWith(false);
+      lg.setMatches(false); fixture.detectChanges(); TestBed.flushEffects(); fixture.detectChanges();
+      expect(drawer.opened).toBe(true);
+      expect(root.querySelector('app-panel-rail')).toBeNull();
+      fixture.destroy();
+    });
+
+    it('sums the active filters on the count line, a link that opens Filter', () => {
       const { fixture, root } = render(true);
       expect(root.querySelector('[data-collection-filter-summary]')).toBeNull();
       mockStore.filters.set({ ...DEFAULT_FILTERS, camera: 'X100V', lens: '23mm' });
@@ -457,8 +504,11 @@ describe('GalleryComponent', () => {
       const summary = root.querySelector<HTMLButtonElement>('[data-collection-filter-summary]')!;
       expect(summary.textContent!.trim()).toBe('gallery.rail.filters');
       summary.click(); fixture.detectChanges();
-      expect(root.querySelector<HTMLElement>('[data-gallery-panel="view"]')!.hidden).toBe(false);
+      expect(root.querySelector<HTMLElement>('[data-gallery-panel="filter"]')!.hidden).toBe(false);
       expect(summary.getAttribute('aria-expanded')).toBe('true');
+      // A second click keeps it open: the summary is a way in, not a toggle.
+      summary.click(); fixture.detectChanges();
+      expect(root.querySelector<HTMLElement>('[data-gallery-panel="filter"]')!.hidden).toBe(false);
       fixture.destroy();
     });
 
@@ -1730,7 +1780,7 @@ describe('GalleryComponent', () => {
         showTooltip(e: unknown, p: unknown): void;
         tooltipPhoto(): unknown;
       };
-      wide.railWide.setup();
+      widenRail(wide);
       fixture!.detectChanges();
       // The event chain into showTooltip is bound identically in all three card
       // loops and pinned by the narrow test; what only this rendered template can
@@ -2686,7 +2736,7 @@ describe('GalleryComponent', () => {
       expect(stack(html)?.textContent).toContain(I18N.gallery.hidden_banner.showing_all);
     });
 
-    it('anchors the stack bottom-right, clear of an open end drawer and the content scrollbar', () => {
+    it('anchors the stack bottom-right, clear of an open side drawer (md to lg) and the content scrollbar', () => {
       vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
       const rect = (left: number, right: number) => ({ left, right, top: 0, bottom: 600, width: right - left, height: 600, x: left, y: 0, toJSON() { return {}; } });
       const original = HTMLElement.prototype.getBoundingClientRect;
@@ -2701,7 +2751,8 @@ describe('GalleryComponent', () => {
       try {
         const fixture = TestBed.createComponent(GalleryComponent);
         Object.defineProperty(fixture.componentInstance, 'isDesktop', { value: signal(true), configurable: true });
-        Object.defineProperty(fixture.componentInstance['lgDesktop'], 'isDesktop', { value: signal(true), configurable: true });
+        // From lg the filters are the rail's panel, outside the notice host: only the md-to-lg drawer takes room.
+        Object.defineProperty(fixture.componentInstance['lgDesktop'], 'isDesktop', { value: signal(false), configurable: true });
         mockStore.filterDrawerOpen.set(true);
         fixture.detectChanges();
         const notices = stack(fixture.nativeElement as HTMLElement)!;
@@ -2729,7 +2780,7 @@ describe('GalleryComponent', () => {
       vi.stubGlobal('matchMedia', (media: string) => ({
         matches: true, media, addEventListener() {}, removeEventListener() {},
       }));
-      (component as unknown as { railWide: { setup(): void } }).railWide.setup();
+      widenRail(component);
     }
 
     beforeEach(() => {
@@ -2992,56 +3043,82 @@ describe('GalleryComponent', () => {
         mockStore.selectionCount.set(0);
       });
 
-      it('keeps the grid at full width until a photo is chosen, then opens the rail once and keeps it', () => {
+      it('keeps the grid at full width until a photo is chosen, then opens the Grade tab once and keeps it', () => {
         const photo = makePhoto({ path: '/a.jpg', filename: 'a.jpg' });
         mockStore.photos.set([photo]);
         Object.assign(mockApi, { get: vi.fn(() => of({})) });
         const fixture = TestBed.createComponent(GalleryComponent);
-        (fixture.componentInstance as unknown as { railWide: { setup(): void } }).railWide.setup();
+        widenRail(fixture.componentInstance);
         fixture.detectChanges();
+        const root = fixture.nativeElement as HTMLElement;
         const drawer = fixture.debugElement.query(By.directive(MatSidenav)).componentInstance as MatSidenav;
         expect(fixture.componentInstance.panelMode()).toBe(true);
+        expect([...root.querySelectorAll('app-panel-rail [data-rail-tab]')].map(tab => tab.getAttribute('data-rail-tab'))).toEqual(['filter', 'grade', 'camera', 'content']);
         expect(fixture.componentInstance.detailsRailVisible()).toBe(false);
-        expect(fixture.nativeElement.querySelector('[data-details-rail]')).toBeNull();
-        expect(drawer.opened).toBe(false);
+        expect(root.querySelector('[data-details-rail]')).toBeNull();
         const open = vi.spyOn(drawer, 'open');
-        const close = vi.spyOn(drawer, 'close');
         fixture.componentInstance.showTooltip(hoverEvent, photo);
         fixture.detectChanges();
         expect(fixture.componentInstance.detailsRailVisible()).toBe(true);
-        expect(fixture.nativeElement.querySelector('[data-details-rail]')).not.toBeNull();
-        expect(open).toHaveBeenCalled();
-        const opened = open.mock.calls.length;
-        // Hovering off the grid and across the next card never closes or reopens the strip.
+        expect(root.querySelector('[data-details-rail] [data-photo-tab="grade"] app-photo-tooltip')).not.toBeNull();
+        expect(root.querySelector('app-panel-rail [data-rail-tab="grade"]')!.getAttribute('aria-selected')).toBe('true');
+        // The Material drawer has no part in it any more.
+        expect(open).not.toHaveBeenCalled();
+        // Hovering off the grid and across the next card never closes or reopens the panel.
         fixture.componentInstance.hideTooltip();
         fixture.detectChanges();
         fixture.componentInstance.showTooltip(hoverEvent, makePhoto({ path: '/b.jpg' }));
         fixture.componentInstance.hideTooltip();
         fixture.detectChanges();
         expect(fixture.componentInstance.detailsRailVisible()).toBe(true);
-        expect(open.mock.calls.length).toBe(opened);
-        expect(close).not.toHaveBeenCalled();
         fixture.destroy();
       });
 
-      it('a reload that drops the held photo keeps the rail open on its empty state, for a hovered photo and for the cursor', () => {
+      it('splits the photo like the photo page: Grade, Camera and Content tabs, the last one picked reopening', () => {
+        const photo = makePhoto({ path: '/a.jpg', filename: 'a.jpg', camera_model: 'X100V', tags_list: ['sky'] });
+        mockStore.photos.set([photo]);
+        Object.assign(mockApi, { get: vi.fn(() => of({})) });
+        const fixture = TestBed.createComponent(GalleryComponent);
+        widenRail(fixture.componentInstance);
+        fixture.detectChanges();
+        const root = fixture.nativeElement as HTMLElement;
+        fixture.componentInstance.showTooltip(hoverEvent, photo);
+        fixture.detectChanges();
+        const shown = () => root.querySelector<HTMLElement>('[data-details-rail] [data-photo-tab]:not([hidden])')!;
+        expect(shown().dataset['photoTab']).toBe('grade');
+        expect(root.querySelector('[data-details-rail] [data-panel-header] h2')!.textContent!.trim()).toBe(I18N.photo_detail.rail.grade);
+        root.querySelector<HTMLButtonElement>('app-panel-rail [data-rail-tab="camera"]')!.click(); fixture.detectChanges();
+        expect(shown().dataset['photoTab']).toBe('camera');
+        expect(shown().querySelector('[data-capture-line]')!.textContent).toContain('X100V');
+        root.querySelector<HTMLButtonElement>('app-panel-rail [data-rail-tab="content"]')!.click(); fixture.detectChanges(); TestBed.flushEffects();
+        expect(shown().querySelector('[data-testid="tooltip-tag"]')).not.toBeNull();
+        expect(localStorage.getItem('facet_gallery_photo_tab')).toBe('content');
+        // Closed with the X, the next photo to enter opens the tab picked last.
+        root.querySelector<HTMLButtonElement>('[data-details-rail] [data-close-panels]')!.click(); fixture.detectChanges();
+        expect(root.querySelector('[data-details-rail]')).toBeNull();
+        fixture.componentInstance.showTooltip(hoverEvent, photo); fixture.detectChanges();
+        expect(shown().dataset['photoTab']).toBe('content');
+        fixture.destroy();
+        localStorage.removeItem('facet_gallery_photo_tab');
+        localStorage.removeItem('facet_gallery_rail_tab');
+      });
+
+      it('a reload that drops the held photo keeps the tab open on its empty state, for a hovered photo and for the cursor', () => {
         // Closing would widen the grid under a still pointer, and the card that lands under it would
-        // reopen the rail on a photo nobody chose: two reflows for one re-sort.
+        // reopen the panel on a photo nobody chose: two reflows for one re-sort.
         const a = makePhoto({ path: '/a.jpg', filename: 'a.jpg' });
         const b = makePhoto({ path: '/b.jpg', filename: 'b.jpg' });
         mockStore.photos.set([a, b]);
         Object.assign(mockApi, { get: vi.fn(() => of({})) });
         const fixture = TestBed.createComponent(GalleryComponent);
-        const instance = fixture.componentInstance as unknown as { railWide: { setup(): void }; setCursor(index: number): void; hasActivePhoto(): boolean; panelPhoto(): { path: string } | null };
-        instance.railWide.setup();
+        const instance = fixture.componentInstance as unknown as { setCursor(index: number): void; hasActivePhoto(): boolean; panelPhoto(): { path: string } | null };
+        widenRail(instance);
         fixture.detectChanges();
-        const drawer = fixture.debugElement.query(By.directive(MatSidenav)).componentInstance as MatSidenav;
         fixture.componentInstance.showTooltip(hoverEvent, a);
         fixture.detectChanges();
-        // A hover leaving the grid keeps the rail and its photo.
+        // A hover leaving the grid keeps the panel and its photo.
         fixture.componentInstance.hideTooltip();
         expect(fixture.componentInstance.detailsRailVisible()).toBe(true);
-        const close = vi.spyOn(drawer, 'close');
         mockStore.photos.set([b]);
         fixture.detectChanges();
         expect(fixture.componentInstance.detailsRailVisible()).toBe(true);
@@ -3056,16 +3133,15 @@ describe('GalleryComponent', () => {
         expect(instance.hasActivePhoto()).toBe(false);
         expect(fixture.componentInstance.detailsRailVisible()).toBe(true);
         expect(rail()?.textContent).toContain(I18N.gallery.tooltip_mode.panel_empty);
-        expect(close).not.toHaveBeenCalled();
         fixture.destroy();
       });
 
-      it('Escape in a rail opened by hover alone hands focus to the gallery, never to the page body', () => {
+      it('Escape in a panel opened by hover alone hands focus to the gallery, never to the page body', () => {
         const a = makePhoto({ path: '/a.jpg', filename: 'a.jpg' });
         mockStore.photos.set([a]);
         Object.assign(mockApi, { get: vi.fn(() => of({})) });
         const fixture = TestBed.createComponent(GalleryComponent);
-        (fixture.componentInstance as unknown as { railWide: { setup(): void } }).railWide.setup();
+        widenRail(fixture.componentInstance);
         document.body.appendChild(fixture.nativeElement);
         fixture.detectChanges();
         fixture.componentInstance.showTooltip(hoverEvent, a);
@@ -3083,21 +3159,23 @@ describe('GalleryComponent', () => {
         fixture.destroy();
       });
 
-      it('disableClose follows the rail: false while the filters occupy the drawer', () => {
+      it('Filter takes the panel place from the photo tab, and a photo entering never takes it back', () => {
         mockStore.photos.set([makePhoto({ path: '/inspected.jpg', filename: 'inspected.jpg' })]);
         Object.assign(mockApi, { get: vi.fn(() => of({})) });
         const fixture = TestBed.createComponent(GalleryComponent);
-        (fixture.componentInstance as unknown as { railWide: { setup(): void } }).railWide.setup();
+        widenRail(fixture.componentInstance);
         fixture.componentInstance['setCursor'](0);
         fixture.detectChanges();
-        const drawer = fixture.debugElement.query(By.directive(MatSidenav)).componentInstance as MatSidenav;
         expect(fixture.componentInstance.detailsRailVisible()).toBe(true);
-        expect(drawer.disableClose).toBe(true);
         mockStore.filterDrawerOpen.set(true);
+        fixture.detectChanges(); TestBed.flushEffects(); fixture.detectChanges();
+        expect(fixture.componentInstance.detailsRailVisible()).toBe(false);
+        expect((fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('[data-gallery-panel="filter"]')!.hidden).toBe(false);
+        fixture.componentInstance.showTooltip(hoverEvent, mockStore.photos()[0]);
         fixture.detectChanges();
         expect(fixture.componentInstance.detailsRailVisible()).toBe(false);
-        expect(drawer.disableClose).toBe(false);
         fixture.destroy();
+        localStorage.removeItem('facet_gallery_rail_tab');
       });
 
       describe('rail rendered with a held photo', () => {
@@ -3119,7 +3197,7 @@ describe('GalleryComponent', () => {
           Object.assign(mockApi, { get: vi.fn(() => of({})) });
           fixture = TestBed.createComponent(GalleryComponent);
           instance = fixture.componentInstance as unknown as RailInstance;
-          instance.railWide.setup();
+          widenRail(instance);
           fixture.detectChanges();
           instance.setCursor(0);
           fixture.detectChanges();
@@ -3133,25 +3211,20 @@ describe('GalleryComponent', () => {
           key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true, cancelable: true,
         }));
 
-        it('names the inspector owner and offers no close button (the Details mode is switched off in the Display menu)', () => {
+        it('names the inspector owner under the tab name, with the X that folds the panels', () => {
           expect(rail.querySelector('[data-inspector-owner]')?.textContent).toContain('a.jpg');
-          expect(rail.querySelector('[data-close-inspector]')).toBeNull();
+          expect(rail.querySelector('[data-close-panels]')).not.toBeNull();
         });
 
-        it('Escape releases the photo and closes the rail through the latch, not through MatDrawer (rendered)', () => {
-          // MatDrawer closes itself on an Escape from inside it unless disableClose is set; the
-          // rail's own latch is what closes the strip now, so the drawer closes once, on purpose,
-          // and the sync effect has nothing left to reopen.
-          const drawer = fixture.debugElement.query(By.directive(MatSidenav)).componentInstance as MatSidenav;
-          const open = vi.spyOn(drawer, 'open');
-          const close = vi.spyOn(drawer, 'close');
+        it('Escape releases the photo and closes the photo tab, leaving an open add-on alone (rendered)', () => {
+          const panels = TestBed.inject(AddonPanelService);
+          const close = vi.spyOn(panels, 'close');
           escape(rail);
           fixture.detectChanges();
           expect(instance.hasActivePhoto()).toBe(false);
           expect(fixture.componentInstance.detailsRailVisible()).toBe(false);
           expect(fixture.nativeElement.querySelector('[data-details-rail]')).toBeNull();
-          expect(close).toHaveBeenCalled();
-          expect(open).not.toHaveBeenCalled();
+          expect(close).not.toHaveBeenCalled();
         });
 
         it('focus leaving the rail for the outside releases the hold', () => {
@@ -3170,7 +3243,7 @@ describe('GalleryComponent', () => {
 
         it('Escape on the focused Deselect button closes the rail and never leaves focus inside it', () => {
           document.body.appendChild(fixture.nativeElement);
-          const button = rail.querySelector('button') as HTMLElement;
+          const button = rail.querySelector('[data-rail-deselect]') as HTMLElement;
           button.focus();
           escape(button);
           fixture.detectChanges();
@@ -3179,7 +3252,7 @@ describe('GalleryComponent', () => {
         });
 
         it('Deselect closes the rail, and the next photo to enter it opens it again', () => {
-          (rail.querySelector('button') as HTMLButtonElement).click();
+          (rail.querySelector('[data-rail-deselect]') as HTMLButtonElement).click();
           fixture.detectChanges();
           expect(fixture.componentInstance.detailsRailVisible()).toBe(false);
           fixture.componentInstance.showTooltip(hoverEvent, mockStore.photos()[0]);
@@ -3205,9 +3278,15 @@ describe('GalleryComponent', () => {
         });
       });
 
-      it('yields the shared drawer to the filters while they are open', () => {
+      it('yields the panel place to Filter while it is open', () => {
+        mockStore.photos.set([{ path: '/a.jpg' }]);
+        component['setCursor'](0);
+        TestBed.tick();
+        expect(component.detailsRailVisible()).toBe(true);
         mockStore.filterDrawerOpen.set(true);
+        TestBed.tick();
         expect(component.detailsRailVisible()).toBe(false);
+        localStorage.removeItem('facet_gallery_rail_tab');
       });
     });
 
@@ -6664,7 +6743,8 @@ describe('GalleryComponent', () => {
       mockStore.photos.set([{ path: '/p0.jpg', filename: 'p0.jpg', image_width: 4000, image_height: 3000 }]);
       mockStore.total.set(1);
       mockStore.filterDrawerOpen.set(true);
-      vi.stubGlobal('matchMedia', (media: string) => ({ matches: true, media, addEventListener() {}, removeEventListener() {} }));
+      // A tablet width (md to lg): the filters are the side drawer there.
+      vi.stubGlobal('matchMedia', (media: string) => ({ matches: !/min-width: (1024|1280)px/.test(media), media, addEventListener() {}, removeEventListener() {} }));
       fixture = TestBed.createComponent(GalleryComponent);
       (fixture.componentInstance as unknown as { desktop: { setup(): void } }).desktop.setup();
       fixture.detectChanges();

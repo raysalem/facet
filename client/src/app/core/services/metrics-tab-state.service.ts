@@ -3,6 +3,9 @@ import { Injectable, WritableSignal, signal } from '@angular/core';
 const METRICS_TAB_KEY = 'facet_photo_detail_tab';
 export const METRICS_TABS = ['exif', 'quality', 'composition', 'technical', 'histogram'] as const;
 export type MetricsTab = typeof METRICS_TABS[number];
+/** The Grade panel's metric tabs (scores to judge by) and the Camera panel's (how it was shot), on the photo page and the gallery rail. */
+export const GRADE_METRICS: readonly MetricsTab[] = ['quality', 'composition'];
+export const CAMERA_METRICS: readonly MetricsTab[] = ['exif', 'technical', 'histogram'];
 /**
  * Which set of metric tabs: '' is the full set (the gallery's details), `grade` and `camera` are the
  * photo panels' halves (scores to judge by, and how the photo was shot). Each remembers its own tab.

@@ -1772,7 +1772,7 @@
     },
     "rail": {
       "label": "图库面板",
-      "view": "视图与筛选",
+      "filter": "筛选",
       "filters_one": "{count} 个筛选条件",
       "filters": "{count} 个筛选条件"
     }
@@ -3433,7 +3433,7 @@
       "grade": "评分",
       "camera": "相机",
       "content": "内容",
-      "view": "视图"
+      "filter": "筛选"
     },
     "view": {
       "open_gallery": "在图库中显示",

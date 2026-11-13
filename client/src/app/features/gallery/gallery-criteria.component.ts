@@ -34,7 +34,7 @@ const SORT_ARROWS:Record<string,string>={ASC:' ↑',DESC:' ↓'};
  imports:[NgTemplateOutlet, MatButtonModule, MatIconModule, MatSliderModule, MatTooltipModule, PersonFilterChipComponent, TranslatePipe, ThumbnailUrlPipe, GalleryAlbumRulesComponent, KeywordBranchLabelPipe, GalleryQueryProposalComponent, ContextHelpComponent],
  host:{class:'block'}, template:`
  @let currentKeywordBranchLabel = store.filters().keyword_branch | keywordBranchLabel;
- @if (store.currentAlbum()) { <app-gallery-album-rules [active]="canAct()" /> }
+ @if (store.currentAlbum() && !rulesLast()) { <app-gallery-album-rules [active]="canAct()" /> }
  <app-gallery-query-proposal [active]="canAct()" />
  @if (pinned()) {
    <p data-criteria-pinned class="text-xs my-2 text-[var(--mat-sys-on-surface-variant)]">{{ I18N.gallery.criteria.pinned | translate }}</p>
@@ -200,11 +200,14 @@ const SORT_ARROWS:Record<string,string>={ASC:' ↑',DESC:' ↓'};
       }
     </div>
   }
- }`})
+ }
+ @if (store.currentAlbum() && rulesLast()) { <app-gallery-album-rules [active]="canAct()" /> }`})
 export class GalleryCriteriaComponent {
  readonly consolidatedSettings = input(false);
  readonly portShortcuts = input(false);
  readonly searchPresented = input(false);
+ /** The album's rules come last (the gallery's Filter panel ranks them under the active filters). */
+ readonly rulesLast = input(false);
  readonly shortcuts = viewChild<TemplateRef<unknown>>('shortcuts');
 
  protected readonly I18N=i18nKeys();

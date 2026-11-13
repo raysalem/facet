@@ -277,12 +277,14 @@ type RatingOption = 'any' | '1' | '2' | '3' | '4' | '5' | 'zero';
         }
         <span class="flex-1"></span>
         <app-context-help data-count-help [iconOnly]="true" [label]="I18N.gallery.sidebar.count_scope" [keys]="countScopeHelp" />
+        @if (closable()) {
         <button mat-icon-button data-test="close" class="shrink-0 pointer-coarse:!h-11 pointer-coarse:!w-11"
           [matTooltip]="I18N.dialog.close | translate"
           [attr.aria-label]="I18N.dialog.close | translate"
           (click)="store.setFilterDrawerOpen(false)">
           <mat-icon class="!text-xl !w-5 !h-5 !leading-5">close</mat-icon>
         </button>
+        }
       </div>
 
       <!-- Smart album filter notice -->
@@ -1092,6 +1094,8 @@ type RatingOption = 'any' | '1' | '2' | '3' | '4' | '5' | 'zero';
 export class GalleryFilterSidebarComponent {
   protected readonly faceOutlines = inject(FaceOutlinePreferences);
   readonly portSettings = input(false);
+  /** False where the host panel has its own close (the gallery rail's Filter panel at lg and up). */
+  readonly closable = input(true);
   readonly bodyContent = viewChild<TemplateRef<unknown>>('bodyContent');
   readonly reviewSettings = viewChild<TemplateRef<unknown>>('reviewSettings');
   readonly displaySettings = viewChild<TemplateRef<unknown>>('displaySettings');

@@ -11,7 +11,7 @@ import { GalleryViewControlsComponent } from './gallery-view-controls.component'
 import { GalleryCriteriaComponent } from './gallery-criteria.component';
 import { galleryFilterChips } from './gallery-filter-chips';
 import { AddonRail } from '../../core/addons/addon-rail';
-import { PanelRailComponent } from '../../shared/components/panel-rail/panel-rail.component';
+import { PanelRailComponent, type RailTab } from '../../shared/components/panel-rail/panel-rail.component';
 import { StackActionsService } from './stack-actions.service';
 import { STACK_EDITOR_HISTORY } from './stack-editor-history';
 import {
@@ -94,6 +94,21 @@ import { I18N, i18nKeys } from '../../core/i18n/keys';
 import { PageHelpService } from '../../core/services/page-help.service';
 import { MAX_COMPARE_QUEUE } from './comparison-slots.util';
 import { HistogramMode, isHistogramMode } from '../../shared/utils/histogram';
+
+/** The gallery rail's own panels: Filter, then the held photo split like the photo page. */
+const PHOTO_TABS = ['grade', 'camera', 'content'] as const;
+type PhotoTab = typeof PHOTO_TABS[number];
+type GalleryTab = 'filter' | PhotoTab;
+const PHOTO_TAB_KEY = 'facet_gallery_photo_tab';
+function isPhotoTab(tab: string | null): tab is PhotoTab {
+  return (PHOTO_TABS as readonly (string | null)[]).includes(tab);
+}
+function readPhotoTab(): PhotoTab {
+  try {
+    const stored = localStorage.getItem(PHOTO_TAB_KEY);
+    return isPhotoTab(stored) ? stored : 'grade';
+  } catch { return 'grade'; }
+}
 
 function assertNever(action: never): never {
   throw new Error(`Unhandled photo menu action: ${JSON.stringify(action)}`);
@@ -228,56 +243,21 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
     </ng-template>
 
 
-    <!-- lg and up: the grid area, then the rail and the panel it picks (View here; an add-on's panel is the
-         shell's dock to the right, never moved). No panel by default, so the grid keeps the width. -->
+    <!-- lg and up: the grid area, then the rail and the panel it picks (Filter, the photo's Grade / Camera /
+         Content, or an add-on, whose panel is the shell's dock to the right, never moved). No panel by default,
+         so the grid keeps the width. -->
     <div class="flex h-full min-h-0">
     <div #noticeHost class="relative h-full min-w-0 flex-1">
     <mat-sidenav-container class="h-full !overflow-clip">
-      <!-- One end drawer, two occupants. Material allows a single drawer per
-           side, which is also the behaviour we want: the details rail and the
-           filters compete for the same strip, so opening the filters hides the
-           rail and closing them brings it back, without either changing how much
-           room the grid gets. -->
       <app-gallery-view-controls #collectionViewControls (slideshowRequested)="closeCollectionPopovers(true)" [portPrimary]="true" [portFilters]="true" [portDisplay]="true" class="contents" />
-      <app-gallery-filter-sidebar #collectionSettings [portSettings]="true"
+      <app-gallery-filter-sidebar #collectionSettings [portSettings]="true" [closable]="!lgDesktop.isDesktop()"
          [layoutControls]="collectionViewControls.sidebarLayoutControls() ?? null"
          [displayExtras]="collectionViewControls.displayControls() ?? null" />
-      <mat-sidenav #filterDrawer [disableClose]="detailsRailVisible()" [mode]="isDesktop() ? 'side' : 'over'" position="end" class="w-[min(320px,100vw)] p-0"
+      <!-- Below lg only: the Filters drawer (over the grid on a phone, beside it on a tablet). From lg the
+           filters are the rail's Filter panel and this drawer stays shut and empty. -->
+      <mat-sidenav #filterDrawer [mode]="isDesktop() ? 'side' : 'over'" position="end" class="w-[min(320px,100vw)] p-0"
         (openedChange)="onFilterDrawerChange($event)">
-        @if (detailsRailVisible()) {
-          <!-- Deselect stays put above the scrolling details; the tooltip
-               background covers the whole rail instead of a rounded card. -->
-          <div class="flex flex-col h-full bg-[var(--facet-rail-bg)]" data-details-rail tabindex="-1" (keydown.escape)="onRailEscape($event)"
-               (focusout)="onGridFocusOut($event)">
-            <header class="flex items-center gap-2 px-4 py-2 border-b border-[var(--mat-sys-outline-variant)] shrink-0">
-              <div class="min-w-0 flex-1">
-                <h2 class="m-0 text-sm font-medium text-[var(--mat-sys-on-surface)]">{{ I18N.gallery.tooltip_mode.details | translate }}</h2>
-                @if (panelPhoto(); as owner) {
-                  <p data-inspector-owner class="m-0 truncate text-xs text-[var(--mat-sys-on-surface-variant)]" [title]="owner.filename">{{ owner.filename }}</p>
-                }
-              </div>
-            </header>
-            @if (hasActivePhoto()) {
-              <button mat-button class="!min-w-0 !px-0 shrink-0 self-start mx-4 mt-2" (click)="deselectFromRail()">
-                <mat-icon class="!ml-0">arrow_back</mat-icon> {{ I18N.gallery.tooltip_mode.panel_deselect | translate }}
-              </button>
-            }
-            <div class="min-h-0 flex-1 overflow-y-auto">
-            @if (panelPhoto(); as p) {
-              <app-photo-tooltip [photo]="p" [docked]="true" [pinned]="true"
-                                 [histogramDefaultMode]="tooltipHistogramDefaultMode()"
-                                 [indicatorPercent]="clippingIndicatorPercent()"
-                                 [explainable]="railCritiqueVisible()" (explain)="openRailCritique()"
-                                 [personLinks]="!pinned()" [tagCollectionAvailable]="!store.filters().similar_to" (tagSelected)="navigateTag($event)"
-        (personSelected)="store.updateFilter('person_id', $event)" />
-            } @else {
-              <div class="p-4 text-sm text-[var(--mat-sys-on-surface-variant)] text-center">
-                {{ I18N.gallery.tooltip_mode.panel_empty | translate }}
-              </div>
-            }
-            </div>
-          </div>
-        } @else {
+        @if (!lgDesktop.isDesktop()) {
           <!-- Usually closed, and heavy enough that building it eagerly holds up the grid's first paint. -->
           @defer (on idle; when store.filterDrawerOpen()) {
             <ng-container [ngTemplateOutlet]="collectionSettings.bodyContent()" />
@@ -303,7 +283,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
           </p>
           @if (lgDesktop.isDesktop() && activeFilterCount()) {
             <button type="button" data-collection-filter-summary class="m-0 cursor-pointer p-0 text-left text-xs leading-5 tabular-nums text-[var(--mat-sys-primary)] underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-[var(--mat-sys-primary)]"
-              [attr.aria-expanded]="viewPanelOpen()" aria-controls="gallery-panel-view" (click)="rail.select('view')">{{ activeFilterCount() | pluralKey:I18N.gallery.rail.filters_one:I18N.gallery.rail.filters | translate:{ count: activeFilterCount() } }}</button>
+              [attr.aria-expanded]="filterPanelOpen()" aria-controls="gallery-panel-filter" (click)="rail.open('filter')">{{ activeFilterCount() | pluralKey:I18N.gallery.rail.filters_one:I18N.gallery.rail.filters | translate:{ count: activeFilterCount() } }}</button>
           }
           </div>
           <div data-collection-query role="search" [attr.aria-label]="I18N.gallery.search_placeholder | translate" class="order-last flex w-full min-w-0 flex-wrap items-center gap-1 @min-[960px]:order-none @min-[960px]:w-auto @min-[960px]:min-w-44 @min-[1120px]:min-w-56 @min-[960px]:flex-1 @min-[1280px]:max-w-[32rem] @min-[1600px]:max-w-[40rem] @min-[480px]:@max-[639px]:col-start-1 @min-[480px]:@max-[639px]:row-start-2" [class.!hidden]="compactCollectionControls() && !mediumCollectionControls() && !mobileSearchOpen() && !store.filters().search">
@@ -988,17 +968,67 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
       }
     </div>
     @if (lgDesktop.isDesktop()) {
-      <app-panel-rail data-gallery-rail [rail]="rail" [tabs]="railTabs" [wide]="true" [label]="I18N.gallery.rail.label | translate" idPrefix="gallery" />
-      <aside id="gallery-panel-view" data-gallery-panel="view" role="tabpanel" aria-labelledby="gallery-rail-view" [hidden]="!viewPanelOpen()" (keydown)="closePanels($event)"
-        class="w-80 shrink-0 overflow-y-auto border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] px-4 py-2 text-sm">
-        <div data-panel-header class="flex items-center gap-2">
-          <h2 class="m-0 min-w-0 flex-1 truncate py-1 text-sm font-medium">{{ I18N.gallery.rail.view | translate }}</h2>
+      <app-panel-rail data-gallery-rail [rail]="rail" [tabs]="railTabs()" [wide]="true" [label]="I18N.gallery.rail.label | translate" idPrefix="gallery" />
+      <!-- Filter: what you are looking at and how to change it. The active filters first (album, people,
+           similarity), then the filter controls that were the Filters drawer, the album's rules last. -->
+      <aside id="gallery-panel-filter" data-gallery-panel="filter" role="tabpanel" aria-labelledby="gallery-rail-filter" [hidden]="!filterPanelOpen()" (keydown)="closePanels($event)"
+        class="flex w-80 shrink-0 flex-col border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] text-sm">
+        <div data-panel-header class="flex shrink-0 items-center gap-2 px-4 pt-2">
+          <h2 class="m-0 min-w-0 flex-1 truncate py-1 text-sm font-medium">{{ I18N.gallery.rail.filter | translate }}</h2>
           <button mat-icon-button data-close-panels class="!h-8 !w-8 !p-0 shrink-0" [matTooltip]="I18N.ui.buttons.close_panels | translate"
             [attr.aria-label]="I18N.ui.buttons.close_panels | translate" (click)="rail.closeAll()"><mat-icon class="!text-xl">close</mat-icon></button>
         </div>
-        <!-- What the criteria row showed over the grid: the album and its rules, the active filters, people, similarity. -->
-        <app-gallery-criteria data-collection-header [portShortcuts]="true" [consolidatedSettings]="true" [searchPresented]="true" class="block min-w-0" />
+        <app-gallery-criteria data-collection-header [portShortcuts]="true" [consolidatedSettings]="true" [searchPresented]="true" [rulesLast]="true"
+          class="block min-w-0 max-h-[45%] shrink-0 overflow-y-auto px-4" />
+        @if (!pinned()) {
+          <div data-filter-controls class="min-h-0 flex-1 border-t border-[var(--mat-sys-outline-variant)]">
+            @defer (on idle; when filterPanelOpen()) {
+              <ng-container [ngTemplateOutlet]="collectionSettings.bodyContent()" />
+            }
+          </div>
+        }
       </aside>
+      <!-- The photo under the cursor (or the last one hovered), split like the photo page: Grade, Camera, Content.
+           Only with "Show details: Side panel" on a window wide enough for it. -->
+      @if (detailsRailVisible()) {
+        <aside data-details-rail data-gallery-panel="photo" tabindex="-1" (keydown.escape)="onRailEscape($event)" (keydown)="closePanels($event)" (focusout)="onGridFocusOut($event)"
+          class="flex w-80 shrink-0 flex-col border-l border-[var(--mat-sys-outline-variant)] bg-[var(--facet-rail-bg)]">
+          <div data-panel-header class="flex shrink-0 items-center gap-2 border-b border-[var(--mat-sys-outline-variant)] px-4 py-2">
+            <div class="min-w-0 flex-1">
+              <h2 class="m-0 truncate text-sm font-medium text-[var(--mat-sys-on-surface)]">{{ photoPanelLabel() | translate }}</h2>
+              @if (panelPhoto(); as owner) {
+                <p data-inspector-owner class="m-0 truncate text-xs text-[var(--mat-sys-on-surface-variant)]" [title]="owner.filename">{{ owner.filename }}</p>
+              }
+            </div>
+            <button mat-icon-button data-close-panels class="!h-8 !w-8 !p-0 shrink-0" [matTooltip]="I18N.ui.buttons.close_panels | translate"
+              [attr.aria-label]="I18N.ui.buttons.close_panels | translate" (click)="rail.closeAll()"><mat-icon class="!text-xl">close</mat-icon></button>
+          </div>
+          @if (hasActivePhoto()) {
+            <button mat-button data-rail-deselect class="!min-w-0 !px-0 shrink-0 self-start mx-4 mt-2" (click)="deselectFromRail()">
+              <mat-icon class="!ml-0">arrow_back</mat-icon> {{ I18N.gallery.tooltip_mode.panel_deselect | translate }}
+            </button>
+          }
+          @for (section of PHOTO_TABS; track section) {
+            <section [attr.id]="'gallery-panel-' + section" [attr.data-photo-tab]="section" role="tabpanel" [attr.aria-labelledby]="'gallery-rail-' + section"
+              [hidden]="rail.tab() !== section" class="min-h-0 flex-1 overflow-y-auto">
+              @if (rail.tab() === section) {
+                @if (panelPhoto(); as p) {
+                  <app-photo-tooltip [photo]="p" [docked]="true" [pinned]="true" [section]="section"
+                                     [histogramDefaultMode]="tooltipHistogramDefaultMode()"
+                                     [indicatorPercent]="clippingIndicatorPercent()"
+                                     [explainable]="railCritiqueVisible()" (explain)="openRailCritique()"
+                                     [personLinks]="!pinned()" [tagCollectionAvailable]="!store.filters().similar_to" (tagSelected)="navigateTag($event)"
+                                     (personSelected)="store.updateFilter('person_id', $event)" />
+                } @else {
+                  <div class="p-4 text-sm text-[var(--mat-sys-on-surface-variant)] text-center">
+                    {{ I18N.gallery.tooltip_mode.panel_empty | translate }}
+                  </div>
+                }
+              }
+            </section>
+          }
+        </aside>
+      }
     }
     </div>
 
@@ -1198,10 +1228,65 @@ export class GalleryComponent implements OnInit, OnDestroy {
   /** The sticky bar row: what sticks over the top of the scrolling content, and so the scroll padding. */
   protected readonly collectionBarHeight = signal(0);
   protected readonly collectionHeaderHeight = this.collectionBarHeight.asReadonly();
-  /** The right rail (lg and up): View, or an add-on's panel; none by default so the grid keeps the width. */
-  protected readonly rail: AddonRail<'view'> = new AddonRail<'view'>({ storageKey: 'facet_gallery_rail_tab', tabs: ['view'], defaultTab: null });
-  protected readonly railTabs = [{ id: 'view', icon: 'filter_alt', label: I18N.gallery.rail.view }] as const;
-  protected readonly viewPanelOpen = computed(() => this.rail.tab() === 'view');
+  /**
+   * The right rail (lg and up): Filter, the held photo's Grade / Camera / Content (with "Show details: Side
+   * panel"), or an add-on's panel; none by default so the grid keeps the width.
+   */
+  protected readonly rail: AddonRail<GalleryTab> = new AddonRail<GalleryTab>({
+    storageKey: 'facet_gallery_rail_tab', tabs: ['filter', ...PHOTO_TABS], defaultTab: null,
+  });
+  protected readonly PHOTO_TABS = PHOTO_TABS;
+  private readonly filterRailTab: RailTab = { id: 'filter', icon: 'filter_alt', label: this.I18N.gallery.rail.filter };
+  private readonly photoRailTabs: readonly RailTab[] = [
+    { id: 'grade', icon: 'star_half', label: this.I18N.photo_detail.rail.grade },
+    { id: 'camera', icon: 'photo_camera', label: this.I18N.photo_detail.rail.camera },
+    { id: 'content', icon: 'info', label: this.I18N.photo_detail.rail.content },
+  ];
+  /** The photo tabs are there only while the details dock (Side panel, a window wide enough for it). */
+  protected readonly railTabs = computed<readonly RailTab[]>(() => this.panelMode() ? [this.filterRailTab, ...this.photoRailTabs] : [this.filterRailTab]);
+  protected readonly filterPanelOpen = computed(() => this.rail.tab() === 'filter');
+  /** The open photo tab's name, for its header. */
+  protected readonly photoPanelLabel = computed(() => this.photoRailTabs.find(tab => tab.id === this.rail.tab())?.label ?? '');
+  /** The photo tab a photo entering the panel opens: the last one picked, remembered per browser. */
+  private lastPhotoTab: PhotoTab = readPhotoTab();
+  private readonly rememberPhotoTab = effect(() => {
+    const tab = this.rail.tab();
+    if (!isPhotoTab(tab) || tab === this.lastPhotoTab) return;
+    this.lastPhotoTab = tab;
+    try { localStorage.setItem(PHOTO_TAB_KEY, tab); } catch { /* the pick holds for this visit only */ }
+  });
+  /**
+   * From lg the Filter panel is what the Filters button, the sidebar shortcut and the filters' own close act on:
+   * the store's drawer flag is its open state there. The flag opens or closes the panel; picking a panel on
+   * the rail sets the flag. Below lg the flag keeps driving the drawer. Left alone while an assistant pins a list.
+   */
+  private readonly filterPanelFollowsFlag = effect(() => {
+    const open = this.store.filterDrawerOpen();
+    const wide = this.lgDesktop.isDesktop();
+    untracked(() => {
+      if (!wide || this.pinned()) return;
+      if (open && this.rail.tab() !== 'filter') this.rail.open('filter');
+      else if (!open && this.rail.tab() === 'filter') this.rail.closePage();
+    });
+  });
+  private readonly flagFollowsRail = (() => {
+    let previous: string | null | undefined;
+    return effect(() => {
+      const tab = this.rail.tab();
+      untracked(() => {
+        const changed = previous !== undefined && tab !== previous;
+        previous = tab;
+        if (!changed || !this.lgDesktop.isDesktop() || this.pinned()) return;
+        const open = tab === 'filter';
+        if (this.store.filterDrawerOpen() !== open) this.store.setFilterDrawerOpen(open);
+      });
+    });
+  })();
+  /** Without the details dock (another Show details mode, a narrower window) no photo tab stays picked. */
+  private readonly photoTabsFollowMode = effect(() => {
+    const docked = this.panelMode();
+    untracked(() => { if (!docked && isPhotoTab(this.rail.tab())) this.rail.closePage(); });
+  });
   private readonly railElement = viewChild<PanelRailComponent, ElementRef<HTMLElement>>(PanelRailComponent, { read: ElementRef });
 
   /** Escape in the panel folds every panel to the side; the focus goes back to the rail. */
@@ -1424,36 +1509,28 @@ export class GalleryComponent implements OnInit, OnDestroy {
   protected readonly pinned = computed(() => this.store.pinnedPaths() !== null);
 
   /**
-   * Whether the end drawer currently shows details rather than filters.
+   * Whether one of the photo tabs (Grade, Camera, Content) is the rail's panel.
    *
-   * The filters win while they are open: they are an explicit, transient action,
-   * and the rail is a standing preference to come back to once they are closed.
-   */
-  readonly detailsRailVisible = computed(
-    () => this.panelMode() && this.railOpen() && (!this.store.filterDrawerOpen() || this.pinned()),
-  );
-
-  /**
-   * Whether the rail has been opened. The strip is 320px of the grid, so it stays
-   * closed until a photo first enters it (a hover or a click in panel mode) and then
-   * stays until the user dismisses it or the view it belongs to is reset. The latch,
-   * not the held photo, drives the drawer: a hover that crosses the gap between two
+   * The panel is 320px of the grid, so it stays closed until a photo first enters it
+   * (a hover, a click or the keyboard cursor in panel mode) and then stays until the
+   * user dismisses it, picks another panel, or the view it belongs to is reset. The
+   * rail's pick, not the held photo, decides: a hover that crosses the gap between two
    * cards, or leaves the grid, never opens or closes anything. Nor does a reload of the
-   * results (a re-sort, a filter, the next page): when it drops the held photo the rail
+   * results (a re-sort, a filter, the next page): when it drops the held photo the tab
    * shows its empty state, because closing would widen the grid under a still pointer
-   * and the card landing under it would reopen the rail on a photo nobody chose.
+   * and the card landing under it would reopen it on a photo nobody chose.
    */
-  private readonly railOpen = signal(false);
+  readonly detailsRailVisible = computed(() => this.panelMode() && isPhotoTab(this.rail.tab()));
 
-  /** A photo enters the rail: hovered, clicked, or under the keyboard cursor. */
+  /** A photo enters the panel: it opens the last photo tab, but only while no other panel (Filter, an add-on) is up. */
   private openRail(): void {
-    if (this.panelMode()) this.railOpen.set(true);
+    if (this.panelMode() && this.rail.tab() === null) this.rail.open(this.lastPhotoTab);
   }
 
-  /** A view or collection reset drops the hovered photo; the rail closes with it unless the keyboard cursor still holds one. */
+  /** A view or collection reset drops the hovered photo; its tab closes with it unless the keyboard cursor still holds one. */
   private dropHeldPhoto(): void {
     this.tooltipPhoto.set(null);
-    if (!this.hasActivePhoto()) this.railOpen.set(false);
+    if (!this.hasActivePhoto() && isPhotoTab(this.rail.tab())) this.rail.closePage();
   }
 
   /** Set kinds whose sets are currently collapsed behind one frame.
@@ -1562,7 +1639,8 @@ export class GalleryComponent implements OnInit, OnDestroy {
   protected readonly noticeRightPx = computed(() => {
     // ResizeObserver can retain the previous side-drawer inset after a viewport
     // or presentation change. An over drawer never reserves photo-canvas width.
-    const reservesSpace = this.isDesktop() && (this.store.filterDrawerOpen() || this.detailsRailVisible());
+    // From lg the rail's panels sit outside the notice host, so only the md-to-lg side drawer takes room.
+    const reservesSpace = this.isDesktop() && !this.lgDesktop.isDesktop() && this.store.filterDrawerOpen();
     return (reservesSpace ? this.noticeInsetPx() : 0) + this.floatMarginPx();
   });
 
@@ -2124,11 +2202,10 @@ export class GalleryComponent implements OnInit, OnDestroy {
       if (!this.awaitingInitialScope) this.refreshSideData();
     });
 
-    // Sync store.filterDrawerOpen signal → mat-sidenav. The details rail shares
-    // this drawer, so it keeps the strip open on its own once the filters close.
+    // Sync store.filterDrawerOpen signal → mat-sidenav, below lg only (from lg the flag is the Filter panel).
     effect(() => {
       // The persisted flag is left alone while pinned: the drawer only stays shut.
-      const open = (this.store.filterDrawerOpen() && !this.pinned()) || this.detailsRailVisible();
+      const open = this.store.filterDrawerOpen() && !this.pinned() && !this.lgDesktop.isDesktop();
       const drawer = this.filterDrawer();
       if (!drawer) return;
       if (open) drawer.open();
@@ -2541,10 +2618,8 @@ export class GalleryComponent implements OnInit, OnDestroy {
     // would make the sync effect close the drawer, whose pending open would then
     // reopen it -- an endless open/close loop.
     if (open !== this.filterDrawer()?.opened) return;
-    // The details rail holds this drawer open by itself, so an `open` it caused
-    // must not be recorded as "the user asked for filters" — otherwise closing
-    // the filters would immediately re-open them and the toggle would be stuck.
-    if (open && this.detailsRailVisible()) return;
+    // From lg the drawer is shut because the Filter panel took over, not because the user closed the filters.
+    if (this.lgDesktop.isDesktop()) return;
     // A close caused by the pin is not the user's choice; keep the persisted flag.
     if (this.pinned()) return;
     this.store.setFilterDrawerOpen(open);
@@ -3371,7 +3446,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
   protected deselectFromRail(): void {
     const index = this.railPhotoIndex();
     this.releasePanel();
-    this.railOpen.set(false);
+    this.rail.closePage();
     this.focusAfterRail(index);
   }
 
@@ -3400,16 +3475,14 @@ export class GalleryComponent implements OnInit, OnDestroy {
     if (this.selectionCount() || this.viewScoped()) this.clearSelection();
   }
 
-  /** Escape from inside the rail. The drawer is kept open by `disableClose` while the
-   *  rail occupies it (it would otherwise close and be reopened by the open/close
-   *  effect, a flicker and a focus jump); propagation is left alone so an open
-   *  tooltip's overlay handler still closes. The rail goes with the release, so focus
-   *  moves back to the gallery rather than dropping to the body. */
+  /** Escape from inside a photo tab: what Deselect does, and the tab closes. Marked handled, so the rail's own
+   *  Escape (close every panel) leaves an open add-on alone; propagation is left alone so an open tooltip's
+   *  overlay handler still closes. Focus moves back to the gallery rather than dropping to the body. */
   protected onRailEscape(event: Event): void {
     event.preventDefault();
     const index = this.railPhotoIndex();
     this.escapeSelection();
-    this.railOpen.set(false);
+    this.rail.closePage();
     this.focusAfterRail(index);
   }
 

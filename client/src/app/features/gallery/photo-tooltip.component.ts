@@ -22,6 +22,9 @@ import { HistogramMode } from '../../shared/utils/histogram';
 import { PhotoMetricsTabsComponent } from '../../shared/components/photo-metrics-tabs/photo-metrics-tabs.component';
 import { CaptureDatePipe } from '../../shared/pipes/capture-date.pipe';
 import { PhotoAssessmentComponent } from '../../shared/components/photo-assessment/photo-assessment.component';
+import { CAMERA_METRICS, GRADE_METRICS, METRICS_TABS, type MetricsPanel, type MetricsTab } from '../../core/services/metrics-tab-state.service';
+
+export type TooltipSection = 'all' | 'grade' | 'camera' | 'content';
 
 /** How long the pointer must rest on a photo before the tooltip fetches the
  *  frame count + EV span for its set. Kind and this frame's own EV offset are
@@ -86,6 +89,7 @@ const KEY_SCORES = [
                rounded corners show on every orientation. In the docked rail it
                takes the rail's width, so a portrait photo is as large as the column
                allows; only a very tall one is capped and contained. -->
+          @if (shows().content) {
           <img
             [src]="p.path | thumbnailUrl:640:p.preview_revision"
             [alt]="p.filename"
@@ -97,6 +101,7 @@ const KEY_SCORES = [
             [class.object-contain]="docked()"
             [class.max-h-[75dvh]]="docked()"
           />
+          }
 
           <!-- Scoring panel -->
           <div class="text-xs leading-relaxed text-[var(--facet-tooltip-text)]"
@@ -105,6 +110,7 @@ const KEY_SCORES = [
             [class.w-full]="isLandscape() || docked()"
           >
             <!-- Filename + Date -->
+            @if (shows().content) {
             <div class="font-semibold text-[var(--facet-tooltip-text-title)] truncate"
               [class.flex]="isLandscape()"
               [class.justify-between]="isLandscape()"
@@ -124,8 +130,9 @@ const KEY_SCORES = [
             @if (p.category) { <div class="flex items-center gap-2 mt-1 mb-1.5">
               <span class="text-xs text-[var(--facet-tooltip-text-secondary)] truncate">{{ p.category | categoryLabel }}</span>
             </div> }
+            }
             @if (!docked()) { <app-photo-assessment [photo]="p" [range]="store.metricRangesByColumn()['aggregate']" [explainable]="explainable()" (explain)="explain.emit()" /> }
-            @if (p.star_rating) {
+            @if (p.star_rating && shows().grade) {
               <div class="flex items-center gap-0.5 mb-1.5 text-yellow-400" role="img"
                    [attr.aria-label]="'rating.stars_out_of_five' | translate:{ stars: p.star_rating }">
                 @for (star of stars; track star) {
@@ -135,14 +142,15 @@ const KEY_SCORES = [
             }
 
             <!-- Caption (after score) -->
-            @if (p.caption_translated || p.caption) {
+            @if ((p.caption_translated || p.caption) && shows().content) {
               <!-- w-0 + min-w-full: the caption wraps inside the width the photo and
                    scores already give the bubble instead of widening it. -->
               <div class="w-0 min-w-full text-xs italic text-[var(--facet-tooltip-text-muted)] mb-1.5">{{ p.caption_translated || p.caption }}</div>
             }
 
             <!-- Narrative moment (with confidence) -->
-            @if (p.narrative_moment | momentLabel; as ml) {
+            @if ((p.narrative_moment | momentLabel) && shows().content) {
+              @let ml = p.narrative_moment | momentLabel;
               <div class="text-xs mb-1.5 flex items-center gap-1.5">
                 <span class="text-[var(--mat-sys-primary)] font-medium">✦ {{ ml }}</span>
                 @if (p.narrative_moment_confidence !== null && p.narrative_moment_confidence !== undefined) {
@@ -154,6 +162,10 @@ const KEY_SCORES = [
             <!-- Floating: a glance, not the full sheet -- four fixed scores and one
                  EXIF line. Every other metric lives in the side
                  panel and photo detail, which the docked rail renders below. -->
+            <!-- The docked Camera tab opens on the same capture line the bubble ends with. -->
+            @if (docked() && section() === 'camera' && hasExif()) {
+              <ng-container [ngTemplateOutlet]="captureLine" [ngTemplateOutletContext]="{ $implicit: p }" />
+            }
             @if (!docked()) {
               <div data-floating-key-scores class="border-t border-[var(--facet-tooltip-divider)] pt-1.5 mt-1">
                 @for (row of KEY_SCORES; track row.field) {
@@ -166,13 +178,7 @@ const KEY_SCORES = [
                 }
               </div>
               @if (hasExif()) {
-                <div class="mt-1.5 truncate text-[var(--facet-tooltip-text-secondary)] [&>span+span]:before:content-['_·_']">
-                  @if (p.camera_model) {<span>{{ p.camera_model }}</span>}
-                  @if (p.focal_length) {<span>{{ p.focal_length }}mm</span>}
-                  @if (p.f_stop) {<span>f/{{ p.f_stop }}</span>}
-                  @if (p.shutter_speed) {<span>{{ p.shutter_speed | shutterSpeed }}</span>}
-                  @if (p.iso) {<span>ISO {{ p.iso }}</span>}
-                </div>
+                <ng-container [ngTemplateOutlet]="captureLine" [ngTemplateOutletContext]="{ $implicit: p }" />
               }
             }
             @if (!isLandscape() && !docked()) {
@@ -187,12 +193,22 @@ const KEY_SCORES = [
         <!-- Zones B-D sit below the photo, except in a floating portrait bubble,
              where they join the column beside it so nothing spans under a tall
              image. -->
+        <ng-template #captureLine let-p>
+          <div data-capture-line class="mt-1.5 truncate text-[var(--facet-tooltip-text-secondary)] [&>span+span]:before:content-['_·_']">
+            @if (p.camera_model) {<span>{{ p.camera_model }}</span>}
+            @if (p.focal_length) {<span>{{ p.focal_length }}mm</span>}
+            @if (p.f_stop) {<span>f/{{ p.f_stop }}</span>}
+            @if (p.shutter_speed) {<span>{{ p.shutter_speed | shutterSpeed }}</span>}
+            @if (p.iso) {<span>ISO {{ p.iso }}</span>}
+          </div>
+        </ng-template>
         <ng-template #details>
         <!-- Zone B: the docked rail's metric tabs, then the set strip; the floating
              bubble keeps only the set, its scores having been reduced above. -->
-        @if (docked()) {
-          <!-- Photo detail's metric tabs, sharing its remembered tab. -->
+        @if (docked() && (shows().grade || shows().camera)) {
+          <!-- Photo detail's metric tabs: all of them, or the Grade or Camera half, each with its remembered tab. -->
           <app-photo-metrics-tabs class="text-xs text-[var(--facet-tooltip-text)]" [photo]="p" [ranges]="store.metricRangesByColumn()"
+                                  [sections]="metricSections()" [assessment]="section() !== 'camera'" [panel]="metricPanel()"
                                   [populated]="store.config()?.populated_scores"
                                   [histogramSrcSize]="160" [histogramHeight]="HISTOGRAM_TOOLTIP_HEIGHT"
                                   [histogramSurface]="'tooltip'" [histogramDefaultMode]="histogramDefaultMode()"
@@ -205,7 +221,7 @@ const KEY_SCORES = [
              it resolves -- never blocking the rest of the bubble. Sibling
              thumbnails only in the docked panel: reaching for one in the
              floating hover bubble would dismiss it before the click could land. -->
-        @if (setKind(); as kind) {
+        @if (shows().grade && setKind(); as kind) {
           <div class="mt-2 text-xs text-[var(--facet-tooltip-text)]" data-testid="tooltip-set">
             <div class="flex flex-wrap items-center gap-1.5">
               <mat-icon class="!text-sm !w-3.5 !h-3.5 !leading-[14px] opacity-70" aria-hidden="true">{{ kind | photoSetKindIcon }}</mat-icon>
@@ -242,7 +258,7 @@ const KEY_SCORES = [
         }
 
         <!-- Zone C: Tags (full width) -->
-        @if (navigationTags().length) {
+        @if (shows().content && navigationTags().length) {
           <div class="flex gap-1 flex-wrap mt-2 pt-1.5 border-[var(--facet-tooltip-divider)]" [class.border-t]="!docked()">
             @for (tag of navigationTags(); track tag) {
               @if (personLinks() && showInteractiveControls()) {
@@ -275,7 +291,7 @@ const KEY_SCORES = [
              keeps the original 24px -- it is a dense scan-many-photos
              surface where large avatars would cost width against the
              scoring grid, whether or not it happens to be click-pinned. -->
-        @if (p.persons.length) {
+        @if (shows().content && p.persons.length) {
           <div class="flex items-center gap-1.5 flex-wrap mt-2 pt-1.5 border-[var(--facet-tooltip-divider)]" [class.border-t]="!docked()">
             @for (person of p.persons; track person.id) {
               @if (personLinks() && showInteractiveControls()) {
@@ -336,6 +352,22 @@ export class PhotoTooltipComponent {
    *  `viewer.clipping.tooltip_histogram_mode` -- independent of the detail
    *  panel's default and of the user's per-surface persisted choice. */
   readonly histogramDefaultMode = input<HistogramMode>('luma');
+  /**
+   * Which part a docked panel shows, as the photo page splits it: `grade` (stars, AI score, Quality and
+   * Composition, the set), `camera` (capture line, EXIF, Technical, Histogram), `content` (preview, name,
+   * date, category, caption, moment, tags, people), or `all` (the floating bubble).
+   */
+  readonly section = input<TooltipSection>('all');
+  protected readonly shows = computed(() => {
+    const section = this.section();
+    return { grade: section === 'all' || section === 'grade', camera: section === 'all' || section === 'camera', content: section === 'all' || section === 'content' };
+  });
+  protected readonly metricSections = computed<readonly MetricsTab[]>(() =>
+    this.section() === 'grade' ? GRADE_METRICS : this.section() === 'camera' ? CAMERA_METRICS : METRICS_TABS);
+  protected readonly metricPanel = computed<MetricsPanel>(() => {
+    const section = this.section();
+    return section === 'grade' || section === 'camera' ? section : '';
+  });
 
   /** Whether the photo is landscape orientation (wider than tall).
    *

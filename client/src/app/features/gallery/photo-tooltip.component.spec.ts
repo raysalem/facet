@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Component, signal, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
 import { of, Subject } from 'rxjs';
-import { PhotoTooltipComponent } from './photo-tooltip.component';
+import { PhotoTooltipComponent, type TooltipSection } from './photo-tooltip.component';
 import { CategoryLabelPipe } from '../../shared/pipes/category-label.pipe';
 import { ApiService } from '../../core/services/api.service';
 import { I18nService } from '../../core/services/i18n.service';
@@ -20,7 +20,7 @@ import { OverlayContainer } from '@angular/cdk/overlay';
   changeDetection: ChangeDetectionStrategy.Eager,
   template: `<app-photo-tooltip [photo]="photo()" [x]="x()" [y]="y()" [flipped]="flipped()"
                                  [pinned]="pinned()" [docked]="docked()" [personLinks]="personLinks()"
-                                 [explainable]="explainable()" (explain)="explained = explained + 1" />`,
+                                 [explainable]="explainable()" (explain)="explained = explained + 1" [section]="section()" />`,
 })
 class TestHostComponent {
   photo = signal<Photo | null>(null);
@@ -31,6 +31,7 @@ class TestHostComponent {
   docked = signal(false);
   personLinks = signal(true);
   explainable = signal(false);
+  section = signal<TooltipSection>('all');
   explained = 0;
 }
 
@@ -57,8 +58,26 @@ describe('PhotoTooltipComponent', () => {
     fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
     expect(overlay.querySelector('[role="menu"]')).toBeNull();
   });
-  // The open metric tab is remembered across tests otherwise.
-  afterEach(() => localStorage.removeItem('facet_photo_detail_tab'));
+  it('docked, shows one part per panel the way the photo page splits it: Grade, Camera, Content', () => {
+    fixture.componentInstance.photo.set(makePhoto({ filename: 'a.jpg', category: 'astro', star_rating: 4, camera_model: 'X100V', tags_list: ['sky'], caption: 'Night' }));
+    fixture.componentInstance.docked.set(true);
+    fixture.componentInstance.pinned.set(true);
+    const root = fixture.nativeElement as HTMLElement;
+    const parts = () => ({
+      preview: !!root.querySelector('img[alt="a.jpg"]'), stars: !!root.querySelector('[role="img"][aria-label^="rating."]'),
+      capture: root.querySelector('[data-capture-line]')?.textContent?.includes('X100V') ?? false,
+      tags: !!root.querySelector('[data-testid="tooltip-tag"]'), caption: (root.textContent ?? '').includes('Night'),
+      tabs: [...root.querySelectorAll('app-photo-metrics-tabs [role="tab"]')].map(tab => tab.getAttribute('aria-label')),
+    });
+    fixture.componentInstance.section.set('grade'); fixture.detectChanges();
+    expect(parts()).toEqual({ preview: false, stars: true, capture: false, tags: false, caption: false, tabs: ['photo_detail.quality', 'photo_detail.composition'] });
+    fixture.componentInstance.section.set('camera'); fixture.detectChanges();
+    expect(parts()).toEqual({ preview: false, stars: false, capture: true, tags: false, caption: false, tabs: ['photo_detail.exif', 'photo_detail.technical', 'tooltip.histogram'] });
+    fixture.componentInstance.section.set('content'); fixture.detectChanges();
+    expect(parts()).toEqual({ preview: true, stars: false, capture: false, tags: true, caption: true, tabs: [] });
+  });
+
+  // The open metric tab is remembered across tests otherwise.  afterEach(() => localStorage.removeItem('facet_photo_detail_tab'));
 
   let fixture: ComponentFixture<TestHostComponent>;
   const mockI18n = { t: (key: string) => key, locale: vi.fn(() => 'en'), translations: vi.fn(() => ({})) };

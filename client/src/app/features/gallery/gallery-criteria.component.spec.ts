@@ -47,8 +47,20 @@ describe('zero-star quick refinement', () => {
   app.setActive(false);button.click();expect(mockStore.updateFilters).not.toHaveBeenCalled();
  });
 });
-describe('recent collection visits',()=>{
- it('lets Escape leave a closed inner disclosure so the enclosing mobile menu can close',()=>{
+describe('album rules placement',()=>{
+ it('puts the album rules after the active filters when the Filter panel asks for it',()=>{
+  const {fixture,filtersSignal,mockStore}=createCriteria();
+  (mockStore.currentAlbum as unknown as {set(v:unknown):void}).set({id:7,name:'Astro test (fixed)',is_smart:false});
+  filtersSignal.update(filters=>({...filters,camera:'X100V'}));
+  fixture.detectChanges();
+  const root=fixture.nativeElement as HTMLElement;
+  const order=()=>[...root.querySelectorAll('app-gallery-album-rules, [data-active-criteria]')].map(el=>el.tagName==='APP-GALLERY-ALBUM-RULES'?'rules':'chips');
+  expect(order()).toEqual(['rules','chips']);
+  fixture.componentRef.setInput('rulesLast',true);fixture.detectChanges();
+  expect(order()).toEqual(['chips','rules']);
+ });
+});
+describe('recent collection visits',()=>{ it('lets Escape leave a closed inner disclosure so the enclosing mobile menu can close',()=>{
   const {fixture}=createCriteria();fixture.detectChanges();
   const root=fixture.nativeElement as HTMLElement;
   const details=root.querySelector<HTMLDetailsElement>('details')!;

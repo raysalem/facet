@@ -1772,7 +1772,7 @@
     },
     "rail": {
       "label": "Pannelli della galleria",
-      "view": "Vista e filtri",
+      "filter": "Filtro",
       "filters_one": "{count} filtro",
       "filters": "{count} filtri"
     }
@@ -3433,7 +3433,7 @@
       "grade": "Valutazione",
       "camera": "Fotocamera",
       "content": "Contenuto",
-      "view": "Vista"
+      "filter": "Filtro"
     },
     "view": {
       "open_gallery": "Mostra nella galleria",

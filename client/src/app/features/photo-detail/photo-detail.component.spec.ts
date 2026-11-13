@@ -374,12 +374,12 @@ describe('PhotoDetailComponent', () => {
 
     it('starts on Grade, shows one panel at a time and remembers the pick', async () => {
       const { view, root, panel, tab } = await render();
-      expect([...root.querySelectorAll('[data-rail-tab]')].map(button => button.getAttribute('data-rail-tab'))).toEqual(['grade', 'camera', 'content', 'view']);
+      expect([...root.querySelectorAll('[data-rail-tab]')].map(button => button.getAttribute('data-rail-tab'))).toEqual(['grade', 'camera', 'content', 'filter']);
       expect(tab('grade').getAttribute('aria-selected')).toBe('true');
       expect(tab('grade').getAttribute('tabindex')).toBe('0');
       expect(tab('camera').getAttribute('tabindex')).toBe('-1');
       expect(tab('camera').getAttribute('aria-label')).toBe('photo_detail.rail.camera');
-      expect([panel('grade').hidden, panel('camera').hidden, panel('content').hidden, panel('view').hidden]).toEqual([false, true, true, true]);
+      expect([panel('grade').hidden, panel('camera').hidden, panel('content').hidden, panel('filter').hidden]).toEqual([false, true, true, true]);
       expect(panel('grade').getAttribute('aria-labelledby')).toBe(tab('grade').id);
       expect(panel('grade').querySelector('[data-photo-review]')).not.toBeNull();
       expect(panel('content').querySelector('[data-photo-when]')).not.toBeNull();
@@ -410,21 +410,21 @@ describe('PhotoDetailComponent', () => {
         expect(event.defaultPrevented).toBe(true);
         expect(outside).not.toHaveBeenCalled();
         tab('camera').dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true }));
-        expect(document.activeElement).toBe(tab('view'));
+        expect(document.activeElement).toBe(tab('filter'));
         // Moving focus does not pick: Grade is still shown.
         expect(tab('grade').getAttribute('aria-selected')).toBe('true');
       } finally { root.remove(); }
     });
 
-    it('shows the collection, its filters and the way back in View, and says so for a photo opened on its own', async () => {
+    it('shows the collection, its filters and the way back in Filter, and says so for a photo opened on its own', async () => {
       const photo = makePhoto({ path: samplePhoto.path });
       const { view, panel } = await render(photo);
-      expect(panel('view').querySelector('[data-view-standalone]')).not.toBeNull();
+      expect(panel('filter').querySelector('[data-view-standalone]')).not.toBeNull();
       const store = TestBed.inject(GalleryStore);
       store.photos.set([photo, makePhoto({ path: '/next.jpg' })]);
       store.filters.update(filters => ({ ...filters, camera: 'X100V' }));
       view.detectChanges();
-      const viewPanel = panel('view');
+      const viewPanel = panel('filter');
       expect(viewPanel.querySelector('[data-view-standalone]')).toBeNull();
       expect(viewPanel.querySelector('[data-view-collection] h2')!.textContent!.trim()).toBe('nav.gallery');
       expect(viewPanel.querySelector('[data-view-filters]')!.textContent).toContain('X100V');

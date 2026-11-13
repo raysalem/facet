@@ -66,7 +66,7 @@ import { isPageShortcutBlocked } from '../../shared/utils/keyboard';
 import { privateImageSessionKey } from '../../shared/utils/private-image-session';
 import { KeyboardMappingService } from '../../core/services/keyboard-mapping.service';
 import { AddonRail } from '../../core/addons/addon-rail';
-import type { MetricsTab } from '../../core/services/metrics-tab-state.service';
+import { CAMERA_METRICS, GRADE_METRICS } from '../../core/services/metrics-tab-state.service';
 import { PanelRailComponent } from '../../shared/components/panel-rail/panel-rail.component';
 import { galleryFilterChips } from '../gallery/gallery-filter-chips';
 import { PanelWidth } from '../../shared/utils/panel-width';
@@ -88,7 +88,7 @@ interface PhotoTagOrigin {
 const LOCATION_OPEN_KEY = 'facet_photo_location_open';
 /** The key an add-on's objects chip opens under, beside its tag group's own key. */
 const OBJECTS = 'objects:';
-type FacetTab = 'grade' | 'camera' | 'content' | 'view';
+type FacetTab = 'grade' | 'camera' | 'content' | 'filter';
 
 /**
  * Model D fields of `GET /api/photo` (no share token): the summary tags each add-on wrote, and how many
@@ -407,7 +407,7 @@ function inDetectedSet(photo: Photo): boolean {
         </div>
         </div>
 
-        <!-- The rail picks one panel: Content, Ranking, View, or an add-on. An add-on's frame stays in the shell's
+        <!-- The rail picks one panel: Grade, Camera, Content, Filter, or an add-on. An add-on's frame stays in the shell's
              dock at the far right (moving a frame reloads it), so the panel slot is always the far-right column. -->
         <app-panel-rail data-photo-rail [rail]="rail" [tabs]="facetRailTabs" [label]="I18N.photo_detail.rail.label | translate" idPrefix="photo" />
 
@@ -822,7 +822,7 @@ function inDetectedSet(photo: Photo): boolean {
               <app-photo-related-files [photo]="p" (logicalApplied)="onLogicalAssetApplied($event)" />
             </mat-accordion>
           </section>
-          <section id="photo-panel-view" data-photo-panel="view" role="tabpanel" aria-labelledby="photo-rail-view" [hidden]="rail.shownPage() !== 'view'" class="flex min-h-0 flex-col gap-3 lg:h-full">
+          <section id="photo-panel-filter" data-photo-panel="filter" role="tabpanel" aria-labelledby="photo-rail-filter" [hidden]="rail.shownPage() !== 'filter'" class="flex min-h-0 flex-col gap-3 lg:h-full">
             <!-- What you are looking through: the collection, its filters, the way back to it, its photos. -->
             @if (collectionSidebarAvailable()) {
               <div data-view-collection class="flex items-center gap-2">
@@ -961,18 +961,18 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
       })
       .catch(() => undefined));
   });
-  /** The right rail: Content, Ranking, View or an add-on's panel, remembered per browser. */
+  /** The right rail: Grade, Camera, Content, Filter or an add-on's panel, remembered per browser. */
   protected readonly rail: AddonRail<FacetTab> = new AddonRail<FacetTab>({
-    storageKey: 'facet_photo_rail_tab', tabs: ['grade', 'camera', 'content', 'view'], defaultTab: 'grade',
+    storageKey: 'facet_photo_rail_tab', tabs: ['grade', 'camera', 'content', 'filter'], defaultTab: 'grade',
     needsRegistry: () => this.tagGroups().addons.length > 0,
   });
-  protected readonly GRADE_METRICS: readonly MetricsTab[] = ['quality', 'composition'];
-  protected readonly CAMERA_METRICS: readonly MetricsTab[] = ['exif', 'technical', 'histogram'];
+  protected readonly GRADE_METRICS = GRADE_METRICS;
+  protected readonly CAMERA_METRICS = CAMERA_METRICS;
   protected readonly facetRailTabs = [
     { id: 'grade', icon: 'star_half', label: I18N.photo_detail.rail.grade },
     { id: 'camera', icon: 'photo_camera', label: I18N.photo_detail.rail.camera },
     { id: 'content', icon: 'info', label: I18N.photo_detail.rail.content },
-    { id: 'view', icon: 'filter_alt', label: I18N.photo_detail.rail.view },
+    { id: 'filter', icon: 'filter_alt', label: I18N.photo_detail.rail.filter },
   ] as const;
   /** The open page panel's name, for the panel header. */
   protected readonly shownPanelLabel = computed(() => this.facetRailTabs.find(tab => tab.id === this.rail.shownPage())?.label ?? '');

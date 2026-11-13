@@ -1772,7 +1772,7 @@
     },
     "rail": {
       "label": "Panneaux de la galerie",
-      "view": "Vue et filtres",
+      "filter": "Filtre",
       "filters_one": "{count} filtre",
       "filters": "{count} filtres"
     }
@@ -3433,7 +3433,7 @@
       "grade": "Évaluation",
       "camera": "Appareil",
       "content": "Contenu",
-      "view": "Vue"
+      "filter": "Filtre"
     },
     "view": {
       "open_gallery": "Afficher dans la galerie",

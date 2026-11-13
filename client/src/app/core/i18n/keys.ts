@@ -1811,7 +1811,7 @@ export const I18N = {
     },
     rail: {
       label: "gallery.rail.label",
-      view: "gallery.rail.view",
+      filter: "gallery.rail.filter",
       filters_one: "gallery.rail.filters_one",
       filters: "gallery.rail.filters",
     },
@@ -3472,7 +3472,7 @@ export const I18N = {
       grade: "photo_detail.rail.grade",
       camera: "photo_detail.rail.camera",
       content: "photo_detail.rail.content",
-      view: "photo_detail.rail.view",
+      filter: "photo_detail.rail.filter",
     },
     view: {
       open_gallery: "photo_detail.view.open_gallery",

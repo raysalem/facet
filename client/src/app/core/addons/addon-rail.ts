@@ -127,6 +127,18 @@ export class AddonRail<T extends string> {
     this.tab.set(tab);
   }
 
+  /** Show a page panel without toggling (a page's own button or a photo entering the panel). */
+  open(tab: T): void {
+    this.pageTab.set(tab);
+    this.tab.set(tab);
+  }
+
+  /** Close the page panel on screen, if one is; an add-on on screen stays. */
+  closePage(): void {
+    const tab = this.tab();
+    if (tab !== null && !tab.startsWith(ADDON_PREFIX)) this.tab.set(null);
+  }
+
   /** Show an add-on's panel; opening it (when another or none is open) selects its tab once it is there. */
   selectAddon(addon: RailAddon): void {
     const tab = ADDON_PREFIX + addon.id;
