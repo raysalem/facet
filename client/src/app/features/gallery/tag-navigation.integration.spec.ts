@@ -52,6 +52,7 @@ describe('tag pivots through actual gallery, photo, menus, Router and HTTP', () 
     http.match(request => request.url === '/api/photo/set').forEach(request => request.flush({ kind: null, members: [] }));
     http.match(request => request.url === '/api/photo/faces').forEach(request => request.flush({ faces: [] }));
     http.match(request => request.url === '/api/photo/objects').forEach(request => request.flush({ objects: [] }));
+    http.match(request => request.url === '/api/photo/annotations').forEach(request => request.flush({ annotations: [] }));
   };
   const render = async () => {
     harness.detectChanges(); sideData(); await Promise.resolve(); harness.detectChanges(); sideData();

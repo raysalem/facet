@@ -30,6 +30,7 @@ describe('private photo history through the Router and browser history', () => {
     http.match('/api/photos/keeper_hints').forEach(request => request.flush({}));
     http.match(request => request.url === '/api/photo/set').forEach(request => request.flush({ kind: null, members: [] }));
     http.match(request => request.url === '/api/photo/objects').forEach(request => request.flush({ objects: [] }));
+    http.match(request => request.url === '/api/photo/annotations').forEach(request => request.flush({ annotations: [] }));
     http.match(request => request.url === '/api/photo/faces').forEach(request => request.flush({ faces: [] }));
     http.match(request => request.url === '/api/stacks/by-photo').forEach(request => request.flush(null));
   };
