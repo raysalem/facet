@@ -1,4 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { Location } from '@angular/common';
+import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -148,6 +150,8 @@ export class AddonsPageComponent implements OnInit {
   protected readonly mintError = signal(false);
   protected readonly panels = inject(AddonPanelService);
   private readonly imports = inject(AddonImportNotifier);
+  private readonly router = inject(Router);
+  private readonly location = inject(Location);
   /** The add-on a Start/Stop/Open is in flight for. */
   protected readonly busy = signal<string | null>(null);
   protected readonly logs = signal<Record<string, string>>({});
@@ -160,11 +164,11 @@ export class AddonsPageComponent implements OnInit {
     void this.addons.load();
   }
 
-  /** Open the add-on's sidebar for the gallery's current view or selection. */
+  /** Open the add-on's sidebar for the gallery's current view or selection, then return to that page. */
   protected async open(addon: Addon): Promise<void> {
     this.busy.set(addon.id);
     try {
-      await this.panels.openForCurrentView(addon);
+      if (await this.panels.openForCurrentView(addon)) this.returnToPreviousPage();
     } finally {
       this.busy.set(null);
       if (addon.mode === 'supervised') void this.addons.load();
@@ -205,7 +209,19 @@ export class AddonsPageComponent implements OnInit {
   /** Open an after-import run that nobody opened yet (the browser was closed when it finished). */
   protected async openRun(addonId: string, jobId: string): Promise<void> {
     const addon = this.addons.list()?.addons.find(a => a.id === addonId);
-    if (addon && await this.imports.openRun(addon, jobId)) void this.addons.load();
+    if (addon && await this.imports.openRun(addon, jobId)) {
+      void this.addons.load();
+      this.returnToPreviousPage();
+    }
+  }
+
+  /**
+   * The panel lives in the shell and survives navigation, so after opening it go back to the page the user
+   * came from (the photo they were on, the gallery view): the panel then works on that, not on this page.
+   * Only within the app: a first page load of /addons has nowhere to go back to.
+   */
+  private returnToPreviousPage(): void {
+    if (this.router.lastSuccessfulNavigation()?.previousNavigation) this.location.back();
   }
 
   protected async mint(id: string): Promise<void> {

@@ -5,6 +5,8 @@ import { AddonsService, type AddonList } from '../../core/services/addons.servic
 import { I18nService } from '../../core/services/i18n.service';
 import { AddonPanelService } from '../../core/addons/addon-panel.service';
 import { AddonImportNotifier } from '../../core/addons/addon-import-notifier.service';
+import { Location } from '@angular/common';
+import { Router } from '@angular/router';
 
 function listing(): AddonList {
   return {
@@ -34,6 +36,8 @@ describe('Add-ons page', () => {
   let start: ReturnType<typeof vi.fn>;
   let stop: ReturnType<typeof vi.fn>;
   let log: ReturnType<typeof vi.fn>;
+  let back: ReturnType<typeof vi.fn>;
+  const lastNavigation = signal<{ previousNavigation: object | null } | null>(null);
 
   beforeEach(() => {
     list.set(null); loadError.set(false);
@@ -46,10 +50,14 @@ describe('Add-ons page', () => {
     start = vi.fn(async () => undefined);
     stop = vi.fn(async () => undefined);
     log = vi.fn(async () => ['line one', 'line two']);
+    back = vi.fn();
+    lastNavigation.set({ previousNavigation: {} });
     TestBed.configureTestingModule({ imports: [AddonsPageComponent], providers: [
       { provide: AddonsService, useValue: { list, loadError, load, mintToken, revokeTokens, start, stop, log } },
       { provide: AddonPanelService, useValue: { openForCurrentView, openError } },
       { provide: AddonImportNotifier, useValue: { openRun } },
+      { provide: Location, useValue: { back } },
+      { provide: Router, useValue: { lastSuccessfulNavigation: lastNavigation } },
       { provide: I18nService, useValue: { t: (key: string, params?: Record<string, unknown>) => key + (params ? ' ' + Object.values(params).join(' ') : ''), translations: signal({}), currentLang: signal('en') } },
     ] });
     fixture = TestBed.createComponent(AddonsPageComponent);
@@ -93,6 +101,27 @@ describe('Add-ons page', () => {
     openError.set('The add-on is not running');
     fixture.detectChanges();
     expect(root.querySelector('[role="alert"]')?.textContent).toContain('The add-on is not running');
+  });
+
+  it('goes back to the page the user came from once the panel is open, so it works on that photo or view', async () => {
+    await settle();
+    (root.querySelector('[data-addon="astro"] [data-addon-open]') as HTMLButtonElement).click();
+    await settle();
+    expect(back).toHaveBeenCalledOnce();
+    (root.querySelector('[data-pending-open]') as HTMLButtonElement).click();
+    await settle();
+    expect(back).toHaveBeenCalledTimes(2);
+  });
+
+  it('stays when the panel did not open or the add-ons page was the first page loaded', async () => {
+    await settle();
+    openForCurrentView.mockResolvedValueOnce(false);
+    (root.querySelector('[data-addon="astro"] [data-addon-open]') as HTMLButtonElement).click();
+    await settle();
+    lastNavigation.set({ previousNavigation: null });
+    (root.querySelector('[data-addon="astro"] [data-addon-open]') as HTMLButtonElement).click();
+    await settle();
+    expect(back).not.toHaveBeenCalled();
   });
 
   it('lists after-import runs nobody opened and opens one with its import scope', async () => {
