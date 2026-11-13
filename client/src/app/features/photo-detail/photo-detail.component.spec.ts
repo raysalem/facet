@@ -22,6 +22,7 @@ import { ApiService } from '../../core/services/api.service';
 import { PhotoActionsService } from '../../core/services/photo-actions.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AddonsService } from '../../core/services/addons.service';
+import { AddonPanelService } from '../../core/addons/addon-panel.service';
 import { I18nService } from '../../core/services/i18n.service';
 import { I18N } from '../../core/i18n/keys';
 import { KeyboardMappingService, KEYMAP_STORAGE_KEY } from '../../core/services/keyboard-mapping.service';
@@ -44,6 +45,7 @@ describe('PhotoDetailComponent', () => {
   // The open metric tab is remembered across tests otherwise.
   afterEach(() => {
     localStorage.removeItem('facet_photo_detail_tab');
+    localStorage.removeItem('facet_photo_rail_tab');
     history.replaceState(null, '', location.href);
   });
 
@@ -54,7 +56,7 @@ describe('PhotoDetailComponent', () => {
   let mockRouter: { url: string; navigate: Mock; currentNavigation: () => Navigation | null; events: Observable<unknown> };
   let mockLocation: { back: Mock; path: Mock; getState: Mock; replaceState: Mock };
   let mockRoute: { snapshot: { queryParamMap: { get: Mock } }; queryParamMap: BehaviorSubject<ParamMap> };
-  let mockAuth: { status: ReturnType<typeof signal>; identity: () => string; session: () => string | null; isEdition: ReturnType<typeof signal>; downloadProfiles: ReturnType<typeof signal> };
+  let mockAuth: { status: ReturnType<typeof signal>; identity: () => string; session: () => string | null; isEdition: ReturnType<typeof signal>; downloadProfiles: ReturnType<typeof signal>; hasFeature: (key: string) => boolean };
   let mockDialog: { open: Mock; openDialogs: unknown[] };
 
   const samplePhoto = {
@@ -167,7 +169,7 @@ describe('PhotoDetailComponent', () => {
       queryParamMap: new BehaviorSubject(convertToParamMap({ path: '/photos/test.jpg' })),
     };
     const status = signal({ user_id: 'test' });
-    mockAuth = { status, identity: () => status().user_id, session: computed(() => status()?.user_id ?? null), isEdition: signal(true), downloadProfiles: signal([]) };
+    mockAuth = { status, identity: () => status().user_id, session: computed(() => status()?.user_id ?? null), isEdition: signal(true), downloadProfiles: signal([]), hasFeature: () => false };
     mockDialog = { open: vi.fn(() => ({ afterClosed: () => of(undefined) })), openDialogs: [] };
   });
 
@@ -353,6 +355,101 @@ describe('PhotoDetailComponent', () => {
     expect(canvas.querySelector('[data-rendition-status] [data-rendition-retry]')).not.toBeNull();
   });
 
+  describe('right rail', () => {
+    async function render(photo = makePhoto({ path: samplePhoto.path })) {
+      const view = renderDetail();
+      mockApi.get.mockImplementation((url: string) => of(url === '/photo' ? photo : {}));
+      view.componentInstance.photo.set(photo);
+      view.detectChanges(); await view.whenStable(); view.detectChanges();
+      const root = view.nativeElement as HTMLElement;
+      const panel = (id: string) => root.querySelector<HTMLElement>(`[data-photo-panel="${id}"]`)!;
+      const tab = (id: string) => root.querySelector<HTMLButtonElement>(`[data-rail-tab="${id}"]`)!;
+      return { view, root, panel, tab };
+    }
+
+    it('starts on Content, shows one panel at a time and remembers the pick', async () => {
+      const { view, panel, tab } = await render();
+      expect(tab('content').getAttribute('aria-selected')).toBe('true');
+      expect(tab('content').getAttribute('tabindex')).toBe('0');
+      expect(tab('ranking').getAttribute('tabindex')).toBe('-1');
+      expect(tab('ranking').getAttribute('aria-label')).toBe('photo_detail.rail.ranking');
+      expect([panel('content').hidden, panel('ranking').hidden, panel('view').hidden]).toEqual([false, true, true]);
+      expect(panel('content').getAttribute('aria-labelledby')).toBe(tab('content').id);
+      expect(panel('ranking').querySelector('[data-photo-review]')).not.toBeNull();
+      expect(panel('content').querySelector('[data-photo-when]')).not.toBeNull();
+      tab('ranking').click(); view.detectChanges(); TestBed.flushEffects();
+      expect([panel('content').hidden, panel('ranking').hidden]).toEqual([true, false]);
+      expect(localStorage.getItem('facet_photo_rail_tab')).toBe('ranking');
+      view.destroy();
+      TestBed.resetTestingModule();
+      const again = await render();
+      expect(again.tab('ranking').getAttribute('aria-selected')).toBe('true');
+    });
+
+    it('moves focus along the rail with the arrow keys, keeping them from the photo navigation', async () => {
+      const { root, tab } = await render();
+      document.body.appendChild(root);
+      try {
+        tab('content').focus();
+        const event = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true });
+        const outside = vi.fn(); document.addEventListener('keydown', outside);
+        tab('content').dispatchEvent(event);
+        document.removeEventListener('keydown', outside);
+        expect(document.activeElement).toBe(tab('ranking'));
+        expect(event.defaultPrevented).toBe(true);
+        expect(outside).not.toHaveBeenCalled();
+        tab('ranking').dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true }));
+        expect(document.activeElement).toBe(tab('view'));
+        // Moving focus does not pick: Content is still shown.
+        expect(tab('content').getAttribute('aria-selected')).toBe('true');
+      } finally { root.remove(); }
+    });
+
+    it('shows the collection, its filters and the way back in View, and says so for a photo opened on its own', async () => {
+      const photo = makePhoto({ path: samplePhoto.path });
+      const { view, panel } = await render(photo);
+      expect(panel('view').querySelector('[data-view-standalone]')).not.toBeNull();
+      const store = TestBed.inject(GalleryStore);
+      store.photos.set([photo, makePhoto({ path: '/next.jpg' })]);
+      store.filters.update(filters => ({ ...filters, camera: 'X100V' }));
+      view.detectChanges();
+      const viewPanel = panel('view');
+      expect(viewPanel.querySelector('[data-view-standalone]')).toBeNull();
+      expect(viewPanel.querySelector('[data-view-collection] h2')!.textContent!.trim()).toBe('nav.gallery');
+      expect(viewPanel.querySelector('[data-view-filters]')!.textContent).toContain('X100V');
+      expect(viewPanel.querySelector('[data-view-open-gallery]')).not.toBeNull();
+      expect(viewPanel.querySelector('app-photo-collection-sidebar')).not.toBeNull();
+      // The collection list has one place now: no strip left of the image.
+      expect((view.nativeElement as HTMLElement).querySelectorAll('app-photo-collection-sidebar')).toHaveLength(1);
+    });
+
+    it('gives an open add-on its own tab, hides the dock (frame kept) while a Facet panel shows, and falls back when it closes', async () => {
+      const { view, root, panel, tab } = await render();
+      const panels = TestBed.inject(AddonPanelService);
+      panels.panel.set({ addon: { id: 'astro', name: 'Astro', icon: 'star' }, nonce: 'n1', src: '/addons/astro/', scope: { kind: 'view' } });
+      view.detectChanges(); TestBed.flushEffects(); view.detectChanges();
+      const astro = root.querySelector<HTMLButtonElement>('[data-rail-addon="astro"]')!;
+      expect(astro.getAttribute('aria-label')).toBe('Astro');
+      // Opened from anywhere (the toolbar, the puzzle menu): its tab is selected and the dock shows.
+      expect(astro.getAttribute('aria-selected')).toBe('true');
+      expect(panels.dockHidden()).toBe(false);
+      expect(root.querySelector('[data-photo-inspector]')!.classList).toContain('lg:!hidden');
+      tab('content').click(); view.detectChanges(); TestBed.flushEffects(); view.detectChanges();
+      expect(panels.dockHidden()).toBe(true);
+      expect(root.querySelector('[data-photo-inspector]')!.classList).not.toContain('lg:!hidden');
+      expect(panel('content').hidden).toBe(false);
+      const open = vi.spyOn(panels, 'openForCurrentView');
+      astro.click(); view.detectChanges(); TestBed.flushEffects();
+      expect(open).not.toHaveBeenCalled();
+      expect(panels.dockHidden()).toBe(false);
+      panels.panel.set(null); view.detectChanges(); TestBed.flushEffects(); view.detectChanges();
+      expect(tab('content').getAttribute('aria-selected')).toBe('true');
+      expect(root.querySelector('[data-rail-addon]')).toBeNull();
+      view.destroy();
+      expect(panels.dockHidden()).toBe(false);
+    });
+  });
+
   describe('inspector width', () => {
     const KEY = 'facet_photo_inspector_width';
     afterEach(() => localStorage.removeItem(KEY));
@@ -413,7 +510,10 @@ describe('PhotoDetailComponent', () => {
       expect(toggle.getAttribute('aria-expanded')).toBe('true');
       expect(detail.hidden).toBe(false);
       expect(detail.textContent).toContain('48.858370, 2.294481');
-      expect(detail.querySelector('.rounded-lg')!.classList).toContain('h-24');
+      const map = detail.querySelector<HTMLElement>('[data-location-map]')!;
+      expect(map.classList).toContain('h-40');
+      // Readable light tiles in the dark theme too (the global dark filter inverts them).
+      expect(map.classList).toContain('[&_.leaflet-tile-pane]:![filter:none]');
       expect(leafletMock.map).toHaveBeenCalledOnce();
       expect(localStorage.getItem(KEY)).toBe('true');
 
@@ -816,7 +916,7 @@ describe('PhotoDetailComponent', () => {
     // Metadata sources and related files close the panel as one single-open Material accordion, both collapsed.
     const fileDetails = aside.querySelector<HTMLElement>('mat-accordion[data-file-details]')!;
     expect(fileDetails).not.toBeNull();
-    expect(aside.lastElementChild).toBe(fileDetails);
+    expect(aside.querySelector('[data-photo-panel="content"]')!.lastElementChild).toBe(fileDetails);
     for (const panel of ['[data-photo-provenance]', '[data-related-files]']) {
       expect(fileDetails.querySelector(`mat-expansion-panel${panel}`)).not.toBeNull();
       expect(fileDetails.querySelector(`${panel} mat-expansion-panel-header`)!.getAttribute('aria-expanded')).toBe('false');
@@ -826,7 +926,7 @@ describe('PhotoDetailComponent', () => {
     expect(mockApi.get.mock.calls.filter(([url]) => url === '/photo/related_files')).toHaveLength(0);
   });
 
-  it('orders the inspector Review, date line, Describe, metric tabs, set, location, file details and pins Review on wide screens', async () => {
+  it('orders each rail panel by priority and pins Review on wide screens', async () => {
     const view = renderDetail();
     const photo = makePhoto({ camera_model: 'Canon EOS R6', focal_length: 85, f_stop: 2.8, shutter_speed: '0.01', iso: 4000,
       caption: 'A street', tags_list: ['street'], gps_latitude: 1, gps_longitude: 2, persons: [{ id: 1, name: 'Alice' }],
@@ -840,13 +940,17 @@ describe('PhotoDetailComponent', () => {
     }
     view.detectChanges();
     const aside = (view.nativeElement as HTMLElement).querySelector<HTMLElement>('[data-photo-inspector]')!;
-    // By priority: review and the date line always, Describe compact, metrics and set below, location then file details folded at the bottom.
-    const order = ['[data-photo-review]', '[data-photo-when]', '[data-photo-describe]', 'app-photo-metrics-tabs', '[data-photo-set]', '[data-photo-location]', '[data-file-details]']
-      .map(selector => aside.querySelector<HTMLElement>(selector)!);
-    order.forEach(element => expect(element).not.toBeNull());
-    for (let i = 1; i < order.length; i++) {
-      expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    }
+    // By priority, per rail panel. Content: date line, Describe, then location and file details folded at the bottom.
+    // Ranking: the review first, then the metric tabs and the set.
+    const inOrder = (panel: string, selectors: string[]) => {
+      const elements = selectors.map(selector => aside.querySelector<HTMLElement>(`[data-photo-panel="${panel}"] ${selector}`)!);
+      elements.forEach(element => expect(element).not.toBeNull());
+      for (let i = 1; i < elements.length; i++) {
+        expect(elements[i - 1].compareDocumentPosition(elements[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      }
+    };
+    inOrder('content', ['[data-photo-when]', '[data-photo-describe]', '[data-photo-location]', '[data-file-details]']);
+    inOrder('ranking', ['[data-photo-review]', 'app-photo-metrics-tabs', '[data-photo-set]']);
     const describe = aside.querySelector<HTMLElement>('[data-photo-describe]')!;
     expect(aside.querySelector('[data-photo-describe] [data-photo-location]')).toBeNull();
     const fields = ['[data-photo-caption]', '[data-testid="tags-section"]', '[data-photo-people]']
@@ -3321,7 +3425,7 @@ describe('PhotoDetailComponent', () => {
       const chipTexts = (el: HTMLElement) => [...el.querySelectorAll('[data-testid="manual-tag-chip"]')].map(chip => chip.querySelector('button span:last-child')!.textContent!.trim());
 
       it('folds an add-on\'s tags into one collapsed chip named after the add-on, keeping the user\'s own chips', async () => {
-        const load = vi.fn().mockResolvedValue({ addons: [{ id: 'astro-id', name: 'Astro' }] });
+        const load = vi.fn().mockResolvedValue({ addons: [{ id: 'astro-id', name: 'Astro', icon: 'star', slots: ['sidebar'] }] });
         const el = await render(astro, true, [addonsMock(load)]);
         await settle();
         expect(el.querySelectorAll('[data-testid="ai-tag-chip"]').length).toBe(1);
@@ -3352,7 +3456,7 @@ describe('PhotoDetailComponent', () => {
 
       it('reads the sources for a photo opened from a gallery row, which carries none', async () => {
         const row = { ...astro, manual_tag_sources: undefined };
-        const el = await render(row, true, [addonsMock(vi.fn().mockResolvedValue({ addons: [{ id: 'astro-id', name: 'Astro' }] }))]);
+        const el = await render(row, true, [addonsMock(vi.fn().mockResolvedValue({ addons: [{ id: 'astro-id', name: 'Astro', icon: 'star', slots: ['sidebar'] }] }))]);
         // The page took the row as it was (no fetch); the add-on chip appears once /photo names the sources.
         expect(mockApi.get).toHaveBeenCalledWith('/photo', { path: row.path });
         mockApi.get.mockReturnValue(of(astro));
@@ -3367,7 +3471,7 @@ describe('PhotoDetailComponent', () => {
       });
 
       it('groups AI, Yours and add-on tags in that order, naming the groups only when more than one shows', async () => {
-        const el = await render({ ...astro, tags_list: ['sky'] }, true, [addonsMock(vi.fn().mockResolvedValue({ addons: [{ id: 'astro-id', name: 'Astro' }] }))]);
+        const el = await render({ ...astro, tags_list: ['sky'] }, true, [addonsMock(vi.fn().mockResolvedValue({ addons: [{ id: 'astro-id', name: 'Astro', icon: 'star', slots: ['sidebar'] }] }))]);
         await settle(); await settle();
         const groups = [...el.querySelectorAll<HTMLElement>('[data-testid="tags-section"] [data-tag-group]')];
         expect(groups.map(group => group.dataset['tagGroup'])).toEqual(['ai', 'yours', 'addons']);

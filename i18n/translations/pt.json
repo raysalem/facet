@@ -3260,9 +3260,6 @@
       "next": "Foto seguinte da coleção",
       "title": "Coleção",
       "position": "Coleção {position} / {total}",
-      "show": "Mostrar coleção",
-      "hide": "Ocultar coleção",
-      "resize": "Redimensionar o painel da coleção",
       "loaded": "{loaded} de {total} itens apresentados carregados · mesmos filtros e ordenação",
       "more": "Carregar mais",
       "previous_loaded": "Fotos carregadas anteriores",
@@ -3418,6 +3415,17 @@
     },
     "analysis": "Análise",
     "details": "Detalhes da foto",
+    "rail": {
+      "label": "Painéis da foto",
+      "content": "Conteúdo",
+      "ranking": "Avaliação",
+      "view": "Vista"
+    },
+    "view": {
+      "open_gallery": "Mostrar na galeria",
+      "filters": "Filtros",
+      "standalone": "Aberta sozinha, não a partir de uma coleção da galeria."
+    },
     "inspector_resize": "Redimensionar o painel de detalhes da foto",
     "zoom_controls": "Ampliação da imagem",
     "unassigned_faces": "Rostos não atribuídos: {count}",

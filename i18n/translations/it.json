@@ -3260,9 +3260,6 @@
       "next": "Foto successiva nella raccolta",
       "title": "Raccolta",
       "position": "Raccolta {position} / {total}",
-      "show": "Mostra raccolta",
-      "hide": "Nascondi raccolta",
-      "resize": "Ridimensiona il pannello della raccolta",
       "loaded": "{loaded} di {total} elementi visualizzati caricati · stessi filtri e ordinamento",
       "more": "Carica altre",
       "previous_loaded": "Foto caricate precedenti",
@@ -3418,6 +3415,17 @@
     },
     "analysis": "Analisi",
     "details": "Dettagli della foto",
+    "rail": {
+      "label": "Pannelli della foto",
+      "content": "Contenuto",
+      "ranking": "Valutazione",
+      "view": "Vista"
+    },
+    "view": {
+      "open_gallery": "Mostra nella galleria",
+      "filters": "Filtri",
+      "standalone": "Aperta da sola, non da una raccolta della galleria."
+    },
     "inspector_resize": "Ridimensiona il pannello dei dettagli della foto",
     "zoom_controls": "Ingrandimento dell’immagine",
     "unassigned_faces": "Volti non assegnati: {count}",

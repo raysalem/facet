@@ -5,71 +5,48 @@ import { ThumbnailUrlPipe } from '../../shared/pipes/thumbnail-url.pipe';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { I18N } from '../../core/i18n/keys';
 import { rovingFocusKey } from '../../shared/utils/roving-focus';
-import { PanelWidth } from '../../shared/utils/panel-width';
 
-/** Collapsed, the sidebar is only its expand chevron, so the photo keeps the room. */
-const COLLAPSED_WIDTH = 28;
-
-/** Reads the originating collection; never changes its query, selection or sort. */
+/** The originating collection's thumbnails, shown in the photo page's View panel. Reads the collection;
+ *  never changes its query, selection or sort. */
 @Component({
   selector: 'app-photo-collection-sidebar',
   imports: [MatIconModule, ThumbnailUrlPipe, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'relative hidden xl:flex shrink-0 min-h-0 border-r border-[var(--mat-sys-outline-variant)]', '[style.width.px]': 'collapsed() ? COLLAPSED_WIDTH : resize.width()' },
+  host: { class: 'flex min-h-0 min-w-0 flex-col' },
   template: `
-    <aside class="flex min-h-0 min-w-0 flex-1 flex-col" [attr.aria-label]="I18N.photo_detail.collection.title | translate">
-      <div class="flex min-h-10 shrink-0 items-center gap-1" [class.px-1]="!collapsed()">
-        <button type="button" class="flex h-8 shrink-0 items-center justify-center rounded hover:bg-[var(--mat-sys-surface-container)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--mat-sys-primary)] pointer-coarse:h-11 pointer-coarse:w-11 pointer-coarse:relative pointer-coarse:z-10"
-          [class.w-8]="!collapsed()" [class.w-7]="collapsed()"
-          [attr.aria-label]="(collapsed() ? I18N.photo_detail.collection.show : I18N.photo_detail.collection.hide) | translate"
-          [attr.aria-expanded]="!collapsed()" (click)="toggle()">
-          <mat-icon>{{ collapsed() ? 'chevron_right' : 'chevron_left' }}</mat-icon>
-        </button>
-        @if (!collapsed()) {
-          <span class="min-w-0 truncate text-xs font-medium" [title]="title() || (I18N.photo_detail.collection.title | translate)">{{ title() || (I18N.photo_detail.collection.title | translate) }}</span>
+    <section class="flex min-h-0 min-w-0 flex-1 flex-col" [attr.aria-label]="I18N.photo_detail.collection.title | translate">
+      <p class="m-0 pb-2 text-xs text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.collection.loaded | translate:{ loaded: photos().length, total: total() } }}</p>
+      <div #scroller data-collection-scroller class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1 max-lg:max-h-[60dvh]" tabindex="0" [attr.aria-label]="I18N.photo_detail.collection.title | translate">
+        @if (windowStart() > 0) {
+          <button type="button" data-collection-previous-window class="mb-2 min-h-11 w-full rounded border border-[var(--mat-sys-outline-variant)] px-2 text-xs" (click)="pageWindow(-1)">{{ I18N.photo_detail.collection.previous_loaded | translate }}</button>
         }
-      </div>
-      @if (!collapsed()) {
-        <p class="m-0 px-2 pb-2 text-xs text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.collection.loaded | translate:{ loaded: photos().length, total: total() } }}</p>
-        <div #scroller data-collection-scroller class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2" tabindex="0" [attr.aria-label]="I18N.photo_detail.collection.title | translate">
-          @if (windowStart() > 0) {
-            <button type="button" data-collection-previous-window class="mb-2 min-h-11 w-full rounded border border-[var(--mat-sys-outline-variant)] px-2 text-xs" (click)="pageWindow(-1)">{{ I18N.photo_detail.collection.previous_loaded | translate }}</button>
-          }
-          <div class="grid gap-2" [style.grid-template-columns]="columns()">
-            @for (photo of visiblePhotos(); track photo.path) {
-              <button type="button" [attr.data-collection-current]="photo.path === currentPath() ? '' : null"
-                [attr.aria-current]="photo.path === currentPath() ? 'true' : null" [attr.aria-label]="photo.filename"
-                (keydown)="thumbnailKey($event)" [attr.tabindex]="photo.path === tabStopPath() ? 0 : -1" (focus)="focusedPath.set(photo.path)" [title]="photo.filename" (click)="choose.emit(photo.path)"
-                class="min-w-0 overflow-hidden rounded border-2 border-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mat-sys-primary)]"
-                [class.!border-[var(--mat-sys-primary)]]="photo.path === currentPath()">
-                <img [src]="photo.path | thumbnailUrl:240:photo.preview_revision" alt="" loading="lazy" class="aspect-square w-full object-cover" />
-                <span class="block truncate px-1 py-1 text-xs">{{ photo.filename }}</span>
-              </button>
-            }
-          </div>
-          @if (windowEnd() < photos().length) {
-            <button type="button" data-collection-next-window class="mt-2 min-h-11 w-full rounded border border-[var(--mat-sys-outline-variant)] px-2 text-xs" (click)="pageWindow(1)">{{ I18N.photo_detail.collection.next_loaded | translate }}</button>
-          }
-          @if (hasMore() && windowEnd() === photos().length) {
-            <button type="button" class="mt-2 min-h-11 w-full rounded border border-[var(--mat-sys-outline-variant)] px-2 text-xs"
-              [disabled]="loading()" (click)="more.emit()">{{ (loading() ? I18N.ui.labels.loading : I18N.photo_detail.collection.more) | translate }}</button>
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-2">
+          @for (photo of visiblePhotos(); track photo.path) {
+            <button type="button" [attr.data-collection-current]="photo.path === currentPath() ? '' : null"
+              [attr.aria-current]="photo.path === currentPath() ? 'true' : null" [attr.aria-label]="photo.filename"
+              (keydown)="thumbnailKey($event)" [attr.tabindex]="photo.path === tabStopPath() ? 0 : -1" (focus)="focusedPath.set(photo.path)" [title]="photo.filename" (click)="choose.emit(photo.path)"
+              class="min-w-0 overflow-hidden rounded border-2 border-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mat-sys-primary)]"
+              [class.!border-[var(--mat-sys-primary)]]="photo.path === currentPath()">
+              <img [src]="photo.path | thumbnailUrl:240:photo.preview_revision" alt="" loading="lazy" class="aspect-square w-full object-cover" />
+              <span class="block truncate px-1 py-1 text-xs">{{ photo.filename }}</span>
+            </button>
           }
         </div>
-        <div role="separator" tabindex="0" aria-orientation="vertical" [attr.aria-label]="I18N.photo_detail.collection.resize | translate"
-          [attr.aria-valuemin]="resize.min" [attr.aria-valuemax]="resize.max" [attr.aria-valuenow]="resize.width()"
-          class="absolute inset-y-0 -right-1 z-10 w-2 cursor-col-resize touch-none focus-visible:bg-[var(--mat-sys-primary)]"
-          (pointerdown)="resize.start($event)" (pointermove)="resize.move($event)" (pointerup)="resize.finish($event)"
-          (pointercancel)="resize.finish($event, true)" (lostpointercapture)="resize.finish($event, true)" (keydown)="resize.key($event)"></div>
-      }
-    </aside>
+        @if (windowEnd() < photos().length) {
+          <button type="button" data-collection-next-window class="mt-2 min-h-11 w-full rounded border border-[var(--mat-sys-outline-variant)] px-2 text-xs" (click)="pageWindow(1)">{{ I18N.photo_detail.collection.next_loaded | translate }}</button>
+        }
+        @if (hasMore() && windowEnd() === photos().length) {
+          <button type="button" class="mt-2 min-h-11 w-full rounded border border-[var(--mat-sys-outline-variant)] px-2 text-xs"
+            [disabled]="loading()" (click)="more.emit()">{{ (loading() ? I18N.ui.labels.loading : I18N.photo_detail.collection.more) | translate }}</button>
+        }
+      </div>
+    </section>
   `,
 })
 export class PhotoCollectionSidebarComponent {
   protected readonly I18N = I18N;
-  protected readonly COLLAPSED_WIDTH = COLLAPSED_WIDTH;
   readonly photos = input<readonly Photo[]>([]);
   readonly currentPath = input('');
-  readonly title = input('');
   readonly total = input(0);
   readonly hasMore = input(false);
   readonly loading = input(false);
@@ -77,10 +54,6 @@ export class PhotoCollectionSidebarComponent {
   readonly more = output<void>();
   /** Up/Down pressed on the section's first or last thumbnail, for the page to step along the collection. */
   readonly step = output<-1 | 1>();
-  protected readonly resize = new PanelWidth({ storageKey: 'facet_collection_sidebar_width', defaultWidth: 192, min: 144, max: 384, side: 'left' });
-  protected readonly collapsed = signal(false);
-  protected readonly columnCount = computed(() => this.resize.width() >= 280 ? 2 : 1);
-  protected readonly columns = computed(() => `repeat(${this.columnCount()}, minmax(0, 1fr))`);
   private readonly injector = inject(Injector);
   private readonly windowSize = 200;
   private readonly requestedStart = signal(0);
@@ -126,7 +99,7 @@ export class PhotoCollectionSidebarComponent {
     });
     // Reflow and hidden-to-visible transitions must keep the same photo in view too.
     effect(cleanup => {
-      this.currentPath(); this.resize.width();
+      this.currentPath();
       const viewport = this.scroller()?.nativeElement;
       this.revealCurrent();
       if (viewport && typeof ResizeObserver !== 'undefined') {
@@ -154,7 +127,6 @@ export class PhotoCollectionSidebarComponent {
     });
   }
 
-  protected toggle(): void { this.collapsed.update(value => !value); }
   protected pageWindow(direction: -1 | 1): void {
     const start = this.windowStart();
     const next = Math.max(0, Math.min(this.photos().length - 1, start + direction * this.windowSize));

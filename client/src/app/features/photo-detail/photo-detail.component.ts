@@ -65,7 +65,9 @@ import { I18N, i18nKeys } from '../../core/i18n/keys';
 import { isPageShortcutBlocked } from '../../shared/utils/keyboard';
 import { privateImageSessionKey } from '../../shared/utils/private-image-session';
 import { KeyboardMappingService } from '../../core/services/keyboard-mapping.service';
-import { AddonsService } from '../../core/services/addons.service';
+import { AddonsService, type Addon } from '../../core/services/addons.service';
+import { AddonPanelService } from '../../core/addons/addon-panel.service';
+import { galleryFilterChips } from '../gallery/gallery-filter-chips';
 import { PanelWidth } from '../../shared/utils/panel-width';
 import type { CategoryOverrideResult } from './category-override-dialog.component';
 import { StackNavigatorComponent } from './stack-navigator.component';
@@ -83,6 +85,18 @@ interface PhotoTagOrigin {
 }
 
 const LOCATION_OPEN_KEY = 'facet_photo_location_open';
+const RAIL_KEY = 'facet_photo_rail_tab';
+type FacetTab = 'content' | 'ranking' | 'view';
+/** An add-on as the rail and the panel service know it. */
+type RailAddon = Pick<Addon, 'id' | 'name' | 'icon'> & Partial<Pick<Addon, 'mode'>>;
+
+function readRailTab(): string {
+  try { return localStorage.getItem(RAIL_KEY) || 'content'; } catch { return 'content'; }
+}
+
+function asFacetTab(tab: string): FacetTab {
+  return tab === 'ranking' || tab === 'view' ? tab : 'content';
+}
 
 function readLocationOpen(): boolean {
   try { return localStorage.getItem(LOCATION_OPEN_KEY) === 'true'; } catch { return false; }
@@ -312,13 +326,8 @@ function inDetectedSet(photo: Photo): boolean {
       <app-stack-navigator [path]="p.path" [allowedPaths]="store.pinnedPaths()" [stacked]="!!p.stack_id"
         (memberOpened)="openSetMember($event)" />
 
-      <!-- Main content: originating collection + image + info -->
+      <!-- Main content: the image, the rail that picks one panel, and that panel -->
       <div class="flex flex-col lg:flex-row lg:flex-1 lg:min-h-0 lg:overflow-hidden">
-        @if (collectionSidebarAvailable()) {
-          <app-photo-collection-sidebar [photos]="store.photos()" [currentPath]="collectionEntry()?.path ?? p.path"
-            [title]="collectionSidebarTitle()" [total]="store.total()" [hasMore]="store.hasMore()" [loading]="store.loading()"
-            (choose)="openCollectionPhoto($event)" (more)="loadCollectionPage()" (step)="stepCollection($event)" />
-        }
         <!-- Image panel -->
         <div class="flex min-h-40 max-h-[62dvh] min-w-0 shrink-0 flex-col lg:max-h-none lg:min-h-0 lg:flex-1">
         <div data-photo-canvas tabindex="0" role="group" [attr.aria-label]="I18N.photo_detail.inspection.title | translate" aria-describedby="photo-inspection-help" [appZoomPan]="p.path" #zoom="zoomPan" [style.aspect-ratio]="photoAspect()" class="group/photo focus-visible:!outline-2 focus-visible:!-outline-offset-4 focus-visible:!outline-white flex flex-auto min-h-0 items-center justify-center bg-[var(--facet-image-canvas)] relative overflow-hidden cursor-grab lg:!aspect-auto lg:flex-1">
@@ -395,15 +404,44 @@ function inDetectedSet(photo: Photo): boolean {
         </div>
         </div>
 
-        <!-- Drag or arrow-key the inspector's left edge to trade image room for detail (lg+, remembered). -->
+        <!-- The rail picks one panel: Content, Ranking, View, or an add-on. An add-on's frame stays in the shell's
+             dock at the far right (moving a frame reloads it), so the panel slot is always the far-right column. -->
+        <!-- The keys bubble here from the tabs, which are the focusable elements. -->
+        <!-- eslint-disable-next-line @angular-eslint/template/interactive-supports-focus -->
+        <div data-photo-rail role="tablist" [attr.aria-label]="I18N.photo_detail.rail.label | translate" (keydown)="railKey($event)"
+          class="flex shrink-0 items-center gap-1 border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-1 max-lg:border-y lg:w-11 lg:flex-col lg:border-l">
+          @for (tab of facetRailTabs; track tab.id) {
+            <button type="button" role="tab" [id]="'photo-rail-' + tab.id" [attr.aria-controls]="'photo-panel-' + tab.id" [attr.data-rail-tab]="tab.id"
+              [attr.aria-selected]="railTab() === tab.id" [attr.tabindex]="railTab() === tab.id ? 0 : -1"
+              [matTooltip]="tab.label | translate" matTooltipPosition="left" [attr.aria-label]="tab.label | translate" (click)="selectRail(tab.id)"
+              class="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-[var(--mat-sys-on-surface-variant)] hover:bg-[var(--mat-sys-surface-container-high)] focus-visible:outline-2 focus-visible:outline-[var(--mat-sys-primary)] max-sm:h-11 max-sm:w-11 pointer-coarse:h-11 pointer-coarse:w-11"
+              [class.!bg-[var(--mat-sys-secondary-container)]]="railTab() === tab.id" [class.!text-[var(--mat-sys-on-secondary-container)]]="railTab() === tab.id">
+              <mat-icon aria-hidden="true">{{ tab.icon }}</mat-icon>
+            </button>
+          }
+          @if (railAddons().length) {
+            <span aria-hidden="true" class="shrink-0 bg-[var(--mat-sys-outline-variant)] max-lg:mx-1 max-lg:h-6 max-lg:w-px lg:my-1 lg:h-px lg:w-6"></span>
+            @for (addon of railAddons(); track addon.id) {
+              <button type="button" role="tab" [attr.data-rail-addon]="addon.id"
+                [attr.aria-selected]="railTab() === 'addon:' + addon.id" [attr.tabindex]="railTab() === 'addon:' + addon.id ? 0 : -1"
+                [matTooltip]="addon.name" matTooltipPosition="left" [attr.aria-label]="addon.name" (click)="selectAddon(addon)"
+                class="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-[var(--mat-sys-on-surface-variant)] hover:bg-[var(--mat-sys-surface-container-high)] focus-visible:outline-2 focus-visible:outline-[var(--mat-sys-primary)] max-sm:h-11 max-sm:w-11 pointer-coarse:h-11 pointer-coarse:w-11"
+                [class.!bg-[var(--mat-sys-secondary-container)]]="railTab() === 'addon:' + addon.id" [class.!text-[var(--mat-sys-on-secondary-container)]]="railTab() === 'addon:' + addon.id">
+                <mat-icon aria-hidden="true">{{ addon.icon }}</mat-icon>
+              </button>
+            }
+          }
+        </div>
+
+        <!-- Drag or arrow-key the panel's left edge to trade image room for detail (lg+, remembered). -->
         <div role="separator" tabindex="0" aria-orientation="vertical" data-inspector-resize [attr.aria-label]="I18N.photo_detail.inspector_resize | translate"
-          [attr.aria-valuemin]="inspectorWidth.min" [attr.aria-valuemax]="inspectorWidth.max" [attr.aria-valuenow]="inspectorWidth.width()"
+          [attr.aria-valuemin]="inspectorWidth.min" [attr.aria-valuemax]="inspectorWidth.max" [attr.aria-valuenow]="inspectorWidth.width()" [class.lg:!hidden]="addonTabActive()"
           class="relative z-10 hidden lg:block w-3 -mx-1.5 shrink-0 cursor-col-resize touch-none focus-visible:bg-[var(--mat-sys-primary)]"
           (pointerdown)="inspectorWidth.start($event)" (pointermove)="inspectorWidth.move($event)" (pointerup)="inspectorWidth.finish($event)"
           (pointercancel)="inspectorWidth.finish($event, true)" (lostpointercapture)="inspectorWidth.finish($event, true)" (keydown)="inspectorWidth.key($event)"></div>
 
         <!-- Info panel -->
-        <aside data-photo-inspector [attr.aria-label]="I18N.photo_detail.details | translate" [style.--facet-inspector-width]="inspectorWidth.width() + 'px'" class="[overflow-wrap:anywhere] lg:w-[var(--facet-inspector-width)] lg:shrink-0 lg:overflow-y-auto lg:border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-4 space-y-4 text-sm text-[var(--mat-sys-on-surface)]">
+        <aside data-photo-inspector [attr.aria-label]="I18N.photo_detail.details | translate" [style.--facet-inspector-width]="inspectorWidth.width() + 'px'" [class.lg:!hidden]="addonTabActive()" class="[overflow-wrap:anywhere] lg:w-[var(--facet-inspector-width)] lg:shrink-0 lg:overflow-y-auto lg:border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-4 space-y-4 text-sm text-[var(--mat-sys-on-surface)]">
           <ng-template #categoryExplanation>
               <mat-form-field class="w-full" subscriptSizing="dynamic">
                 <mat-label>{{ I18N.photo.category_override.target_category_label | translate }}</mat-label>
@@ -418,347 +456,393 @@ function inDetectedSet(photo: Photo): boolean {
                 <app-category-explainer [path]="p.path" [targetCategory]="target" />
               }
           </ng-template>
-          <!-- Account review controls -->
-          @if (canReview()) {
-            <section data-photo-review aria-labelledby="photo-review-title" class="space-y-1 bg-[var(--mat-sys-surface-container-lowest)] lg:sticky lg:-top-4 lg:z-10 lg:-mx-4 lg:-mt-4 lg:px-4 lg:pt-4 lg:pb-2">
-              <h2 id="photo-review-title" class="sr-only">{{ I18N.gallery.sidebar.tabs.review | translate }}</h2>
-              <!-- Like the gallery rail: no title or rule above the review controls, the favourite beside the stars. -->
-              <div data-photo-rating-row class="flex items-center gap-2">
-                <div role="group" [attr.aria-label]="I18N.photo_detail.rating | translate" class="flex min-w-0 flex-1 flex-nowrap">
-                  @for (star of stars; track star) {
-                    <button type="button" class="min-w-9 max-w-11 flex-1 max-sm:min-w-11 pointer-coarse:min-w-11 min-h-11 rounded inline-flex items-center justify-center hover:bg-[var(--mat-sys-surface-container-high)] cursor-pointer"
-                            [attr.aria-label]="(I18N.rating.set_rating | translate) + ': ' + star" [attr.aria-pressed]="p.star_rating === star" (click)="setRating(p.path, star)">
-                      <mat-icon class="!text-xl !w-5 !h-5 !leading-5 !text-[var(--mat-sys-primary)]">{{ p.star_rating !== null && star <= p.star_rating! ? 'star' : 'star_border' }}</mat-icon>
-                    </button>
-                  }
-                </div>
-                <button mat-icon-button class="ml-auto max-sm:!h-11 max-sm:!w-11 pointer-coarse:!h-11 pointer-coarse:!w-11" (click)="toggleFavorite(p.path)"
-                  [matTooltip]="(p.is_favorite ? I18N.rating.remove_favorite : I18N.rating.add_favorite) | translate"
-                  [attr.aria-label]="I18N.rating.favorite | translate" [attr.aria-pressed]="!!p.is_favorite">
-                  <mat-icon class="!text-[var(--facet-favorite)]">{{ p.is_favorite ? 'favorite' : 'favorite_border' }}</mat-icon>
-                </button>
-              </div>
-              <div data-photo-decisions role="group" [attr.aria-label]="I18N.gallery.sidebar.review.decision | translate" class="flex items-stretch divide-x divide-[var(--mat-sys-outline-variant)] overflow-hidden rounded border border-[var(--mat-sys-outline-variant)]">
-                @if (canDecide()) {
-                  <button type="button" data-photo-keep class="inline-flex min-h-11 min-w-0 flex-1 cursor-pointer focus-visible:!outline-2 focus-visible:!-outline-offset-4 focus-visible:!outline-current items-center justify-center gap-1 px-1 text-xs hover:bg-[var(--mat-sys-surface-container-high)]" [class.!bg-[var(--facet-review-kept)]]="p.is_kept" [class.!text-[var(--facet-review-on-kept)]]="p.is_kept"
-                    (click)="reviewPhoto(p.is_kept ? 'undecided' : 'kept')" [attr.aria-pressed]="!!p.is_kept">
-                    <mat-icon aria-hidden="true" class="!w-5 !h-5 !text-xl">{{ p.is_kept ? 'flag' : 'outlined_flag' }}</mat-icon>{{ I18N.review.keep | translate }}
-                  </button>
-                  <button type="button" data-photo-undecided class="inline-flex min-h-11 min-w-0 flex-1 cursor-pointer focus-visible:!outline-2 focus-visible:!-outline-offset-4 focus-visible:!outline-current items-center justify-center px-1 text-xs hover:bg-[var(--mat-sys-surface-container-high)]" [class.!bg-[var(--mat-sys-secondary-container)]]="!p.is_kept && !p.is_rejected" [class.!text-[var(--mat-sys-on-secondary-container)]]="!p.is_kept && !p.is_rejected"
-                    (click)="reviewPhoto('undecided')" [attr.aria-pressed]="!p.is_kept && !p.is_rejected">
-                    <span class="min-w-0 break-words hyphens-auto">{{ I18N.gallery.metadata.undecided | translate }}</span>
-                  </button>
-                }
-                <button type="button" data-photo-reject class="inline-flex min-h-11 min-w-0 flex-1 cursor-pointer focus-visible:!outline-2 focus-visible:!-outline-offset-4 focus-visible:!outline-current items-center justify-center gap-1 px-1 text-xs hover:bg-[var(--mat-sys-surface-container-high)]" [class.!bg-[var(--mat-sys-error-container)]]="p.is_rejected" [class.!text-[var(--mat-sys-on-error-container)]]="p.is_rejected"
-                  (click)="toggleRejected(p.path)" [attr.aria-pressed]="!!p.is_rejected">
-                  <mat-icon aria-hidden="true" class="!w-5 !h-5 !text-xl">{{ p.is_rejected ? 'thumb_down' : 'thumb_down_off_alt' }}</mat-icon>{{ I18N.gallery.selection.reject | translate }}
-                </button>
-              </div>
-            </section>
-          }
-
-          <!-- Capture date and scoring category on one line, the capture settings under it -->
-          <div data-photo-when class="space-y-1 text-xs text-[var(--mat-sys-on-surface-variant)]">
-            <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-              @if (p.date_taken || auth.isEdition()) {
-                <span data-photo-date class="inline-flex items-center gap-1">
-                  @if (auth.isEdition()) {
-                    <button mat-icon-button class="!w-7 !h-7 max-sm:!w-11 max-sm:!h-11 pointer-coarse:!w-11 pointer-coarse:!h-11 !min-w-0 !p-0 -ml-1.5 !inline-flex items-center justify-center" (click)="editCaptureDate(p)"
-                            [matTooltip]="I18N.capture_date.title | translate"
-                            [attr.aria-label]="I18N.capture_date.title | translate">
-                      <mat-icon class="!text-base !w-4 !h-4 !leading-4">edit_calendar</mat-icon>
-                    </button>
-                  }
-                  @if (p.date_taken) { <span class="leading-4">{{ p.date_taken | captureDate }}</span> }
-                  @else { <span>{{ I18N.gallery.no_capture_date | translate }}</span> }
-                </span>
-              }
-              @if (p.category || auth.isEdition()) {
-                <span data-photo-category class="inline-flex items-center gap-1">
-                  {{ p.category ? (p.category | categoryLabel) : (I18N.category_names.default | translate) }}
-                  <!-- Category explainer toggle: "why isn't this photo classified as X?" — kept for an uncategorized photo too. -->
-                  @if (auth.isEdition()) {
-                    <app-control-popover icon="help_outline" [compact]="true" [label]="I18N.photo.category_override.explainer_toggle | translate" [content]="categoryExplanation" (opened)="loadExplainerCategories()" />
-                  }
-                </span>
-              }
-              @if (keeperHint()?.has_better) {
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-black/60 text-amber-300 rounded-full text-xs font-medium"
-                      [attr.aria-label]="I18N.culling.reason.better_shot | translate">
-                  <mat-icon class="!text-sm !w-4 !h-4 !leading-4" aria-hidden="true">arrow_circle_up</mat-icon>
-                  {{ I18N.culling.reason.better_shot | translate }}
-                </span>
-              }
-            </div>
-            @if (p.camera_model || p.focal_length || p.f_stop || p.shutter_speed || p.iso || (p.image_width && p.image_height)) {
-              <!-- Each item's "·" sits in the gap before it, so the one that would open a wrapped line is clipped. -->
-              <div data-photo-exposure role="group" [attr.aria-label]="I18N.photo_detail.capture_settings | translate" class="overflow-x-clip">
-                <div class="-ms-3 flex flex-wrap items-center tabular-nums [&>span]:relative [&>span]:ms-3 [&>span]:before:absolute [&>span]:before:-start-2 [&>span]:before:content-['·']">
-                @if (p.camera_model) { <span>{{ p.camera_model }}</span> }
-                @if (p.focal_length) { <span>{{ p.focal_length }}mm</span> }
-                @if (p.f_stop) { <span>f/{{ p.f_stop }}</span> }
-                @if (p.shutter_speed | shutterSpeed; as shutter) { <span>{{ shutter }}</span> }
-                @if (p.iso) { <span>ISO {{ p.iso }}</span> }
-                @if (p.image_width && p.image_height) {
-                  <span class="inline-flex items-center gap-0.5 whitespace-nowrap">
-                    <span data-photo-dimensions>{{ p.image_width }} × {{ p.image_height }}</span>
-                    <app-context-help class="-my-1.5" [label]="I18N.gallery.compare.rendition.sources" [keys]="[I18N.photo_detail.rendition.note]" [iconOnly]="true" />
+          <!-- Content: the photo's own facts, most used first; location and file details folded at the bottom. -->
+          <section id="photo-panel-content" data-photo-panel="content" role="tabpanel" aria-labelledby="photo-rail-content" [hidden]="facetTab() !== 'content'" class="space-y-4">
+            <!-- Capture date and scoring category on one line, the capture settings under it -->
+            <div data-photo-when class="space-y-1 text-xs text-[var(--mat-sys-on-surface-variant)]">
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                @if (p.date_taken || auth.isEdition()) {
+                  <span data-photo-date class="inline-flex items-center gap-1">
+                    @if (auth.isEdition()) {
+                      <button mat-icon-button class="!w-7 !h-7 max-sm:!w-11 max-sm:!h-11 pointer-coarse:!w-11 pointer-coarse:!h-11 !min-w-0 !p-0 -ml-1.5 !inline-flex items-center justify-center" (click)="editCaptureDate(p)"
+                              [matTooltip]="I18N.capture_date.title | translate"
+                              [attr.aria-label]="I18N.capture_date.title | translate">
+                        <mat-icon class="!text-base !w-4 !h-4 !leading-4">edit_calendar</mat-icon>
+                      </button>
+                    }
+                    @if (p.date_taken) { <span class="leading-4">{{ p.date_taken | captureDate }}</span> }
+                    @else { <span>{{ I18N.gallery.no_capture_date | translate }}</span> }
                   </span>
                 }
-                </div>
-              </div>
-            }
-          </div>
-
-          <!-- Describe: caption, tags, location and people; an editor adds a missing one from the compact actions -->
-          <div #describe data-photo-describe class="space-y-3">
-            @if (displayCaption() || translatingCaption()) {
-              <div data-photo-caption>
-                <div class="flex items-center justify-between mb-1">
-                  <div class="text-xs text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.caption | translate }}</div>
-                  @if (auth.isEdition()) {
-                    <button mat-icon-button class="!w-7 !h-7 max-sm:!w-11 max-sm:!h-11 pointer-coarse:!w-11 pointer-coarse:!h-11 !p-0" (click)="editCaption(p)" [matTooltip]="I18N.photo_detail.edit_caption | translate" [attr.aria-label]="I18N.photo_detail.edit_caption | translate">
-                      <mat-icon class="!text-base !w-4 !h-4 !leading-4">edit</mat-icon>
-                    </button>
-                  }
-                </div>
-                @if (translatingCaption()) {
-                  <p class="text-[var(--mat-sys-on-surface-variant)] italic text-xs">{{ I18N.photo_detail.translating_caption | translate }}</p>
-                } @else {
-                  <p class="text-[var(--mat-sys-on-surface-variant)]">{{ displayCaption() }}</p>
+                @if (p.category || auth.isEdition()) {
+                  <span data-photo-category class="inline-flex items-center gap-1">
+                    {{ p.category ? (p.category | categoryLabel) : (I18N.category_names.default | translate) }}
+                    <!-- Category explainer toggle: "why isn't this photo classified as X?" — kept for an uncategorized photo too. -->
+                    @if (auth.isEdition()) {
+                      <app-control-popover icon="help_outline" [compact]="true" [label]="I18N.photo.category_override.explainer_toggle | translate" [content]="categoryExplanation" (opened)="loadExplainerCategories()" />
+                    }
+                  </span>
                 }
               </div>
-            }
-
-              <!-- Tags: AI chips, then manual chips (marked, removable for editors), then + Tag -->
-            @if (p.tags_list.length || p.manual_tags.length || tagInputOpen()) {
-              <div data-testid="tags-section">
-                <div class="text-xs text-[var(--mat-sys-on-surface-variant)] mb-2">{{ I18N.photo_detail.tags | translate }}</div>
-                <!-- AI, then Yours, then one folded chip per add-on; a group is named only when another one shows. -->
-                <div class="space-y-1.5">
-                  <ng-template #manualTagChip let-tag>
-                    <span data-testid="manual-tag-chip"
-                          class="inline-flex min-w-0 max-w-full items-center rounded-full border border-dashed border-[var(--facet-accent-text)] text-[var(--facet-accent-text)] text-xs">
-                      <button class="inline-flex items-center min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 max-sm:min-w-11 pointer-coarse:min-w-11 min-w-0 gap-1 pl-2 pr-2 py-0.5 cursor-pointer hover:opacity-80 transition-opacity"
-                              [attr.title]="I18N.manual_tags.manual | translate"
-                              [matMenuTriggerFor]="tagNavigationMenu" [matMenuTriggerData]="{ tag: tag }">
-                        <mat-icon class="!text-xs !w-3 !h-3 !leading-3" aria-hidden="true">sell</mat-icon>
-                        <span class="sr-only">{{ I18N.manual_tags.manual | translate }}:</span>
-                        <span class="min-w-0 [overflow-wrap:anywhere] text-left">{{ tag }}</span>
-                      </button>
-                      @if (auth.isEdition()) {
-                        <button data-testid="manual-tag-remove"
-                                class="inline-flex items-center justify-center shrink-0 min-w-6 min-h-6 max-sm:min-w-11 max-sm:min-h-11 pointer-coarse:min-w-11 pointer-coarse:min-h-11 -ml-1 max-sm:ml-0 pointer-coarse:ml-0 cursor-pointer hover:opacity-80"
-                                [attr.aria-label]="I18N.manual_tags.remove_tag | translate:{ tag: tag }"
-                                (click)="removeManualTag(p, tag)">
-                          <mat-icon class="!text-xs !w-3 !h-3 !leading-3" aria-hidden="true">close</mat-icon>
-                        </button>
-                      }
-                    </span>
-                  </ng-template>
-                @if (p.tags_list.length) {
-                <div data-tag-group="ai" class="flex gap-1.5 flex-wrap items-center">
-                  @if (tagGroups().labelled) { <span class="text-[0.6875rem] text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.tag_groups.ai | translate }}</span> }
-                  @for (tag of p.tags_list; track tag) {
-                    <span data-testid="ai-tag-chip" class="inline-flex min-w-0 max-w-full">
-                      <button class="inline-flex items-center min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 max-sm:min-w-11 pointer-coarse:min-w-11 max-w-full [overflow-wrap:anywhere] text-left px-2 py-0.5 bg-[var(--facet-accent-badge)] text-[var(--facet-accent-text)] rounded-full text-xs cursor-pointer hover:opacity-80 transition-opacity"
-                              [matMenuTriggerFor]="tagNavigationMenu" [matMenuTriggerData]="{ tag: tag }">{{ tag }}</button>
+              @if (p.camera_model || p.focal_length || p.f_stop || p.shutter_speed || p.iso || (p.image_width && p.image_height)) {
+                <!-- Each item's "·" sits in the gap before it, so the one that would open a wrapped line is clipped. -->
+                <div data-photo-exposure role="group" [attr.aria-label]="I18N.photo_detail.capture_settings | translate" class="overflow-x-clip">
+                  <div class="-ms-3 flex flex-wrap items-center tabular-nums [&>span]:relative [&>span]:ms-3 [&>span]:before:absolute [&>span]:before:-start-2 [&>span]:before:content-['·']">
+                  @if (p.camera_model) { <span>{{ p.camera_model }}</span> }
+                  @if (p.focal_length) { <span>{{ p.focal_length }}mm</span> }
+                  @if (p.f_stop) { <span>f/{{ p.f_stop }}</span> }
+                  @if (p.shutter_speed | shutterSpeed; as shutter) { <span>{{ shutter }}</span> }
+                  @if (p.iso) { <span>ISO {{ p.iso }}</span> }
+                  @if (p.image_width && p.image_height) {
+                    <span class="inline-flex items-center gap-0.5 whitespace-nowrap">
+                      <span data-photo-dimensions>{{ p.image_width }} × {{ p.image_height }}</span>
+                      <app-context-help class="-my-1.5" [label]="I18N.gallery.compare.rendition.sources" [keys]="[I18N.photo_detail.rendition.note]" [iconOnly]="true" />
                     </span>
                   }
-                </div>
-                }
-                @if (tagGroups().own.length || (auth.isEdition() && !tagInputOpen())) {
-                <div data-tag-group="yours" class="flex gap-1.5 flex-wrap items-center">
-                  @if (tagGroups().labelled && tagGroups().own.length) { <span class="text-[0.6875rem] text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.tag_groups.yours | translate }}</span> }
-                  @for (tag of tagGroups().own; track tag) {
-                    <ng-container [ngTemplateOutlet]="manualTagChip" [ngTemplateOutletContext]="{ $implicit: tag }" />
-                  }
-                  @if (auth.isEdition() && !tagInputOpen()) {
-                    <button type="button" data-add-tag class="inline-flex min-h-6 items-center gap-0.5 rounded-full border border-dashed border-[var(--mat-sys-outline)] px-2 py-0.5 text-xs text-[var(--mat-sys-on-surface-variant)] cursor-pointer hover:bg-[var(--mat-sys-surface-container-high)] max-sm:min-h-11 pointer-coarse:min-h-11"
-                            [attr.aria-label]="I18N.manual_tags.add | translate" (click)="openTagInput()">
-                      <mat-icon class="!text-sm !w-3.5 !h-3.5 !leading-3.5" aria-hidden="true">add</mat-icon>{{ I18N.manual_tags.tag_label | translate }}
-                    </button>
-                  }
-                </div>
-                }
-                @if (tagGroups().addons.length) {
-                <!-- An add-on's tags fold into one muted chip per add-on, collapsed until asked for. -->
-                <div data-tag-group="addons" class="flex gap-1.5 flex-wrap items-center">
-                  @if (tagGroups().labelled) { <span class="text-[0.6875rem] text-[var(--mat-sys-on-surface-variant)]">{{ I18N.addons.title | translate }}</span> }
-                  @for (group of tagGroups().addons; track group.source) {
-                    <button type="button" data-addon-tag-group [attr.data-source]="group.source" [attr.aria-expanded]="group.expanded"
-                            class="inline-flex min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 items-center gap-0.5 rounded-full border border-[var(--mat-sys-outline-variant)] px-2 py-0.5 text-xs text-[var(--mat-sys-on-surface-variant)] cursor-pointer hover:bg-[var(--mat-sys-surface-container-high)]"
-                            [attr.aria-label]="I18N.manual_tags.addon_group | translate:{ name: group.name, count: group.tags.length }" (click)="toggleTagSource(group.source)">
-                      <span aria-hidden="true">{{ group.name }} · {{ group.tags.length }}</span>
-                      <mat-icon class="!text-sm !w-3.5 !h-3.5 !leading-3.5" aria-hidden="true">{{ group.expanded ? 'expand_less' : 'chevron_right' }}</mat-icon>
-                    </button>
-                    @if (group.expanded) {
-                      @for (tag of group.tags; track tag) {
-                        <ng-container [ngTemplateOutlet]="manualTagChip" [ngTemplateOutletContext]="{ $implicit: tag }" />
-                      }
-                    }
-                  }
-                </div>
-                }
-                </div>
-                <mat-menu #tagNavigationMenu="matMenu">
-                  <ng-template matMenuContent let-tag="tag">
-                    @if (tagCollectionAvailable()) {
-                      <button mat-menu-item (click)="navigateTag(tag, 'collection')"><mat-icon>filter_alt</mat-icon>{{ I18N.photo_detail.tag_refine_collection | translate }}</button>
-                    }
-                    <button mat-menu-item (click)="navigateTag(tag, 'library')"><mat-icon>search</mat-icon>{{ I18N.photo_detail.tag_search_library | translate }}</button>
-                  </ng-template>
-                </mat-menu>
-                @if (auth.isEdition() && tagInputOpen()) {
-                  <div class="flex items-center gap-1 mt-2" data-testid="manual-tag-add">
-                    <input type="text" maxlength="64"
-                           class="min-w-0 flex-1 max-sm:min-h-11 pointer-coarse:min-h-11 px-2 py-1 text-xs rounded border border-[var(--mat-sys-outline-variant)] bg-transparent"
-                           [value]="newTag()"
-                           [attr.aria-label]="I18N.manual_tags.add | translate"
-                           [placeholder]="I18N.manual_tags.add | translate"
-                           (input)="onNewTagInput($event)"
-                           (keydown.enter)="addManualTag(p, newTag())" (keydown.escape)="closeTagInput($event)" />
-                    <button mat-icon-button class="!w-7 !h-7 max-sm:!w-11 max-sm:!h-11 pointer-coarse:!w-11 pointer-coarse:!h-11 !p-0 !inline-flex !items-center !justify-center shrink-0" (click)="addManualTag(p, newTag())"
-                            [disabled]="!newTag().trim()"
-                            [matTooltip]="I18N.manual_tags.add | translate" [attr.aria-label]="I18N.manual_tags.add | translate">
-                      <mat-icon class="!text-base !w-4 !h-4 !leading-4">add</mat-icon>
-                    </button>
                   </div>
-                }
+                </div>
+              }
+            </div>
+
+            <!-- Describe: caption, tags and people; an editor adds a missing one from the compact actions -->
+            <div #describe data-photo-describe class="space-y-3">
+              @if (displayCaption() || translatingCaption()) {
+                <div data-photo-caption>
+                  <div class="flex items-center justify-between mb-1">
+                    <div class="text-xs text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.caption | translate }}</div>
+                    @if (auth.isEdition()) {
+                      <button mat-icon-button class="!w-7 !h-7 max-sm:!w-11 max-sm:!h-11 pointer-coarse:!w-11 pointer-coarse:!h-11 !p-0" (click)="editCaption(p)" [matTooltip]="I18N.photo_detail.edit_caption | translate" [attr.aria-label]="I18N.photo_detail.edit_caption | translate">
+                        <mat-icon class="!text-base !w-4 !h-4 !leading-4">edit</mat-icon>
+                      </button>
+                    }
+                  </div>
+                  @if (translatingCaption()) {
+                    <p class="text-[var(--mat-sys-on-surface-variant)] italic text-xs">{{ I18N.photo_detail.translating_caption | translate }}</p>
+                  } @else {
+                    <p class="text-[var(--mat-sys-on-surface-variant)]">{{ displayCaption() }}</p>
+                  }
+                </div>
+              }
+
+                <!-- Tags: AI chips, then manual chips (marked, removable for editors), then + Tag -->
+              @if (p.tags_list.length || p.manual_tags.length || tagInputOpen()) {
+                <div data-testid="tags-section">
+                  <div class="text-xs text-[var(--mat-sys-on-surface-variant)] mb-2">{{ I18N.photo_detail.tags | translate }}</div>
+                  <!-- AI, then Yours, then one folded chip per add-on; a group is named only when another one shows. -->
+                  <div class="space-y-1.5">
+                    <ng-template #manualTagChip let-tag>
+                      <span data-testid="manual-tag-chip"
+                            class="inline-flex min-w-0 max-w-full items-center rounded-full border border-dashed border-[var(--facet-accent-text)] text-[var(--facet-accent-text)] text-xs">
+                        <button class="inline-flex items-center min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 max-sm:min-w-11 pointer-coarse:min-w-11 min-w-0 gap-1 pl-2 pr-2 py-0.5 cursor-pointer hover:opacity-80 transition-opacity"
+                                [attr.title]="I18N.manual_tags.manual | translate"
+                                [matMenuTriggerFor]="tagNavigationMenu" [matMenuTriggerData]="{ tag: tag }">
+                          <mat-icon class="!text-xs !w-3 !h-3 !leading-3" aria-hidden="true">sell</mat-icon>
+                          <span class="sr-only">{{ I18N.manual_tags.manual | translate }}:</span>
+                          <span class="min-w-0 [overflow-wrap:anywhere] text-left">{{ tag }}</span>
+                        </button>
+                        @if (auth.isEdition()) {
+                          <button data-testid="manual-tag-remove"
+                                  class="inline-flex items-center justify-center shrink-0 min-w-6 min-h-6 max-sm:min-w-11 max-sm:min-h-11 pointer-coarse:min-w-11 pointer-coarse:min-h-11 -ml-1 max-sm:ml-0 pointer-coarse:ml-0 cursor-pointer hover:opacity-80"
+                                  [attr.aria-label]="I18N.manual_tags.remove_tag | translate:{ tag: tag }"
+                                  (click)="removeManualTag(p, tag)">
+                            <mat-icon class="!text-xs !w-3 !h-3 !leading-3" aria-hidden="true">close</mat-icon>
+                          </button>
+                        }
+                      </span>
+                    </ng-template>
+                  @if (p.tags_list.length) {
+                  <div data-tag-group="ai" class="flex gap-1.5 flex-wrap items-center">
+                    @if (tagGroups().labelled) { <span class="text-[0.6875rem] text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.tag_groups.ai | translate }}</span> }
+                    @for (tag of p.tags_list; track tag) {
+                      <span data-testid="ai-tag-chip" class="inline-flex min-w-0 max-w-full">
+                        <button class="inline-flex items-center min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 max-sm:min-w-11 pointer-coarse:min-w-11 max-w-full [overflow-wrap:anywhere] text-left px-2 py-0.5 bg-[var(--facet-accent-badge)] text-[var(--facet-accent-text)] rounded-full text-xs cursor-pointer hover:opacity-80 transition-opacity"
+                                [matMenuTriggerFor]="tagNavigationMenu" [matMenuTriggerData]="{ tag: tag }">{{ tag }}</button>
+                      </span>
+                    }
+                  </div>
+                  }
+                  @if (tagGroups().own.length || (auth.isEdition() && !tagInputOpen())) {
+                  <div data-tag-group="yours" class="flex gap-1.5 flex-wrap items-center">
+                    @if (tagGroups().labelled && tagGroups().own.length) { <span class="text-[0.6875rem] text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.tag_groups.yours | translate }}</span> }
+                    @for (tag of tagGroups().own; track tag) {
+                      <ng-container [ngTemplateOutlet]="manualTagChip" [ngTemplateOutletContext]="{ $implicit: tag }" />
+                    }
+                    @if (auth.isEdition() && !tagInputOpen()) {
+                      <button type="button" data-add-tag class="inline-flex min-h-6 items-center gap-0.5 rounded-full border border-dashed border-[var(--mat-sys-outline)] px-2 py-0.5 text-xs text-[var(--mat-sys-on-surface-variant)] cursor-pointer hover:bg-[var(--mat-sys-surface-container-high)] max-sm:min-h-11 pointer-coarse:min-h-11"
+                              [attr.aria-label]="I18N.manual_tags.add | translate" (click)="openTagInput()">
+                        <mat-icon class="!text-sm !w-3.5 !h-3.5 !leading-3.5" aria-hidden="true">add</mat-icon>{{ I18N.manual_tags.tag_label | translate }}
+                      </button>
+                    }
+                  </div>
+                  }
+                  @if (tagGroups().addons.length) {
+                  <!-- An add-on's tags fold into one muted chip per add-on, collapsed until asked for. -->
+                  <div data-tag-group="addons" class="flex gap-1.5 flex-wrap items-center">
+                    @if (tagGroups().labelled) { <span class="text-[0.6875rem] text-[var(--mat-sys-on-surface-variant)]">{{ I18N.addons.title | translate }}</span> }
+                    @for (group of tagGroups().addons; track group.source) {
+                      <button type="button" data-addon-tag-group [attr.data-source]="group.source" [attr.aria-expanded]="group.expanded"
+                              class="inline-flex min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 items-center gap-0.5 rounded-full border border-[var(--mat-sys-outline-variant)] px-2 py-0.5 text-xs text-[var(--mat-sys-on-surface-variant)] cursor-pointer hover:bg-[var(--mat-sys-surface-container-high)]"
+                              [attr.aria-label]="I18N.manual_tags.addon_group | translate:{ name: group.name, count: group.tags.length }" (click)="toggleTagSource(group.source)">
+                        <span aria-hidden="true">{{ group.name }} · {{ group.tags.length }}</span>
+                        <mat-icon class="!text-sm !w-3.5 !h-3.5 !leading-3.5" aria-hidden="true">{{ group.expanded ? 'expand_less' : 'chevron_right' }}</mat-icon>
+                      </button>
+                      @if (group.expanded) {
+                        @for (tag of group.tags; track tag) {
+                          <ng-container [ngTemplateOutlet]="manualTagChip" [ngTemplateOutletContext]="{ $implicit: tag }" />
+                        }
+                      }
+                    }
+                  </div>
+                  }
+                  </div>
+                  <mat-menu #tagNavigationMenu="matMenu">
+                    <ng-template matMenuContent let-tag="tag">
+                      @if (tagCollectionAvailable()) {
+                        <button mat-menu-item (click)="navigateTag(tag, 'collection')"><mat-icon>filter_alt</mat-icon>{{ I18N.photo_detail.tag_refine_collection | translate }}</button>
+                      }
+                      <button mat-menu-item (click)="navigateTag(tag, 'library')"><mat-icon>search</mat-icon>{{ I18N.photo_detail.tag_search_library | translate }}</button>
+                    </ng-template>
+                  </mat-menu>
+                  @if (auth.isEdition() && tagInputOpen()) {
+                    <div class="flex items-center gap-1 mt-2" data-testid="manual-tag-add">
+                      <input type="text" maxlength="64"
+                             class="min-w-0 flex-1 max-sm:min-h-11 pointer-coarse:min-h-11 px-2 py-1 text-xs rounded border border-[var(--mat-sys-outline-variant)] bg-transparent"
+                             [value]="newTag()"
+                             [attr.aria-label]="I18N.manual_tags.add | translate"
+                             [placeholder]="I18N.manual_tags.add | translate"
+                             (input)="onNewTagInput($event)"
+                             (keydown.enter)="addManualTag(p, newTag())" (keydown.escape)="closeTagInput($event)" />
+                      <button mat-icon-button class="!w-7 !h-7 max-sm:!w-11 max-sm:!h-11 pointer-coarse:!w-11 pointer-coarse:!h-11 !p-0 !inline-flex !items-center !justify-center shrink-0" (click)="addManualTag(p, newTag())"
+                              [disabled]="!newTag().trim()"
+                              [matTooltip]="I18N.manual_tags.add | translate" [attr.aria-label]="I18N.manual_tags.add | translate">
+                        <mat-icon class="!text-base !w-4 !h-4 !leading-4">add</mat-icon>
+                      </button>
+                    </div>
+                  }
+                </div>
+              }
+
+              @if (p.persons.length || p.unassigned_faces) {
+                <section data-photo-people aria-labelledby="photo-people-title">
+                  <h2 id="photo-people-title" class="m-0 mb-1 text-xs font-normal text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.persons | translate }}</h2>
+                  @if (p.unassigned_faces) { <p class="m-0 pb-2 text-xs text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.unassigned_faces | translate:{ count: p.unassigned_faces } }}</p> }
+                  <div class="flex gap-3 flex-wrap">
+                    @for (person of p.persons; track person.id) {
+                      <button class="flex min-w-0 max-w-full flex-col items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
+                              data-person-avatar aria-haspopup="menu"
+                              (click)="openPersonMenu(person, $event)">
+                        <img
+                          [src]="person.id | personThumbnailUrl"
+                          [alt]="person.name"
+                          class="w-10 h-10 rounded-full object-cover bg-[var(--mat-sys-surface-container)]"
+                        />
+                        <span class="text-xs text-[var(--mat-sys-on-surface-variant)]">{{ person.name }}</span>
+                      </button>
+                    }
+                  </div>
+                </section>
+              }
+
+              @if (auth.isEdition() && (!p.caption || (!p.tags_list.length && !p.manual_tags.length && !tagInputOpen()) || p.gps_latitude === null || p.gps_longitude === null)) {
+                <div data-photo-add class="flex flex-wrap items-center gap-1">
+                  @if (!p.caption) {
+                    <button mat-stroked-button class="!h-8 !min-w-0 !px-2.5 !text-xs max-sm:!h-11 pointer-coarse:!h-11" (click)="editCaption(p)" [attr.aria-label]="I18N.photo_detail.add_caption | translate">
+                      <mat-icon class="!text-base !w-4 !h-4 !leading-4" aria-hidden="true">add_comment</mat-icon>{{ I18N.photo_detail.caption | translate }}
+                    </button>
+                    @if (store.config()?.features?.show_captions) {
+                      <button mat-icon-button class="!w-8 !h-8 max-sm:!w-11 max-sm:!h-11 pointer-coarse:!w-11 pointer-coarse:!h-11 !p-0" (click)="generateCaption(p.path)" [disabled]="generatingCaption()" [matTooltip]="I18N.photo_detail.generate_caption | translate" [attr.aria-label]="I18N.photo_detail.generate_caption | translate">
+                        @if (generatingCaption()) {
+                          <mat-spinner diameter="16" [attr.aria-label]="I18N.ui.labels.loading | translate" />
+                        } @else {
+                          <mat-icon class="!text-base !w-4 !h-4 !leading-4">auto_fix_high</mat-icon>
+                        }
+                      </button>
+                    }
+                  }
+                  @if (!p.tags_list.length && !p.manual_tags.length && !tagInputOpen()) {
+                    <button mat-stroked-button data-add-tag class="!h-8 !min-w-0 !px-2.5 !text-xs max-sm:!h-11 pointer-coarse:!h-11" (click)="openTagInput()" [attr.aria-label]="I18N.manual_tags.add | translate">
+                      <mat-icon class="!text-base !w-4 !h-4 !leading-4" aria-hidden="true">sell</mat-icon>{{ I18N.manual_tags.tag_label | translate }}
+                    </button>
+                  }
+                  @if (p.gps_latitude === null || p.gps_longitude === null) {
+                    <button mat-stroked-button class="!h-8 !min-w-0 !px-2.5 !text-xs max-sm:!h-11 pointer-coarse:!h-11" (click)="editGps(p)" [attr.aria-label]="I18N.photo_detail.add_location | translate">
+                      <mat-icon class="!text-base !w-4 !h-4 !leading-4" aria-hidden="true">add_location</mat-icon>{{ I18N.photo_detail.location | translate }}
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+
+            <!-- Location, folded to one line near the bottom (map and exact coordinates on demand, remembered). -->
+            @if (p.gps_latitude !== null && p.gps_longitude !== null) {
+              <div data-photo-location>
+                <div class="flex items-center gap-1">
+                  <button type="button" data-location-toggle aria-controls="photo-location-detail" [attr.aria-expanded]="locationOpen()"
+                          [matTooltip]="I18N.photo_detail.location_map | translate" (click)="toggleLocation()"
+                          class="flex min-h-7 min-w-0 flex-1 cursor-pointer items-center gap-1 rounded text-left text-xs text-[var(--mat-sys-on-surface-variant)] hover:bg-[var(--mat-sys-surface-container-high)] focus-visible:outline-2 focus-visible:outline-[var(--mat-sys-primary)] max-sm:min-h-11 pointer-coarse:min-h-11">
+                    <mat-icon class="!text-base !w-4 !h-4 !leading-4 shrink-0" aria-hidden="true">place</mat-icon>
+                    <span class="sr-only">{{ I18N.photo_detail.location | translate }}:</span>
+                    <span data-location-summary class="min-w-0 truncate tabular-nums">{{ locationName() || (p.gps_latitude | fixed:4) + ', ' + (p.gps_longitude | fixed:4) }}</span>
+                    <mat-icon class="!text-base !w-4 !h-4 !leading-4 ml-auto shrink-0" aria-hidden="true">{{ locationOpen() ? 'expand_less' : 'expand_more' }}</mat-icon>
+                  </button>
+                  @if (auth.isEdition()) {
+                    <button mat-icon-button class="!w-7 !h-7 max-sm:!w-11 max-sm:!h-11 pointer-coarse:!w-11 pointer-coarse:!h-11 !p-0" (click)="editGps(p)" [matTooltip]="I18N.photo_detail.edit_location | translate" [attr.aria-label]="I18N.photo_detail.edit_location | translate">
+                      <mat-icon class="!text-base !w-4 !h-4 !leading-4">edit_location</mat-icon>
+                    </button>
+                  }
+                </div>
+                <div id="photo-location-detail" class="mt-1 space-y-1" [hidden]="!locationOpen()">
+                  <div class="text-xs tabular-nums text-[var(--mat-sys-on-surface-variant)]">{{ p.gps_latitude | fixed:6 }}, {{ p.gps_longitude | fixed:6 }}</div>
+                  <!-- Light OSM tiles in both themes: the dark theme's inverted tiles lose their labels at this size. -->
+                  <div #locationMapContainer data-location-map class="w-full h-40 rounded-lg overflow-hidden [&_.leaflet-tile-pane]:![filter:none]"></div>
+                </div>
               </div>
             }
 
-            @if (p.persons.length || p.unassigned_faces) {
-              <section data-photo-people aria-labelledby="photo-people-title">
-                <h2 id="photo-people-title" class="m-0 mb-1 text-xs font-normal text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.persons | translate }}</h2>
-                @if (p.unassigned_faces) { <p class="m-0 pb-2 text-xs text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.unassigned_faces | translate:{ count: p.unassigned_faces } }}</p> }
-                <div class="flex gap-3 flex-wrap">
-                  @for (person of p.persons; track person.id) {
-                    <button class="flex min-w-0 max-w-full flex-col items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
-                            data-person-avatar aria-haspopup="menu"
-                            (click)="openPersonMenu(person, $event)">
-                      <img
-                        [src]="person.id | personThumbnailUrl"
-                        [alt]="person.name"
-                        class="w-10 h-10 rounded-full object-cover bg-[var(--mat-sys-surface-container)]"
-                      />
-                      <span class="text-xs text-[var(--mat-sys-on-surface-variant)]">{{ person.name }}</span>
+            <!-- File details: metadata sources and related files, one open at a time -->
+            <mat-accordion data-file-details displayMode="flat" class="block">
+              <app-photo-provenance [photo]="p" />
+              <app-photo-related-files [photo]="p" (logicalApplied)="onLogicalAssetApplied($event)" />
+            </mat-accordion>
+          </section>
+          <!-- Ranking: the decision first, then the evidence for it. -->
+          <section id="photo-panel-ranking" data-photo-panel="ranking" role="tabpanel" aria-labelledby="photo-rail-ranking" [hidden]="facetTab() !== 'ranking'" class="space-y-4">
+            <!-- Account review controls -->
+            @if (canReview()) {
+              <section data-photo-review aria-labelledby="photo-review-title" class="space-y-1 bg-[var(--mat-sys-surface-container-lowest)] lg:sticky lg:-top-4 lg:z-10 lg:-mx-4 lg:-mt-4 lg:px-4 lg:pt-4 lg:pb-2">
+                <h2 id="photo-review-title" class="sr-only">{{ I18N.gallery.sidebar.tabs.review | translate }}</h2>
+                <!-- Like the gallery rail: no title or rule above the review controls, the favourite beside the stars. -->
+                <div data-photo-rating-row class="flex items-center gap-2">
+                  <div role="group" [attr.aria-label]="I18N.photo_detail.rating | translate" class="flex min-w-0 flex-1 flex-nowrap">
+                    @for (star of stars; track star) {
+                      <button type="button" class="min-w-9 max-w-11 flex-1 max-sm:min-w-11 pointer-coarse:min-w-11 min-h-11 rounded inline-flex items-center justify-center hover:bg-[var(--mat-sys-surface-container-high)] cursor-pointer"
+                              [attr.aria-label]="(I18N.rating.set_rating | translate) + ': ' + star" [attr.aria-pressed]="p.star_rating === star" (click)="setRating(p.path, star)">
+                        <mat-icon class="!text-xl !w-5 !h-5 !leading-5 !text-[var(--mat-sys-primary)]">{{ p.star_rating !== null && star <= p.star_rating! ? 'star' : 'star_border' }}</mat-icon>
+                      </button>
+                    }
+                  </div>
+                  <button mat-icon-button class="ml-auto max-sm:!h-11 max-sm:!w-11 pointer-coarse:!h-11 pointer-coarse:!w-11" (click)="toggleFavorite(p.path)"
+                    [matTooltip]="(p.is_favorite ? I18N.rating.remove_favorite : I18N.rating.add_favorite) | translate"
+                    [attr.aria-label]="I18N.rating.favorite | translate" [attr.aria-pressed]="!!p.is_favorite">
+                    <mat-icon class="!text-[var(--facet-favorite)]">{{ p.is_favorite ? 'favorite' : 'favorite_border' }}</mat-icon>
+                  </button>
+                </div>
+                <div data-photo-decisions role="group" [attr.aria-label]="I18N.gallery.sidebar.review.decision | translate" class="flex items-stretch divide-x divide-[var(--mat-sys-outline-variant)] overflow-hidden rounded border border-[var(--mat-sys-outline-variant)]">
+                  @if (canDecide()) {
+                    <button type="button" data-photo-keep class="inline-flex min-h-11 min-w-0 flex-1 cursor-pointer focus-visible:!outline-2 focus-visible:!-outline-offset-4 focus-visible:!outline-current items-center justify-center gap-1 px-1 text-xs hover:bg-[var(--mat-sys-surface-container-high)]" [class.!bg-[var(--facet-review-kept)]]="p.is_kept" [class.!text-[var(--facet-review-on-kept)]]="p.is_kept"
+                      (click)="reviewPhoto(p.is_kept ? 'undecided' : 'kept')" [attr.aria-pressed]="!!p.is_kept">
+                      <mat-icon aria-hidden="true" class="!w-5 !h-5 !text-xl">{{ p.is_kept ? 'flag' : 'outlined_flag' }}</mat-icon>{{ I18N.review.keep | translate }}
+                    </button>
+                    <button type="button" data-photo-undecided class="inline-flex min-h-11 min-w-0 flex-1 cursor-pointer focus-visible:!outline-2 focus-visible:!-outline-offset-4 focus-visible:!outline-current items-center justify-center px-1 text-xs hover:bg-[var(--mat-sys-surface-container-high)]" [class.!bg-[var(--mat-sys-secondary-container)]]="!p.is_kept && !p.is_rejected" [class.!text-[var(--mat-sys-on-secondary-container)]]="!p.is_kept && !p.is_rejected"
+                      (click)="reviewPhoto('undecided')" [attr.aria-pressed]="!p.is_kept && !p.is_rejected">
+                      <span class="min-w-0 break-words hyphens-auto">{{ I18N.gallery.metadata.undecided | translate }}</span>
                     </button>
                   }
+                  <button type="button" data-photo-reject class="inline-flex min-h-11 min-w-0 flex-1 cursor-pointer focus-visible:!outline-2 focus-visible:!-outline-offset-4 focus-visible:!outline-current items-center justify-center gap-1 px-1 text-xs hover:bg-[var(--mat-sys-surface-container-high)]" [class.!bg-[var(--mat-sys-error-container)]]="p.is_rejected" [class.!text-[var(--mat-sys-on-error-container)]]="p.is_rejected"
+                    (click)="toggleRejected(p.path)" [attr.aria-pressed]="!!p.is_rejected">
+                    <mat-icon aria-hidden="true" class="!w-5 !h-5 !text-xl">{{ p.is_rejected ? 'thumb_down' : 'thumb_down_off_alt' }}</mat-icon>{{ I18N.gallery.selection.reject | translate }}
+                  </button>
                 </div>
               </section>
             }
 
-            @if (auth.isEdition() && (!p.caption || (!p.tags_list.length && !p.manual_tags.length && !tagInputOpen()) || p.gps_latitude === null || p.gps_longitude === null)) {
-              <div data-photo-add class="flex flex-wrap items-center gap-1">
-                @if (!p.caption) {
-                  <button mat-stroked-button class="!h-8 !min-w-0 !px-2.5 !text-xs max-sm:!h-11 pointer-coarse:!h-11" (click)="editCaption(p)" [attr.aria-label]="I18N.photo_detail.add_caption | translate">
-                    <mat-icon class="!text-base !w-4 !h-4 !leading-4" aria-hidden="true">add_comment</mat-icon>{{ I18N.photo_detail.caption | translate }}
-                  </button>
-                  @if (store.config()?.features?.show_captions) {
-                    <button mat-icon-button class="!w-8 !h-8 max-sm:!w-11 max-sm:!h-11 pointer-coarse:!w-11 pointer-coarse:!h-11 !p-0" (click)="generateCaption(p.path)" [disabled]="generatingCaption()" [matTooltip]="I18N.photo_detail.generate_caption | translate" [attr.aria-label]="I18N.photo_detail.generate_caption | translate">
-                      @if (generatingCaption()) {
-                        <mat-spinner diameter="16" [attr.aria-label]="I18N.ui.labels.loading | translate" />
-                      } @else {
-                        <mat-icon class="!text-base !w-4 !h-4 !leading-4">auto_fix_high</mat-icon>
-                      }
-                    </button>
-                  }
-                }
-                @if (!p.tags_list.length && !p.manual_tags.length && !tagInputOpen()) {
-                  <button mat-stroked-button data-add-tag class="!h-8 !min-w-0 !px-2.5 !text-xs max-sm:!h-11 pointer-coarse:!h-11" (click)="openTagInput()" [attr.aria-label]="I18N.manual_tags.add | translate">
-                    <mat-icon class="!text-base !w-4 !h-4 !leading-4" aria-hidden="true">sell</mat-icon>{{ I18N.manual_tags.tag_label | translate }}
-                  </button>
-                }
-                @if (p.gps_latitude === null || p.gps_longitude === null) {
-                  <button mat-stroked-button class="!h-8 !min-w-0 !px-2.5 !text-xs max-sm:!h-11 pointer-coarse:!h-11" (click)="editGps(p)" [attr.aria-label]="I18N.photo_detail.add_location | translate">
-                    <mat-icon class="!text-base !w-4 !h-4 !leading-4" aria-hidden="true">add_location</mat-icon>{{ I18N.photo_detail.location | translate }}
-                  </button>
-                }
-              </div>
+            <!-- A better shot in its group changes the decision, so it sits with it. -->
+            @if (keeperHint()?.has_better) {
+              <p data-photo-better-shot class="m-0 inline-flex items-center gap-1 px-2 py-0.5 bg-black/60 text-amber-300 rounded-full text-xs font-medium">
+                <mat-icon class="!text-sm !w-4 !h-4 !leading-4" aria-hidden="true">arrow_circle_up</mat-icon>
+                {{ I18N.culling.reason.better_shot | translate }}
+              </p>
             }
-          </div>
 
-          <!-- Metric tabs: EXIF | Quality | Composition | Technical | Histogram, as in the gallery rail,
-               sharing its remembered tab. "Why this score?" opens the same critique dialog. -->
-          <app-photo-metrics-tabs [photo]="p" [ranges]="store.metricRangesByColumn()"
-                                  [populated]="store.config()?.populated_scores"
-                                  [histogramHeight]="HISTOGRAM_PANEL_HEIGHT"
-                                  [histogramDefaultMode]="histogramDefaultMode()"
-                                  [indicatorPercent]="clippingIndicatorPercent()"
-                                  [explainable]="!!store.config()?.features?.show_critique" (explain)="openCritique(p)" />
+            <!-- Metric tabs: EXIF | Quality | Composition | Technical | Histogram, as in the gallery rail,
+                 sharing its remembered tab. "Why this score?" opens the same critique dialog. -->
+            <app-photo-metrics-tabs [photo]="p" [ranges]="store.metricRangesByColumn()"
+                                    [populated]="store.config()?.populated_scores"
+                                    [histogramHeight]="HISTOGRAM_PANEL_HEIGHT"
+                                    [histogramDefaultMode]="histogramDefaultMode()"
+                                    [indicatorPercent]="clippingIndicatorPercent()"
+                                    [explainable]="!!store.config()?.features?.show_critique" (explain)="openCritique(p)" />
 
-          <!-- Set section (bracket/panorama/hdr_panorama/burst/duplicate) -->
-          @if (photoSet(); as set) {
-            @if (set.kind) {
-              <div data-photo-set class="pt-1">
-                <div class="flex items-center gap-2 flex-wrap mb-2 text-sm">
-                  <mat-icon class="!text-base !w-4 !h-4 !leading-4 opacity-70">{{ set.kind | photoSetKindIcon }}</mat-icon>
-                  <span class="font-medium">{{ set.kind | photoSetKindLabel | translate }}</span>
-                  <span data-set-file-count class="text-xs text-[var(--mat-sys-on-surface-variant)]" [matTooltip]="I18N.photo_detail.set.count_help | translate">{{ (set.count === 1 ? I18N.photo_detail.set.files_count : I18N.photo_detail.set.files_count_plural) | translate:{ count: set.count } }}</span>
-                  @if (setBlinkCount(); as blinks) {
-                    <span class="text-xs text-[var(--mat-sys-on-surface-variant)]">· {{ I18N.gallery.hidden_banner.reason_blinks | translate:{ n: blinks } }}</span>
-                  }
-                  @if (set.ev_span !== null) {
-                    <span class="text-xs text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.set.ev_span | translate }}: {{ set.ev_span | fixed:1 }} EV</span>
-                  }
-                  <button mat-icon-button class="!w-7 !h-7 max-sm:!w-11 max-sm:!h-11 pointer-coarse:!w-11 pointer-coarse:!h-11 !p-0 !inline-flex !items-center !justify-center ml-auto" (click)="openSetInGallery()"
-                          [matTooltip]="I18N.photo_detail.set.open_in_gallery | translate" [attr.aria-label]="I18N.photo_detail.set.open_in_gallery | translate">
-                    <mat-icon class="!text-base !w-4 !h-4 !leading-4">photo_library</mat-icon>
-                  </button>
-                </div>
-                <div data-photo-set-strip class="grid grid-cols-[repeat(auto-fill,minmax(4rem,1fr))] gap-2 lg:grid-cols-5">
-                  @for (member of setStripMembers(); track member.path) {
-                    <button class="relative rounded-lg overflow-hidden aspect-square w-full min-w-0 cursor-pointer hover:opacity-80 transition-opacity ring-[var(--mat-sys-primary)]"
-                            [class.ring-2]="member.path === p.path"
-                            [attr.aria-label]="(I18N.photo_detail.set.member_position | translate:{ position: $index + 1, count: set.members.length }) + (member.ev_offset !== null ? ', ' + (member.ev_offset | evOffset) : '') + (member.ai_edit_of ? ', ' + (I18N.photo_detail.ai_edit.badge | translate) : '') + (member.is_blink ? ', ' + (I18N.ui.badges.blink | translate) : '')"
-                            (click)="openSetMember(member.path)">
-                      <img [src]="member.path | thumbnailUrl:96:member.preview_revision" alt="" class="w-full h-full object-cover" />
-                      @if (member.ev_offset !== null) {
-                        <span class="absolute bottom-0 inset-x-0 text-center text-[0.625rem] leading-4 bg-black/60 text-white">{{ member.ev_offset | evOffset }}</span>
-                      } @else if (member.ai_edit_of) {
-                        <span class="absolute bottom-0 inset-x-0 text-center text-[0.625rem] leading-4 font-bold bg-black/70 text-white" data-ai-label>✨ {{ I18N.photo_detail.ai_edit.badge_short | translate }}</span>
-                      }
-                      @if (member.is_blink) {
-                        <span class="absolute top-0 inset-x-0 text-center text-[0.625rem] leading-4 font-bold bg-yellow-600 text-white">{{ I18N.ui.badges.blink | translate }}</span>
-                      }
+            <!-- Set section (bracket/panorama/hdr_panorama/burst/duplicate) -->
+            @if (photoSet(); as set) {
+              @if (set.kind) {
+                <div data-photo-set class="pt-1">
+                  <div class="flex items-center gap-2 flex-wrap mb-2 text-sm">
+                    <mat-icon class="!text-base !w-4 !h-4 !leading-4 opacity-70">{{ set.kind | photoSetKindIcon }}</mat-icon>
+                    <span class="font-medium">{{ set.kind | photoSetKindLabel | translate }}</span>
+                    <span data-set-file-count class="text-xs text-[var(--mat-sys-on-surface-variant)]" [matTooltip]="I18N.photo_detail.set.count_help | translate">{{ (set.count === 1 ? I18N.photo_detail.set.files_count : I18N.photo_detail.set.files_count_plural) | translate:{ count: set.count } }}</span>
+                    @if (setBlinkCount(); as blinks) {
+                      <span class="text-xs text-[var(--mat-sys-on-surface-variant)]">· {{ I18N.gallery.hidden_banner.reason_blinks | translate:{ n: blinks } }}</span>
+                    }
+                    @if (set.ev_span !== null) {
+                      <span class="text-xs text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.set.ev_span | translate }}: {{ set.ev_span | fixed:1 }} EV</span>
+                    }
+                    <button mat-icon-button class="!w-7 !h-7 max-sm:!w-11 max-sm:!h-11 pointer-coarse:!w-11 pointer-coarse:!h-11 !p-0 !inline-flex !items-center !justify-center ml-auto" (click)="openSetInGallery()"
+                            [matTooltip]="I18N.photo_detail.set.open_in_gallery | translate" [attr.aria-label]="I18N.photo_detail.set.open_in_gallery | translate">
+                      <mat-icon class="!text-base !w-4 !h-4 !leading-4">photo_library</mat-icon>
                     </button>
+                  </div>
+                  <div data-photo-set-strip class="grid grid-cols-[repeat(auto-fill,minmax(4rem,1fr))] gap-2 lg:grid-cols-5">
+                    @for (member of setStripMembers(); track member.path) {
+                      <button class="relative rounded-lg overflow-hidden aspect-square w-full min-w-0 cursor-pointer hover:opacity-80 transition-opacity ring-[var(--mat-sys-primary)]"
+                              [class.ring-2]="member.path === p.path"
+                              [attr.aria-label]="(I18N.photo_detail.set.member_position | translate:{ position: $index + 1, count: set.members.length }) + (member.ev_offset !== null ? ', ' + (member.ev_offset | evOffset) : '') + (member.ai_edit_of ? ', ' + (I18N.photo_detail.ai_edit.badge | translate) : '') + (member.is_blink ? ', ' + (I18N.ui.badges.blink | translate) : '')"
+                              (click)="openSetMember(member.path)">
+                        <img [src]="member.path | thumbnailUrl:96:member.preview_revision" alt="" class="w-full h-full object-cover" />
+                        @if (member.ev_offset !== null) {
+                          <span class="absolute bottom-0 inset-x-0 text-center text-[0.625rem] leading-4 bg-black/60 text-white">{{ member.ev_offset | evOffset }}</span>
+                        } @else if (member.ai_edit_of) {
+                          <span class="absolute bottom-0 inset-x-0 text-center text-[0.625rem] leading-4 font-bold bg-black/70 text-white" data-ai-label>✨ {{ I18N.photo_detail.ai_edit.badge_short | translate }}</span>
+                        }
+                        @if (member.is_blink) {
+                          <span class="absolute top-0 inset-x-0 text-center text-[0.625rem] leading-4 font-bold bg-yellow-600 text-white">{{ I18N.ui.badges.blink | translate }}</span>
+                        }
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+            }
+          </section>
+          <section id="photo-panel-view" data-photo-panel="view" role="tabpanel" aria-labelledby="photo-rail-view" [hidden]="facetTab() !== 'view'" class="flex min-h-0 flex-col gap-3 lg:h-full">
+            <!-- What you are looking through: the collection, its filters, the way back to it, its photos. -->
+            @if (collectionSidebarAvailable()) {
+              <div data-view-collection class="flex items-center gap-2">
+                <mat-icon class="shrink-0 text-[var(--mat-sys-on-surface-variant)]" aria-hidden="true">{{ store.currentAlbum() ? 'photo_album' : 'photo_library' }}</mat-icon>
+                <div class="min-w-0 flex-1">
+                  <h2 class="m-0 truncate text-sm font-medium">{{ store.currentAlbum()?.name || (I18N.nav.gallery | translate) }}</h2>
+                  @if (store.currentAlbum(); as album) {
+                    <p class="m-0 text-xs text-[var(--mat-sys-on-surface-variant)]">{{ (album.is_smart ? I18N.albums.rules.smart : I18N.albums.rules.manual) | translate }}</p>
                   }
                 </div>
               </div>
-            }
-          }
-
-          <!-- Location, folded to one line near the bottom (map and exact coordinates on demand, remembered). -->
-          @if (p.gps_latitude !== null && p.gps_longitude !== null) {
-            <div data-photo-location>
               <div class="flex items-center gap-1">
-                <button type="button" data-location-toggle aria-controls="photo-location-detail" [attr.aria-expanded]="locationOpen()"
-                        [matTooltip]="I18N.photo_detail.location_map | translate" (click)="toggleLocation()"
-                        class="flex min-h-7 min-w-0 flex-1 cursor-pointer items-center gap-1 rounded text-left text-xs text-[var(--mat-sys-on-surface-variant)] hover:bg-[var(--mat-sys-surface-container-high)] focus-visible:outline-2 focus-visible:outline-[var(--mat-sys-primary)] max-sm:min-h-11 pointer-coarse:min-h-11">
-                  <mat-icon class="!text-base !w-4 !h-4 !leading-4 shrink-0" aria-hidden="true">place</mat-icon>
-                  <span class="sr-only">{{ I18N.photo_detail.location | translate }}:</span>
-                  <span data-location-summary class="min-w-0 truncate tabular-nums">{{ locationName() || (p.gps_latitude | fixed:4) + ', ' + (p.gps_longitude | fixed:4) }}</span>
-                  <mat-icon class="!text-base !w-4 !h-4 !leading-4 ml-auto shrink-0" aria-hidden="true">{{ locationOpen() ? 'expand_less' : 'expand_more' }}</mat-icon>
+                <button mat-icon-button data-view-previous class="!h-9 !w-9 max-sm:!h-11 max-sm:!w-11 pointer-coarse:!h-11 pointer-coarse:!w-11" [disabled]="!collectionNavigation().previous || store.loading()"
+                  [attr.aria-label]="I18N.photo_detail.collection.previous | translate" (click)="stepCollectionPhoto(-1)"><mat-icon>chevron_left</mat-icon></button>
+                <span data-view-position class="text-xs tabular-nums">{{ I18N.photo_detail.collection.position | translate:{ position: collectionNavigation().position, total: store.total() } }}</span>
+                <button mat-icon-button data-view-next class="!h-9 !w-9 max-sm:!h-11 max-sm:!w-11 pointer-coarse:!h-11 pointer-coarse:!w-11" [disabled]="!collectionNavigation().next || store.loading()"
+                  [attr.aria-label]="I18N.photo_detail.collection.next | translate" (click)="stepCollectionPhoto(1)"><mat-icon>chevron_right</mat-icon></button>
+                <button mat-stroked-button data-view-open-gallery class="ml-auto !h-9 !min-w-0 !px-2.5 !text-xs max-sm:!h-11 pointer-coarse:!h-11" (click)="goBack()">
+                  <mat-icon class="!text-base !w-4 !h-4 !leading-4" aria-hidden="true">grid_view</mat-icon>{{ I18N.photo_detail.view.open_gallery | translate }}
                 </button>
-                @if (auth.isEdition()) {
-                  <button mat-icon-button class="!w-7 !h-7 max-sm:!w-11 max-sm:!h-11 pointer-coarse:!w-11 pointer-coarse:!h-11 !p-0" (click)="editGps(p)" [matTooltip]="I18N.photo_detail.edit_location | translate" [attr.aria-label]="I18N.photo_detail.edit_location | translate">
-                    <mat-icon class="!text-base !w-4 !h-4 !leading-4">edit_location</mat-icon>
-                  </button>
-                }
               </div>
-              <div id="photo-location-detail" class="mt-1 space-y-1" [hidden]="!locationOpen()">
-                <div class="text-xs tabular-nums text-[var(--mat-sys-on-surface-variant)]">{{ p.gps_latitude | fixed:6 }}, {{ p.gps_longitude | fixed:6 }}</div>
-                <div #locationMapContainer class="w-full h-24 rounded-lg overflow-hidden"></div>
-              </div>
-            </div>
-          }
-
-          <!-- File details: metadata sources and related files, one open at a time -->
-          <mat-accordion data-file-details displayMode="flat" class="block">
-            <app-photo-provenance [photo]="p" />
-            <app-photo-related-files [photo]="p" (logicalApplied)="onLogicalAssetApplied($event)" />
-          </mat-accordion>
+              @if (viewFilterChips().length) {
+                <section data-view-filters aria-labelledby="photo-view-filters-title">
+                  <h3 id="photo-view-filters-title" class="m-0 mb-1 text-xs font-normal text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.view.filters | translate }}</h3>
+                  <ul class="m-0 flex list-none flex-wrap gap-1 p-0">
+                    @for (chip of viewFilterChips(); track chip.id) {
+                      <li class="rounded-full border border-[var(--mat-sys-outline-variant)] px-2 py-0.5 text-xs">{{ chip.labelKey | translate }}@if (chip.value) {: {{ chip.value }}}</li>
+                    }
+                  </ul>
+                </section>
+              }
+              <app-photo-collection-sidebar class="min-h-0 flex-1" [photos]="store.photos()" [currentPath]="collectionEntry()?.path ?? p.path"
+                [total]="store.total()" [hasMore]="store.hasMore()" [loading]="store.loading()"
+                (choose)="openCollectionPhoto($event)" (more)="loadCollectionPage()" (step)="stepCollection($event)" />
+            } @else {
+              <p data-view-standalone class="m-0 text-xs text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.view.standalone | translate }}</p>
+            }
+          </section>
         </aside>
       </div>
     } @else if (photoMissing()) {
@@ -841,19 +925,90 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
       .then(fresh => { if (this.photo()?.path === path) this.fetchedTagSources.set({ path, sources: fresh.manual_tag_sources ?? {} }); })
       .catch(() => undefined));
   });
-  /** Add-on id -> its name ("Astro"), read from the add-on registry the first time a photo shows add-on tags. */
-  private readonly addonNames = signal<ReadonlyMap<string, string>>(new Map());
-  private addonNamesRequested = false;
-  private readonly addonNamesEffect = effect(() => {
-    if (this.addonNamesRequested || !this.tagGroups().addons.length) return;
-    this.addonNamesRequested = true;
-    // Resolved only now: a page without add-on tags never starts the add-on service.
+  /** The installed add-ons, read once when this account has add-ons or a photo shows add-on tags: the rail's
+   *  add-on icons and the names of add-on tag groups ("Astro"). */
+  private readonly addonRegistry = signal<readonly Addon[]>([]);
+  private readonly addonNames = computed(() => new Map(this.addonRegistry().map(addon => [addon.id, addon.name])));
+  private addonRegistryRequested = false;
+  private readonly addonRegistryEffect = effect(() => {
+    if (this.addonRegistryRequested || (!this.auth.hasFeature('addons') && !this.tagGroups().addons.length)) return;
+    this.addonRegistryRequested = true;
+    // Resolved only now: a page that needs no add-on never starts the add-on service.
     const addons = this.injector.get(AddonsService);
     untracked(async () => {
       const list = addons.list() ?? (addons.available() ? await addons.load() : null);
-      if (list) this.addonNames.set(new Map(list.addons.map(addon => [addon.id, addon.name])));
+      if (list) this.addonRegistry.set(list.addons);
     });
   });
+
+  /** The right rail: one of Facet's three panels, or an add-on's panel (`addon:<id>`), remembered per browser. */
+  protected readonly facetRailTabs = [
+    { id: 'content', icon: 'info', label: I18N.photo_detail.rail.content },
+    { id: 'ranking', icon: 'star_half', label: I18N.photo_detail.rail.ranking },
+    { id: 'view', icon: 'filter_alt', label: I18N.photo_detail.rail.view },
+  ] as const;
+  protected readonly railTab = signal<string>(readRailTab());
+  /** The Facet panel shown when no add-on is (and below lg, where add-ons keep their own dock). */
+  protected readonly facetTab = signal<FacetTab>(asFacetTab(readRailTab()));
+  private readonly addonPanels = inject(AddonPanelService);
+  /** Add-ons with a sidebar panel, plus the open panel's add-on when the registry has not been read. */
+  protected readonly railAddons = computed(() => {
+    const listed: RailAddon[] = this.addonRegistry().filter(addon => addon.slots.includes('sidebar'));
+    const open = this.addonPanels.panel()?.addon;
+    return open && !listed.some(addon => addon.id === open.id) ? [...listed, open] : listed;
+  });
+  /** An add-on tab is shown only once its panel is open; until then the Facet panel stays. */
+  protected readonly addonTabActive = computed(() => {
+    const open = this.addonPanels.panel();
+    return !!open && this.railTab() === 'addon:' + open.addon.id;
+  });
+  private lastAddonPanel: string | null | undefined = undefined;
+  /** A panel opened from anywhere (toolbar, puzzle menu, rail) selects its tab; a closed one gives way to the Facet panel. */
+  private readonly railPanelEffect = effect(() => {
+    const open = this.addonPanels.panel();
+    const key = open ? `${open.addon.id}|${open.nonce}` : null;
+    const previous = this.lastAddonPanel;
+    this.lastAddonPanel = key;
+    untracked(() => {
+      const tab = this.railTab();
+      if (open && previous !== undefined && key !== previous) this.railTab.set('addon:' + open.addon.id);
+      else if (tab.startsWith('addon:') && tab !== 'addon:' + open?.addon.id) this.railTab.set(this.facetTab());
+    });
+  });
+  /** The shell's dock is the add-on's panel: hidden (still mounted) while a Facet panel is shown at lg and up. */
+  private readonly dockEffect = effect(() => this.addonPanels.dockHidden.set(!this.addonTabActive()));
+  private readonly railStorageEffect = effect(() => {
+    const tab = this.railTab();
+    try { localStorage.setItem(RAIL_KEY, tab); } catch { /* Storage blocked: the tab holds for this page only. */ }
+  });
+  /** The collection's active filters, as the gallery's criteria row shows them; the album is the panel's heading. */
+  protected readonly viewFilterChips = computed(() => {
+    if (!this.collectionSidebarAvailable()) return [];
+    this.i18n.translations();
+    return galleryFilterChips(this.store, key => this.i18n.t(key)).filter(chip => chip.id !== 'album');
+  });
+
+  protected selectRail(tab: FacetTab): void {
+    this.facetTab.set(tab);
+    this.railTab.set(tab);
+  }
+
+  /** Show an add-on's panel; opening it (when another or none is open) selects its tab once it is there. */
+  protected selectAddon(addon: RailAddon): void {
+    if (this.addonPanels.panel()?.addon.id === addon.id) this.railTab.set('addon:' + addon.id);
+    else void this.addonPanels.openForCurrentView(addon);
+  }
+
+  /** Arrows, Home and End move focus along the rail; Enter or Space picks (an add-on tab may start the add-on). */
+  protected railKey(event: KeyboardEvent): void {
+    const tabs = [...(event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[role="tab"]')];
+    const index = tabs.indexOf(document.activeElement as HTMLElement);
+    const target = index < 0 ? undefined : ({ ArrowDown: index + 1, ArrowRight: index + 1, ArrowUp: index - 1, ArrowLeft: index - 1, Home: 0, End: tabs.length - 1 } as Record<string, number>)[event.key];
+    if (target === undefined) return;
+    event.preventDefault();
+    event.stopPropagation();
+    tabs[(target + tabs.length) % tabs.length].focus();
+  }
 
   protected toggleTagSource(source: string): void {
     this.expandedTagSources.update(open => {
@@ -912,7 +1067,6 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
     if (!this.collectionNavigation().visible || this.destroyRef.destroyed || this.router.currentNavigation?.() || this.dialog.openDialogs.length) return;
     void this.navigateAdjacentPhoto(delta, true);
   }
-  protected readonly collectionSidebarTitle = computed(() => this.store.currentAlbum?.()?.name ?? '');
   // A later library search replaces the singleton store. Keep the query owned
   // by this history entry, including when Back recreates the photo component.
   private readonly tagOrigin = signal(this.readTagOrigin());
@@ -1139,7 +1293,7 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
     const container = this.locationMapContainer();
     const p = this.photo();
     // The map is built only while the section is open, once it has its size, so it never measures a hidden box.
-    const open = this.locationOpen();
+    const open = this.locationOpen() && this.facetTab() === 'content' && !this.addonTabActive();
     if (this.locationMapTimeout !== null) {
       clearTimeout(this.locationMapTimeout);
       this.locationMapTimeout = null;
@@ -1179,6 +1333,8 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
       }
     });
     this.destroyRef.onDestroy(() => {
+      // Other pages have no panel of their own: the add-on dock shows again there.
+      this.addonPanels.dockHidden.set(false);
       if (this.locationMapTimeout !== null) clearTimeout(this.locationMapTimeout);
       if (this.locationMap) { this.locationMap.remove(); this.locationMap = null; }
     });

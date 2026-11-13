@@ -3260,9 +3260,6 @@
       "next": "集合中的下一张照片",
       "title": "集合",
       "position": "合集 {position} / {total}",
-      "show": "显示集合",
-      "hide": "隐藏集合",
-      "resize": "调整集合侧栏宽度",
       "loaded": "已加载 {loaded}/{total} 个显示项目 · 相同筛选和排序",
       "more": "加载更多",
       "previous_loaded": "上一批已加载的照片",
@@ -3418,6 +3415,17 @@
     },
     "analysis": "分析",
     "details": "照片详情",
+    "rail": {
+      "label": "照片面板",
+      "content": "内容",
+      "ranking": "评分",
+      "view": "视图"
+    },
+    "view": {
+      "open_gallery": "在图库中显示",
+      "filters": "筛选条件",
+      "standalone": "单独打开，并非来自图库集合。"
+    },
     "inspector_resize": "调整照片详情面板宽度",
     "zoom_controls": "图像缩放",
     "unassigned_faces": "未分配人脸：{count}",

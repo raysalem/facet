@@ -3285,9 +3285,6 @@
       "next": "Next photo in collection",
       "title": "Collection",
       "position": "Collection {position} / {total}",
-      "show": "Show collection",
-      "hide": "Hide collection",
-      "resize": "Resize collection sidebar",
       "loaded": "{loaded} of {total} displayed items loaded · same filters and sort",
       "more": "Load more",
       "previous_loaded": "Previous loaded photos",
@@ -3443,6 +3440,17 @@
     },
     "analysis": "Analysis",
     "details": "Photo details",
+    "rail": {
+      "label": "Photo panels",
+      "content": "Content",
+      "ranking": "Ranking",
+      "view": "View"
+    },
+    "view": {
+      "open_gallery": "Show in gallery",
+      "filters": "Filters",
+      "standalone": "Opened on its own, not from a gallery collection."
+    },
     "inspector_resize": "Resize photo details panel",
     "zoom_controls": "Image zoom",
     "unassigned_faces": "Unassigned faces: {count}",

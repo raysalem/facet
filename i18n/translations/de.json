@@ -3260,9 +3260,6 @@
       "next": "Nächstes Foto in der Sammlung",
       "title": "Sammlung",
       "position": "Sammlung {position} / {total}",
-      "show": "Sammlung einblenden",
-      "hide": "Sammlung ausblenden",
-      "resize": "Breite der Sammlungsleiste ändern",
       "loaded": "{loaded} von {total} angezeigten Elementen geladen · gleiche Filter und Sortierung",
       "more": "Mehr laden",
       "previous_loaded": "Vorherige geladene Fotos",
@@ -3418,6 +3415,17 @@
     },
     "analysis": "Analyse",
     "details": "Fotodetails",
+    "rail": {
+      "label": "Fotobereiche",
+      "content": "Inhalt",
+      "ranking": "Bewertung",
+      "view": "Ansicht"
+    },
+    "view": {
+      "open_gallery": "In der Galerie zeigen",
+      "filters": "Filter",
+      "standalone": "Einzeln geöffnet, nicht aus einer Galerie-Sammlung."
+    },
     "inspector_resize": "Breite der Fotodetails ändern",
     "zoom_controls": "Bildvergrößerung",
     "unassigned_faces": "Nicht zugewiesene Gesichter: {count}",
