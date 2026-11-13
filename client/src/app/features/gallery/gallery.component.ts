@@ -989,9 +989,13 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
     </div>
     @if (lgDesktop.isDesktop()) {
       <app-panel-rail data-gallery-rail [rail]="rail" [tabs]="railTabs" [label]="I18N.gallery.rail.label | translate" idPrefix="gallery" />
-      <aside id="gallery-panel-view" data-gallery-panel="view" role="tabpanel" aria-labelledby="gallery-rail-view" [hidden]="!viewPanelOpen()"
+      <aside id="gallery-panel-view" data-gallery-panel="view" role="tabpanel" aria-labelledby="gallery-rail-view" [hidden]="!viewPanelOpen()" (keydown)="closePanels($event)"
         class="w-80 shrink-0 overflow-y-auto border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] px-4 py-2 text-sm">
-        <h2 class="m-0 py-1 text-sm font-medium">{{ I18N.gallery.rail.view | translate }}</h2>
+        <div data-panel-header class="flex items-center gap-2">
+          <h2 class="m-0 min-w-0 flex-1 truncate py-1 text-sm font-medium">{{ I18N.gallery.rail.view | translate }}</h2>
+          <button mat-icon-button data-close-panels class="!h-8 !w-8 !p-0 shrink-0" [matTooltip]="I18N.ui.buttons.close_panels | translate"
+            [attr.aria-label]="I18N.ui.buttons.close_panels | translate" (click)="rail.closeAll()"><mat-icon class="!text-xl">close</mat-icon></button>
+        </div>
         <!-- What the criteria row showed over the grid: the album and its rules, the active filters, people, similarity. -->
         <app-gallery-criteria data-collection-header [portShortcuts]="true" [consolidatedSettings]="true" [searchPresented]="true" class="block min-w-0" />
       </aside>
@@ -1198,6 +1202,12 @@ export class GalleryComponent implements OnInit, OnDestroy {
   protected readonly rail: AddonRail<'view'> = new AddonRail<'view'>({ storageKey: 'facet_gallery_rail_tab', tabs: ['view'], defaultTab: null });
   protected readonly railTabs = [{ id: 'view', icon: 'filter_alt', label: I18N.gallery.rail.view }] as const;
   protected readonly viewPanelOpen = computed(() => this.rail.tab() === 'view');
+  private readonly railElement = viewChild<PanelRailComponent, ElementRef<HTMLElement>>(PanelRailComponent, { read: ElementRef });
+
+  /** Escape in the panel folds every panel to the side; the focus goes back to the rail. */
+  protected closePanels(event: KeyboardEvent): void {
+    if (this.rail.escape(event)) this.railElement()?.nativeElement.querySelector<HTMLElement>('[role="tab"][tabindex="0"]')?.focus();
+  }
   /** The active filters the View panel lists, counted for the slim summary on the count line. */
   protected readonly activeFilterCount = computed(() => {
     if (this.pinned()) return 0;

@@ -81,7 +81,8 @@
       "download": "Download",
       "save": "Save",
       "saving": "Saving…",
-      "load_more": "Load more"
+      "load_more": "Load more",
+      "close_panels": "Close panels"
     },
     "sort": {
       "date": "Date"

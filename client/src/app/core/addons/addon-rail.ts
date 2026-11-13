@@ -31,10 +31,12 @@ export class AddonRail<T extends string> {
   private readonly auth = inject(AuthService);
   private readonly injector = inject(Injector);
   private readonly options: AddonRailOptions<T>;
-  /** `T`, `addon:<id>`, or null for no panel (only when `defaultTab` is null). */
+  /** `T`, `addon:<id>`, or null: every panel closed to the side, only the icons left. */
   readonly tab = signal<string | null>(null);
   /** The page panel shown when no add-on is, and below lg where add-ons keep their own dock. */
   readonly pageTab = signal<T | null>(null);
+  /** The page panel on screen: none while everything is closed. */
+  readonly shownPage = computed(() => this.tab() === null ? null : this.pageTab());
   /** The installed add-ons, read once when this account has add-ons (or `needsRegistry` asks). */
   readonly registry = signal<readonly Addon[]>([]);
   /** Add-ons with a sidebar panel, plus the open panel's add-on when the registry has not been read. */
@@ -57,7 +59,7 @@ export class AddonRail<T extends string> {
     this.options = options;
     const stored = this.read();
     const isPageTab = (value: string | null): value is T => value !== null && (options.tabs as readonly string[]).includes(value);
-    this.tab.set(isPageTab(stored) || stored?.startsWith(ADDON_PREFIX) || (stored === '' && options.defaultTab === null) ? stored : options.defaultTab);
+    this.tab.set(stored === '' ? null : isPageTab(stored) || stored?.startsWith(ADDON_PREFIX) ? stored : options.defaultTab);
     this.pageTab.set(isPageTab(stored) ? stored : options.defaultTab);
 
     effect(() => {
@@ -78,7 +80,8 @@ export class AddonRail<T extends string> {
       untracked(() => {
         const tab = this.tab();
         if (open && previous !== undefined && key !== previous) this.tab.set(ADDON_PREFIX + open.addon.id);
-        else if (tab?.startsWith(ADDON_PREFIX) && tab !== ADDON_PREFIX + open?.addon.id) this.tab.set(this.pageTab());
+        // The add-on on screen was closed (its own X): nothing else opens in its place.
+        else if (tab?.startsWith(ADDON_PREFIX) && tab !== ADDON_PREFIX + open?.addon.id) this.tab.set(null);
       });
     });
     effect(() => {
@@ -115,8 +118,27 @@ export class AddonRail<T extends string> {
     else this.tab.set(tab);
   }
 
+  /** Close every panel to the side, and the add-on's too; clicking an icon brings one back. */
+  closeAll(): void {
+    this.tab.set(null);
+    if (this.panels.panel()) this.panels.close();
+  }
+
+  /**
+   * Escape inside the rail or a panel closes everything. Kept from the page (whose own Escape goes back)
+   * and skipped when something inside already handled it (a menu, a field, a disclosure). True when it closed.
+   */
+  escape(event: KeyboardEvent): boolean {
+    if (event.key !== 'Escape' || event.defaultPrevented) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    this.closeAll();
+    return true;
+  }
+
   /** Arrows, Home and End move focus along the rail (kept from the page's own keys); Enter or Space picks. */
   key(event: KeyboardEvent): void {
+    if (this.escape(event)) return;
     const tabs = [...(event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[role="tab"]')];
     const index = tabs.indexOf(document.activeElement as HTMLElement);
     const target = index < 0 ? undefined : ({ ArrowDown: index + 1, ArrowRight: index + 1, ArrowUp: index - 1, ArrowLeft: index - 1, Home: 0, End: tabs.length - 1 } as Record<string, number>)[event.key];

@@ -429,7 +429,7 @@ describe('PhotoDetailComponent', () => {
       expect((view.nativeElement as HTMLElement).querySelectorAll('app-photo-collection-sidebar')).toHaveLength(1);
     });
 
-    it('gives an open add-on its own tab, hides the dock (frame kept) while a Facet panel shows, and falls back when it closes', async () => {
+    it('gives an open add-on its own tab, hides the dock (frame kept) while a Facet panel shows, and closes all when it closes', async () => {
       const { view, root, panel, tab } = await render();
       const panels = TestBed.inject(AddonPanelService);
       panels.panel.set({ addon: { id: 'astro', name: 'Astro', icon: 'star' }, nonce: 'n1', src: '/addons/astro/', scope: { kind: 'view' } });
@@ -448,11 +448,48 @@ describe('PhotoDetailComponent', () => {
       astro.click(); view.detectChanges(); TestBed.flushEffects();
       expect(open).not.toHaveBeenCalled();
       expect(panels.dockHidden()).toBe(false);
+      // Closing the add-on on screen (its own X) leaves the icons only, not another panel.
       panels.panel.set(null); view.detectChanges(); TestBed.flushEffects(); view.detectChanges();
-      expect(tab('content').getAttribute('aria-selected')).toBe('true');
+      expect(root.querySelector('[data-rail-tab][aria-selected="true"]')).toBeNull();
+      expect(root.querySelector<HTMLElement>('[data-photo-inspector]')!.classList).toContain('!hidden');
       expect(root.querySelector('[data-rail-addon]')).toBeNull();
       view.destroy();
       expect(panels.dockHidden()).toBe(false);
+    });
+
+    it('folds every panel and the add-on to the side with the X or Escape, and an icon brings one back', async () => {
+      const { view, root, panel, tab } = await render();
+      const panels = TestBed.inject(AddonPanelService);
+      const close = vi.spyOn(panels, 'close');
+      const aside = root.querySelector<HTMLElement>('[data-photo-inspector]')!;
+      expect(aside.querySelector('[data-panel-header] h2')!.textContent!.trim()).toBe('photo_detail.rail.grade');
+      root.querySelector<HTMLButtonElement>('[data-close-panels]')!.click(); view.detectChanges(); TestBed.flushEffects();
+      expect(aside.classList).toContain('!hidden');
+      expect(root.querySelector('[data-rail-tab][aria-selected="true"]')).toBeNull();
+      expect(localStorage.getItem('facet_photo_rail_tab')).toBe('');
+      expect(close).not.toHaveBeenCalled();
+      tab('camera').click(); view.detectChanges(); TestBed.flushEffects();
+      expect(aside.classList).not.toContain('!hidden');
+      expect(panel('camera').hidden).toBe(false);
+      // Escape inside a panel closes all, the add-on too, and never reaches the page (which would go back).
+      panels.panel.set({ addon: { id: 'astro', name: 'Astro', icon: 'star' }, nonce: 'n1', src: '/addons/astro/', scope: { kind: 'view' } });
+      view.detectChanges(); TestBed.flushEffects();
+      tab('camera').click(); view.detectChanges(); TestBed.flushEffects();
+      document.body.appendChild(root);
+      try {
+        const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+        panel('camera').dispatchEvent(escape);
+        view.detectChanges(); TestBed.flushEffects();
+        expect(escape.defaultPrevented).toBe(true);
+        expect(close).toHaveBeenCalled();
+        expect(aside.classList).toContain('!hidden');
+        expect(mockLocation.back).not.toHaveBeenCalled();
+        expect(document.activeElement).toBe(tab('camera'));
+      } finally { root.remove(); }
+      // Reopened later: the closed state was remembered.
+      view.destroy();
+      TestBed.resetTestingModule();
+      expect((await render()).root.querySelector<HTMLElement>('[data-photo-inspector]')!.classList).toContain('!hidden');
     });
   });
 

@@ -413,13 +413,13 @@ function inDetectedSet(photo: Photo): boolean {
 
         <!-- Drag or arrow-key the panel's left edge to trade image room for detail (lg+, remembered). -->
         <div role="separator" tabindex="0" aria-orientation="vertical" data-inspector-resize [attr.aria-label]="I18N.photo_detail.inspector_resize | translate"
-          [attr.aria-valuemin]="inspectorWidth.min" [attr.aria-valuemax]="inspectorWidth.max" [attr.aria-valuenow]="inspectorWidth.width()" [class.lg:!hidden]="rail.addonActive()"
+          [attr.aria-valuemin]="inspectorWidth.min" [attr.aria-valuemax]="inspectorWidth.max" [attr.aria-valuenow]="inspectorWidth.width()" [class.lg:!hidden]="rail.addonActive() || !rail.shownPage()"
           class="relative z-10 hidden lg:block w-3 -mx-1.5 shrink-0 cursor-col-resize touch-none focus-visible:bg-[var(--mat-sys-primary)]"
           (pointerdown)="inspectorWidth.start($event)" (pointermove)="inspectorWidth.move($event)" (pointerup)="inspectorWidth.finish($event)"
           (pointercancel)="inspectorWidth.finish($event, true)" (lostpointercapture)="inspectorWidth.finish($event, true)" (keydown)="inspectorWidth.key($event)"></div>
 
         <!-- Info panel -->
-        <aside data-photo-inspector [attr.aria-label]="I18N.photo_detail.details | translate" [style.--facet-inspector-width]="inspectorWidth.width() + 'px'" [class.lg:!hidden]="rail.addonActive()" class="[overflow-wrap:anywhere] lg:w-[var(--facet-inspector-width)] lg:shrink-0 lg:overflow-y-auto lg:border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-4 space-y-4 text-sm text-[var(--mat-sys-on-surface)]">
+        <aside data-photo-inspector [attr.aria-label]="I18N.photo_detail.details | translate" [style.--facet-inspector-width]="inspectorWidth.width() + 'px'" [class.lg:!hidden]="rail.addonActive()" [class.!hidden]="!rail.shownPage()" (keydown)="closePanels($event)" class="[overflow-wrap:anywhere] lg:w-[var(--facet-inspector-width)] lg:shrink-0 lg:overflow-y-auto lg:border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-4 space-y-4 text-sm text-[var(--mat-sys-on-surface)]">
           <ng-template #categoryExplanation>
               <mat-form-field class="w-full" subscriptSizing="dynamic">
                 <mat-label>{{ I18N.photo.category_override.target_category_label | translate }}</mat-label>
@@ -434,8 +434,16 @@ function inDetectedSet(photo: Photo): boolean {
                 <app-category-explainer [path]="p.path" [targetCategory]="target" />
               }
           </ng-template>
+          <!-- The open panel's name and the X that folds every panel (and an add-on's) to the side. -->
+          <div data-panel-header class="-mb-2 flex items-center gap-2">
+            <h2 class="m-0 min-w-0 flex-1 truncate text-sm font-medium">{{ shownPanelLabel() | translate }}</h2>
+            <button mat-icon-button data-close-panels class="!h-8 !w-8 !p-0 max-sm:!h-11 max-sm:!w-11 pointer-coarse:!h-11 pointer-coarse:!w-11 shrink-0"
+              [matTooltip]="I18N.ui.buttons.close_panels | translate" [attr.aria-label]="I18N.ui.buttons.close_panels | translate" (click)="rail.closeAll()">
+              <mat-icon class="!text-xl">close</mat-icon>
+            </button>
+          </div>
           <!-- Grade, "do I keep it": the decision first, then the scores that inform it, then the set to compare with. -->
-          <section id="photo-panel-grade" data-photo-panel="grade" role="tabpanel" aria-labelledby="photo-rail-grade" [hidden]="rail.pageTab() !== 'grade'" class="space-y-4">
+          <section id="photo-panel-grade" data-photo-panel="grade" role="tabpanel" aria-labelledby="photo-rail-grade" [hidden]="rail.shownPage() !== 'grade'" class="space-y-4">
             <!-- Account review controls -->
             @if (canReview()) {
               <section data-photo-review aria-labelledby="photo-review-title" class="space-y-1 bg-[var(--mat-sys-surface-container-lowest)] lg:sticky lg:-top-4 lg:z-10 lg:-mx-4 lg:-mt-4 lg:px-4 lg:pt-4 lg:pb-2">
@@ -533,7 +541,7 @@ function inDetectedSet(photo: Photo): boolean {
             }
           </section>
           <!-- Camera, "how was it shot": the capture line, then EXIF, Technical and the histogram with its clipping. -->
-          <section id="photo-panel-camera" data-photo-panel="camera" role="tabpanel" aria-labelledby="photo-rail-camera" [hidden]="rail.pageTab() !== 'camera'" class="space-y-4">
+          <section id="photo-panel-camera" data-photo-panel="camera" role="tabpanel" aria-labelledby="photo-rail-camera" [hidden]="rail.shownPage() !== 'camera'" class="space-y-4">
             <div data-photo-capture class="text-xs text-[var(--mat-sys-on-surface-variant)]">
             @if (p.camera_model || p.focal_length || p.f_stop || p.shutter_speed || p.iso || (p.image_width && p.image_height)) {
               <!-- Each item's "·" sits in the gap before it, so the one that would open a wrapped line is clipped. -->
@@ -561,7 +569,7 @@ function inDetectedSet(photo: Photo): boolean {
                                     [indicatorPercent]="clippingIndicatorPercent()" />
           </section>
           <!-- Content: the photo's own facts, most used first; location and file details folded at the bottom. -->
-          <section id="photo-panel-content" data-photo-panel="content" role="tabpanel" aria-labelledby="photo-rail-content" [hidden]="rail.pageTab() !== 'content'" class="space-y-4">
+          <section id="photo-panel-content" data-photo-panel="content" role="tabpanel" aria-labelledby="photo-rail-content" [hidden]="rail.shownPage() !== 'content'" class="space-y-4">
             <!-- Capture date and scoring category on one line -->
             <div data-photo-when class="space-y-1 text-xs text-[var(--mat-sys-on-surface-variant)]">
               <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -814,7 +822,7 @@ function inDetectedSet(photo: Photo): boolean {
               <app-photo-related-files [photo]="p" (logicalApplied)="onLogicalAssetApplied($event)" />
             </mat-accordion>
           </section>
-          <section id="photo-panel-view" data-photo-panel="view" role="tabpanel" aria-labelledby="photo-rail-view" [hidden]="rail.pageTab() !== 'view'" class="flex min-h-0 flex-col gap-3 lg:h-full">
+          <section id="photo-panel-view" data-photo-panel="view" role="tabpanel" aria-labelledby="photo-rail-view" [hidden]="rail.shownPage() !== 'view'" class="flex min-h-0 flex-col gap-3 lg:h-full">
             <!-- What you are looking through: the collection, its filters, the way back to it, its photos. -->
             @if (collectionSidebarAvailable()) {
               <div data-view-collection class="flex items-center gap-2">
@@ -965,6 +973,14 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
     { id: 'content', icon: 'info', label: I18N.photo_detail.rail.content },
     { id: 'view', icon: 'filter_alt', label: I18N.photo_detail.rail.view },
   ] as const;
+  /** The open page panel's name, for the panel header. */
+  protected readonly shownPanelLabel = computed(() => this.facetRailTabs.find(tab => tab.id === this.rail.shownPage())?.label ?? '');
+  private readonly railElement = viewChild<PanelRailComponent, ElementRef<HTMLElement>>(PanelRailComponent, { read: ElementRef });
+
+  /** Escape in a panel folds every panel to the side; the focus goes back to the rail. */
+  protected closePanels(event: KeyboardEvent): void {
+    if (this.rail.escape(event)) this.railElement()?.nativeElement.querySelector<HTMLElement>('[role="tab"][tabindex="0"]')?.focus();
+  }
   /** Add-on id -> its name ("Astro"), for the add-on tag groups. */
   private readonly addonNames = computed<ReadonlyMap<string, string>>(() => new Map(this.rail.registry().map(addon => [addon.id, addon.name])));
   /** The collection's active filters, as the gallery's criteria row shows them; the album is the panel's heading. */
@@ -1280,7 +1296,7 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
     const container = this.locationMapContainer();
     const p = this.photo();
     // The map is built only while the section is open, once it has its size, so it never measures a hidden box.
-    const open = this.locationOpen() && this.rail.pageTab() === 'content' && !this.rail.addonActive();
+    const open = this.locationOpen() && this.rail.shownPage() === 'content' && !this.rail.addonActive();
     if (this.locationMapTimeout !== null) {
       clearTimeout(this.locationMapTimeout);
       this.locationMapTimeout = null;

@@ -56,7 +56,8 @@
       "download": "下载",
       "save": "保存",
       "saving": "正在保存…",
-      "load_more": "加载更多"
+      "load_more": "加载更多",
+      "close_panels": "关闭面板"
     },
     "sort": {
       "date": "日期"

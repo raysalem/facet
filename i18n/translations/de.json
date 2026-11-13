@@ -56,7 +56,8 @@
       "download": "Herunterladen",
       "save": "Speichern",
       "saving": "Wird gespeichert…",
-      "load_more": "Mehr laden"
+      "load_more": "Mehr laden",
+      "close_panels": "Bereiche schließen"
     },
     "sort": {
       "date": "Datum"

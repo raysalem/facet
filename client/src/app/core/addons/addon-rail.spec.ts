@@ -53,6 +53,34 @@ describe('AddonRail', () => {
     expect(rail.tab()).toBeNull();
   });
 
+  it('closes every panel and the add-on with closeAll or Escape, also on a page that starts with a panel', () => {
+    const close = vi.fn(() => panel.set(null));
+    TestBed.overrideProvider(AddonPanelService, { useValue: { panel, dockHidden, openForCurrentView, close } });
+    const rail = create('view');
+    TestBed.tick();
+    open('n1');
+    rail.closeAll(); TestBed.tick();
+    expect(close).toHaveBeenCalledOnce();
+    expect(rail.tab()).toBeNull();
+    expect(rail.shownPage()).toBeNull();
+    expect(localStorage.getItem(KEY)).toBe('');
+    rail.select('view'); TestBed.tick();
+    expect(rail.shownPage()).toBe('view');
+    const handled = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true });
+    handled.preventDefault();
+    expect(rail.escape(handled)).toBe(false);
+    expect(rail.escape(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))).toBe(true);
+    expect(rail.tab()).toBeNull();
+    TestBed.tick();
+    // A page with a default panel still reopens closed.
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: AddonPanelService, useValue: { panel, dockHidden, openForCurrentView } },
+      { provide: AuthService, useValue: { hasFeature: () => false } },
+    ] });
+    expect(create('view').tab()).toBeNull();
+  });
+
   it('opens an add-on that is not open yet rather than picking an empty tab', () => {
     const rail = create('view');
     TestBed.tick();

@@ -56,7 +56,8 @@
       "download": "Scarica",
       "save": "Salva",
       "saving": "Salvataggio…",
-      "load_more": "Carica altro"
+      "load_more": "Carica altro",
+      "close_panels": "Chiudi i pannelli"
     },
     "sort": {
       "date": "Data"

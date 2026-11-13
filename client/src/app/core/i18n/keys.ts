@@ -96,6 +96,7 @@ export const I18N = {
       save: "ui.buttons.save",
       saving: "ui.buttons.saving",
       load_more: "ui.buttons.load_more",
+      close_panels: "ui.buttons.close_panels",
     },
     sort: {
       date: "ui.sort.date",
