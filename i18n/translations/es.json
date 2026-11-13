@@ -3287,6 +3287,12 @@
       "ai": "IA",
       "yours": "Tuyas"
     },
+    "detections": {
+      "summary": "{name} · {count} objetos",
+      "summary_one": "{name} · {count} objeto",
+      "label": "Objetos encontrados por {name}: {count}",
+      "search": "Mostrar fotos con {label}"
+    },
     "rating": "Valoración",
     "generate_caption": "Generar",
     "edit_caption": "Editar",

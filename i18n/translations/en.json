@@ -3316,6 +3316,12 @@
       "ai": "AI",
       "yours": "Yours"
     },
+    "detections": {
+      "summary": "{name} · {count} objects",
+      "summary_one": "{name} · {count} object",
+      "label": "Objects {name} found: {count}",
+      "search": "Show photos with {label}"
+    },
     "rating": "Rating",
     "generate_caption": "Generate",
     "edit_caption": "Edit",

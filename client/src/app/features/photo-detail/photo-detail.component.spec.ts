@@ -3488,6 +3488,49 @@ describe('PhotoDetailComponent', () => {
         expect(groups[0].textContent).not.toContain('photo_detail.tag_groups.ai');
       });
 
+      describe('Model D fields (inert until the server sends them)', () => {
+        const solved = { ...untagged, tags_list: ['sky'], manual_tags: ['m42', 'plate-solved', 'trip'],
+          plugin_tags: [{ tag: 'plate-solved', source: 'astro-id' }, { tag: 'm42', source: 'astro-id' }],
+          detections: [{ source: 'astro-id', count: 3 }, { source: 'other', count: 0 }] };
+
+        it('moves plugin tags out of Yours into their add-on group', async () => {
+          const el = await render(solved, true, [addonsMock(vi.fn().mockResolvedValue({ addons: [{ id: 'astro-id', name: 'Astro', icon: 'star', slots: ['sidebar'] }] }))]);
+          await settle(); await settle();
+          expect(chipTexts(el)).toEqual(['trip']);
+          expect(el.querySelector('[data-addon-tag-group]')!.textContent).toContain('Astro · 2');
+        });
+
+        it('shows what an add-on found as one folded chip whose labels open the gallery on them', async () => {
+          const el = await render(solved, false, [addonsMock()]);
+          mockApi.get.mockImplementation((url: string) => of(url === '/photo/detections'
+            ? { detections: [{ label: 'M42', grp: 'dso', source: 'astro-id' }, { label: 'Orion', grp: 'constellation', source: 'astro-id' }, { label: 'M42', grp: 'dso', source: 'astro-id' }] }
+            : solved));
+          const objects = [...el.querySelectorAll<HTMLButtonElement>('[data-addon-objects]')];
+          // A source with no detections gets no chip.
+          expect(objects).toHaveLength(1);
+          expect(objects[0].getAttribute('aria-expanded')).toBe('false');
+          expect(objects[0].textContent).toContain('photo_detail.detections.summary');
+          expect(objects[0].getAttribute('aria-label')).toBe('photo_detail.detections.label');
+          expect(el.querySelector('[data-detection-chip]')).toBeNull();
+          objects[0].click(); await settle(); await settle();
+          expect(mockApi.get).toHaveBeenCalledWith('/photo/detections', { path: solved.path, source: 'astro-id' });
+          const labels = [...el.querySelectorAll<HTMLButtonElement>('[data-detection-chip]')];
+          expect(labels.map(chip => chip.textContent!.trim())).toEqual(['M42', 'Orion']);
+          labels[1].click();
+          expect(mockRouter.navigate).toHaveBeenLastCalledWith(['/'], { info: GALLERY_REVISIT, queryParams: { detected: 'Orion' } });
+          // Closing and reopening reuses the labels already read.
+          objects[0].click(); await settle(); objects[0].click(); await settle();
+          expect(mockApi.get.mock.calls.filter(([url]) => url === '/photo/detections')).toHaveLength(1);
+        });
+
+        it('shows the add-ons row for detections alone, with no tags', async () => {
+          const el = await render({ ...untagged, detections: [{ source: 'astro-id', count: 1 }] }, false, [addonsMock()]);
+          expect(el.querySelector('[data-testid="tags-section"]')).not.toBeNull();
+          expect(el.querySelector('[data-addon-tag-group]')).toBeNull();
+          expect(el.querySelector('[data-addon-objects]')!.textContent).toContain('photo_detail.detections.summary_one');
+        });
+      });
+
       it('shows every manual tag as a chip when no add-on wrote any', async () => {
         const load = vi.fn();
         const el = await render({ ...astro, manual_tag_sources: {} }, true, [addonsMock(load)]);

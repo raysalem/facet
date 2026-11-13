@@ -3287,6 +3287,12 @@
       "ai": "KI",
       "yours": "Eigene"
     },
+    "detections": {
+      "summary": "{name} · {count} Objekte",
+      "summary_one": "{name} · {count} Objekt",
+      "label": "Von {name} gefundene Objekte: {count}",
+      "search": "Fotos mit {label} zeigen"
+    },
     "rating": "Bewertung",
     "generate_caption": "Generieren",
     "edit_caption": "Bearbeiten",

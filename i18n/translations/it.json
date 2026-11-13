@@ -3291,6 +3291,12 @@
       "ai": "IA",
       "yours": "Tuoi"
     },
+    "detections": {
+      "summary": "{name} · {count} oggetti",
+      "summary_one": "{name} · {count} oggetto",
+      "label": "Oggetti trovati da {name}: {count}",
+      "search": "Mostra le foto con {label}"
+    },
     "rating": "Valutazione",
     "generate_caption": "Genera",
     "edit_caption": "Modifica",

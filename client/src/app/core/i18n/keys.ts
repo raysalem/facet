@@ -3330,6 +3330,12 @@ export const I18N = {
       ai: "photo_detail.tag_groups.ai",
       yours: "photo_detail.tag_groups.yours",
     },
+    detections: {
+      summary: "photo_detail.detections.summary",
+      summary_one: "photo_detail.detections.summary_one",
+      label: "photo_detail.detections.label",
+      search: "photo_detail.detections.search",
+    },
     rating: "photo_detail.rating",
     generate_caption: "photo_detail.generate_caption",
     edit_caption: "photo_detail.edit_caption",

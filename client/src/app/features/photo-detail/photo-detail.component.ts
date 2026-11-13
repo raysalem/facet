@@ -85,7 +85,20 @@ interface PhotoTagOrigin {
 }
 
 const LOCATION_OPEN_KEY = 'facet_photo_location_open';
+/** The key an add-on's objects chip opens under, beside its tag group's own key. */
+const OBJECTS = 'objects:';
 type FacetTab = 'content' | 'ranking' | 'view';
+
+/**
+ * Model D fields of `GET /api/photo` (no share token): the summary tags each add-on wrote, and how many
+ * detections it indexed. Kept here, not on `Photo`, until the server on this branch sends them; absent,
+ * the page shows exactly what it showed before.
+ */
+interface AddonPhotoFields {
+  plugin_tags?: readonly { tag: string; source: string }[] | null;
+  detections?: readonly { source: string; count: number }[] | null;
+}
+type DetectionLabels = readonly string[] | 'loading' | 'failed';
 
 function readLocationOpen(): boolean {
   try { return localStorage.getItem(LOCATION_OPEN_KEY) === 'true'; } catch { return false; }
@@ -489,7 +502,7 @@ function inDetectedSet(photo: Photo): boolean {
               }
 
                 <!-- Tags: AI chips, then manual chips (marked, removable for editors), then + Tag -->
-              @if (p.tags_list.length || p.manual_tags.length || tagInputOpen()) {
+              @if (p.tags_list.length || p.manual_tags.length || tagInputOpen() || tagGroups().addons.length) {
                 <div data-testid="tags-section">
                   <div class="text-xs text-[var(--mat-sys-on-surface-variant)] mb-2">{{ I18N.photo_detail.tags | translate }}</div>
                   <!-- AI, then Yours, then one folded chip per add-on; a group is named only when another one shows. -->
@@ -544,6 +557,7 @@ function inDetectedSet(photo: Photo): boolean {
                   <div data-tag-group="addons" class="flex gap-1.5 flex-wrap items-center">
                     @if (tagGroups().labelled) { <span class="text-[0.6875rem] text-[var(--mat-sys-on-surface-variant)]">{{ I18N.addons.title | translate }}</span> }
                     @for (group of tagGroups().addons; track group.source) {
+                      @if (group.tags.length) {
                       <button type="button" data-addon-tag-group [attr.data-source]="group.source" [attr.aria-expanded]="group.expanded"
                               class="inline-flex min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 items-center gap-0.5 rounded-full border border-[var(--mat-sys-outline-variant)] px-2 py-0.5 text-xs text-[var(--mat-sys-on-surface-variant)] cursor-pointer hover:bg-[var(--mat-sys-surface-container-high)]"
                               [attr.aria-label]="I18N.manual_tags.addon_group | translate:{ name: group.name, count: group.tags.length }" (click)="toggleTagSource(group.source)">
@@ -553,6 +567,28 @@ function inDetectedSet(photo: Photo): boolean {
                       @if (group.expanded) {
                         @for (tag of group.tags; track tag) {
                           <ng-container [ngTemplateOutlet]="manualTagChip" [ngTemplateOutletContext]="{ $implicit: tag }" />
+                        }
+                      }
+                      }
+                      <!-- What the add-on found in the frame, folded; each label opens the gallery on photos with it. -->
+                      @if (group.objects) {
+                        <button type="button" data-addon-objects [attr.data-source]="group.source" [attr.aria-expanded]="group.objectsExpanded"
+                                class="inline-flex min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 items-center gap-0.5 rounded-full border border-[var(--mat-sys-outline-variant)] px-2 py-0.5 text-xs text-[var(--mat-sys-on-surface-variant)] cursor-pointer hover:bg-[var(--mat-sys-surface-container-high)]"
+                                [attr.aria-label]="I18N.photo_detail.detections.label | translate:{ name: group.name, count: group.objects }" (click)="toggleDetections(group.source)">
+                          <span aria-hidden="true">{{ (group.objects === 1 ? I18N.photo_detail.detections.summary_one : I18N.photo_detail.detections.summary) | translate:{ name: group.name, count: group.objects } }}</span>
+                          <mat-icon class="!text-sm !w-3.5 !h-3.5 !leading-3.5" aria-hidden="true">{{ group.objectsExpanded ? 'expand_less' : 'chevron_right' }}</mat-icon>
+                        </button>
+                        @if (group.objectsExpanded) {
+                          @if (group.labels === 'loading') {
+                            <span role="status" class="text-xs text-[var(--mat-sys-on-surface-variant)]">{{ I18N.ui.labels.loading | translate }}</span>
+                          } @else if (group.labels === 'failed') {
+                            <span role="alert" class="text-xs text-[var(--mat-sys-on-surface-variant)]">{{ I18N.errors.action_failed | translate }}</span>
+                          } @else {
+                            @for (label of group.labels; track label) {
+                              <button type="button" data-detection-chip [title]="I18N.photo_detail.detections.search | translate:{ label: label }" (click)="navigateDetection(label)"
+                                      class="inline-flex min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 max-w-full items-center rounded-full bg-[var(--mat-sys-surface-container-high)] px-2 py-0.5 text-left text-xs [overflow-wrap:anywhere] cursor-pointer hover:opacity-80">{{ label }}</button>
+                            }
+                          }
                         }
                       }
                     }
@@ -857,7 +893,11 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   protected readonly tagGroups = computed(() => {
     const photo = this.photo();
     const fetched = this.fetchedTagSources();
-    const sources = photo?.manual_tag_sources ?? (fetched && fetched.path === photo?.path ? fetched.sources : {});
+    const current = fetched && fetched.path === photo?.path ? fetched : null;
+    const modelD = photo as (Photo & AddonPhotoFields) | null;
+    // An add-on's tag: named by manual_tag_sources (this fork) or plugin_tags (Model D); either kind leaves Yours.
+    const sources: Record<string, string> = { ...(photo?.manual_tag_sources ?? current?.sources ?? {}) };
+    for (const { tag, source } of modelD?.plugin_tags ?? current?.pluginTags ?? []) sources[tag] = source;
     const own: string[] = [];
     const bySource = new Map<string, string[]>();
     for (const tag of photo?.manual_tags ?? []) {
@@ -865,9 +905,15 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
       if (!source) own.push(tag);
       else bySource.set(source, [...(bySource.get(source) ?? []), tag]);
     }
+    const objects = new Map<string, number>();
+    for (const { source, count } of modelD?.detections ?? current?.detections ?? []) if (count > 0) objects.set(source, count);
     const names = this.addonNames();
     const expanded = this.expandedTagSources();
-    const addons = [...bySource].map(([source, tags]) => ({ source, tags, name: names.get(source) ?? source, expanded: expanded.has(source) }));
+    const labels = this.detectionLabels();
+    const addons = [...new Set([...bySource.keys(), ...objects.keys()])].map(source => ({
+      source, tags: bySource.get(source) ?? [], name: names.get(source) ?? source, expanded: expanded.has(source),
+      objects: objects.get(source) ?? 0, objectsExpanded: expanded.has(OBJECTS + source), labels: labels.get(source) ?? 'loading' as DetectionLabels,
+    }));
     return {
       own,
       addons,
@@ -877,7 +923,10 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   });
   /** Only `GET /api/photo` names a tag's add-on; a photo opened from a gallery, album or collection row carries no
    *  `manual_tag_sources`, so they are read for it here (only when it has manual tags). */
-  private readonly fetchedTagSources = signal<{ path: string; sources: Readonly<Record<string, string>> } | null>(null);
+  private readonly fetchedTagSources = signal<{
+    path: string; sources: Readonly<Record<string, string>>;
+    pluginTags: AddonPhotoFields['plugin_tags']; detections: AddonPhotoFields['detections'];
+  } | null>(null);
   private readonly tagSourcesPath = computed(() => {
     const photo = this.photo();
     return photo && photo.manual_tag_sources === undefined && photo.manual_tags.length ? photo.path : null;
@@ -886,7 +935,11 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
     const path = this.tagSourcesPath();
     if (!path || untracked(this.fetchedTagSources)?.path === path) return;
     untracked(() => firstValueFrom(this.api.get<Photo>('/photo', { path }))
-      .then(fresh => { if (this.photo()?.path === path) this.fetchedTagSources.set({ path, sources: fresh.manual_tag_sources ?? {} }); })
+      .then(fresh => {
+        if (this.photo()?.path !== path) return;
+        const added = fresh as Photo & AddonPhotoFields;
+        this.fetchedTagSources.set({ path, sources: fresh.manual_tag_sources ?? {}, pluginTags: added.plugin_tags, detections: added.detections });
+      })
       .catch(() => undefined));
   });
   /** The right rail: Content, Ranking, View or an add-on's panel, remembered per browser. */
@@ -907,6 +960,29 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
     this.i18n.translations();
     return galleryFilterChips(this.store, key => this.i18n.t(key)).filter(chip => chip.id !== 'album');
   });
+
+  /** An add-on's detection labels for the open photo, read the first time its objects chip opens. */
+  private readonly detectionLabels = linkedSignal<string | undefined, ReadonlyMap<string, DetectionLabels>>({
+    source: () => this.photo()?.path, computation: () => new Map(),
+  });
+
+  protected toggleDetections(source: string): void {
+    this.toggleTagSource(OBJECTS + source);
+    const path = this.photo()?.path;
+    if (!path || this.detectionLabels().has(source)) return;
+    const settle = (value: DetectionLabels) => {
+      if (this.photo()?.path === path) this.detectionLabels.update(map => new Map(map).set(source, value));
+    };
+    settle('loading');
+    firstValueFrom(this.api.get<{ detections: { label: string }[] }>('/photo/detections', { path, source }))
+      .then(result => settle([...new Set(result.detections.map(detection => detection.label))]))
+      .catch(() => settle('failed'));
+  }
+
+  /** The gallery on every photo where an add-on found this label. */
+  protected navigateDetection(label: string): void {
+    this.router.navigate(['/'], { info: GALLERY_REVISIT, queryParams: { detected: label } });
+  }
 
   protected toggleTagSource(source: string): void {
     this.expandedTagSources.update(open => {

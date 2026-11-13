@@ -3291,6 +3291,12 @@
       "ai": "AI",
       "yours": "我的"
     },
+    "detections": {
+      "summary": "{name} · {count} 个对象",
+      "summary_one": "{name} · {count} 个对象",
+      "label": "{name} 找到的对象：{count}",
+      "search": "显示包含 {label} 的照片"
+    },
     "rating": "星级",
     "generate_caption": "生成",
     "edit_caption": "编辑",
