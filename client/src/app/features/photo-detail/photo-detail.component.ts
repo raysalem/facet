@@ -65,8 +65,7 @@ import { I18N, i18nKeys } from '../../core/i18n/keys';
 import { isPageShortcutBlocked } from '../../shared/utils/keyboard';
 import { privateImageSessionKey } from '../../shared/utils/private-image-session';
 import { KeyboardMappingService } from '../../core/services/keyboard-mapping.service';
-import { AddonsService, type Addon } from '../../core/services/addons.service';
-import { AddonPanelService } from '../../core/addons/addon-panel.service';
+import { AddonRail } from '../../core/addons/addon-rail';
 import { galleryFilterChips } from '../gallery/gallery-filter-chips';
 import { PanelWidth } from '../../shared/utils/panel-width';
 import type { CategoryOverrideResult } from './category-override-dialog.component';
@@ -85,18 +84,7 @@ interface PhotoTagOrigin {
 }
 
 const LOCATION_OPEN_KEY = 'facet_photo_location_open';
-const RAIL_KEY = 'facet_photo_rail_tab';
 type FacetTab = 'content' | 'ranking' | 'view';
-/** An add-on as the rail and the panel service know it. */
-type RailAddon = Pick<Addon, 'id' | 'name' | 'icon'> & Partial<Pick<Addon, 'mode'>>;
-
-function readRailTab(): string {
-  try { return localStorage.getItem(RAIL_KEY) || 'content'; } catch { return 'content'; }
-}
-
-function asFacetTab(tab: string): FacetTab {
-  return tab === 'ranking' || tab === 'view' ? tab : 'content';
-}
 
 function readLocationOpen(): boolean {
   try { return localStorage.getItem(LOCATION_OPEN_KEY) === 'true'; } catch { return false; }
@@ -408,25 +396,25 @@ function inDetectedSet(photo: Photo): boolean {
              dock at the far right (moving a frame reloads it), so the panel slot is always the far-right column. -->
         <!-- The keys bubble here from the tabs, which are the focusable elements. -->
         <!-- eslint-disable-next-line @angular-eslint/template/interactive-supports-focus -->
-        <div data-photo-rail role="tablist" [attr.aria-label]="I18N.photo_detail.rail.label | translate" (keydown)="railKey($event)"
+        <div data-photo-rail role="tablist" [attr.aria-label]="I18N.photo_detail.rail.label | translate" (keydown)="rail.key($event)"
           class="flex shrink-0 items-center gap-1 border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-1 max-lg:border-y lg:w-11 lg:flex-col lg:border-l">
           @for (tab of facetRailTabs; track tab.id) {
             <button type="button" role="tab" [id]="'photo-rail-' + tab.id" [attr.aria-controls]="'photo-panel-' + tab.id" [attr.data-rail-tab]="tab.id"
-              [attr.aria-selected]="railTab() === tab.id" [attr.tabindex]="railTab() === tab.id ? 0 : -1"
-              [matTooltip]="tab.label | translate" matTooltipPosition="left" [attr.aria-label]="tab.label | translate" (click)="selectRail(tab.id)"
+              [attr.aria-selected]="rail.tab() === tab.id" [attr.tabindex]="rail.tab() === tab.id ? 0 : -1"
+              [matTooltip]="tab.label | translate" matTooltipPosition="left" [attr.aria-label]="tab.label | translate" (click)="rail.select(tab.id)"
               class="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-[var(--mat-sys-on-surface-variant)] hover:bg-[var(--mat-sys-surface-container-high)] focus-visible:outline-2 focus-visible:outline-[var(--mat-sys-primary)] max-sm:h-11 max-sm:w-11 pointer-coarse:h-11 pointer-coarse:w-11"
-              [class.!bg-[var(--mat-sys-secondary-container)]]="railTab() === tab.id" [class.!text-[var(--mat-sys-on-secondary-container)]]="railTab() === tab.id">
+              [class.!bg-[var(--mat-sys-secondary-container)]]="rail.tab() === tab.id" [class.!text-[var(--mat-sys-on-secondary-container)]]="rail.tab() === tab.id">
               <mat-icon aria-hidden="true">{{ tab.icon }}</mat-icon>
             </button>
           }
-          @if (railAddons().length) {
+          @if (rail.addons().length) {
             <span aria-hidden="true" class="shrink-0 bg-[var(--mat-sys-outline-variant)] max-lg:mx-1 max-lg:h-6 max-lg:w-px lg:my-1 lg:h-px lg:w-6"></span>
-            @for (addon of railAddons(); track addon.id) {
+            @for (addon of rail.addons(); track addon.id) {
               <button type="button" role="tab" [attr.data-rail-addon]="addon.id"
-                [attr.aria-selected]="railTab() === 'addon:' + addon.id" [attr.tabindex]="railTab() === 'addon:' + addon.id ? 0 : -1"
-                [matTooltip]="addon.name" matTooltipPosition="left" [attr.aria-label]="addon.name" (click)="selectAddon(addon)"
+                [attr.aria-selected]="rail.tab() === 'addon:' + addon.id" [attr.tabindex]="rail.tab() === 'addon:' + addon.id ? 0 : -1"
+                [matTooltip]="addon.name" matTooltipPosition="left" [attr.aria-label]="addon.name" (click)="rail.selectAddon(addon)"
                 class="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-[var(--mat-sys-on-surface-variant)] hover:bg-[var(--mat-sys-surface-container-high)] focus-visible:outline-2 focus-visible:outline-[var(--mat-sys-primary)] max-sm:h-11 max-sm:w-11 pointer-coarse:h-11 pointer-coarse:w-11"
-                [class.!bg-[var(--mat-sys-secondary-container)]]="railTab() === 'addon:' + addon.id" [class.!text-[var(--mat-sys-on-secondary-container)]]="railTab() === 'addon:' + addon.id">
+                [class.!bg-[var(--mat-sys-secondary-container)]]="rail.tab() === 'addon:' + addon.id" [class.!text-[var(--mat-sys-on-secondary-container)]]="rail.tab() === 'addon:' + addon.id">
                 <mat-icon aria-hidden="true">{{ addon.icon }}</mat-icon>
               </button>
             }
@@ -435,13 +423,13 @@ function inDetectedSet(photo: Photo): boolean {
 
         <!-- Drag or arrow-key the panel's left edge to trade image room for detail (lg+, remembered). -->
         <div role="separator" tabindex="0" aria-orientation="vertical" data-inspector-resize [attr.aria-label]="I18N.photo_detail.inspector_resize | translate"
-          [attr.aria-valuemin]="inspectorWidth.min" [attr.aria-valuemax]="inspectorWidth.max" [attr.aria-valuenow]="inspectorWidth.width()" [class.lg:!hidden]="addonTabActive()"
+          [attr.aria-valuemin]="inspectorWidth.min" [attr.aria-valuemax]="inspectorWidth.max" [attr.aria-valuenow]="inspectorWidth.width()" [class.lg:!hidden]="rail.addonActive()"
           class="relative z-10 hidden lg:block w-3 -mx-1.5 shrink-0 cursor-col-resize touch-none focus-visible:bg-[var(--mat-sys-primary)]"
           (pointerdown)="inspectorWidth.start($event)" (pointermove)="inspectorWidth.move($event)" (pointerup)="inspectorWidth.finish($event)"
           (pointercancel)="inspectorWidth.finish($event, true)" (lostpointercapture)="inspectorWidth.finish($event, true)" (keydown)="inspectorWidth.key($event)"></div>
 
         <!-- Info panel -->
-        <aside data-photo-inspector [attr.aria-label]="I18N.photo_detail.details | translate" [style.--facet-inspector-width]="inspectorWidth.width() + 'px'" [class.lg:!hidden]="addonTabActive()" class="[overflow-wrap:anywhere] lg:w-[var(--facet-inspector-width)] lg:shrink-0 lg:overflow-y-auto lg:border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-4 space-y-4 text-sm text-[var(--mat-sys-on-surface)]">
+        <aside data-photo-inspector [attr.aria-label]="I18N.photo_detail.details | translate" [style.--facet-inspector-width]="inspectorWidth.width() + 'px'" [class.lg:!hidden]="rail.addonActive()" class="[overflow-wrap:anywhere] lg:w-[var(--facet-inspector-width)] lg:shrink-0 lg:overflow-y-auto lg:border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-4 space-y-4 text-sm text-[var(--mat-sys-on-surface)]">
           <ng-template #categoryExplanation>
               <mat-form-field class="w-full" subscriptSizing="dynamic">
                 <mat-label>{{ I18N.photo.category_override.target_category_label | translate }}</mat-label>
@@ -457,7 +445,7 @@ function inDetectedSet(photo: Photo): boolean {
               }
           </ng-template>
           <!-- Content: the photo's own facts, most used first; location and file details folded at the bottom. -->
-          <section id="photo-panel-content" data-photo-panel="content" role="tabpanel" aria-labelledby="photo-rail-content" [hidden]="facetTab() !== 'content'" class="space-y-4">
+          <section id="photo-panel-content" data-photo-panel="content" role="tabpanel" aria-labelledby="photo-rail-content" [hidden]="rail.pageTab() !== 'content'" class="space-y-4">
             <!-- Capture date and scoring category on one line, the capture settings under it -->
             <div data-photo-when class="space-y-1 text-xs text-[var(--mat-sys-on-surface-variant)]">
               <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -706,7 +694,7 @@ function inDetectedSet(photo: Photo): boolean {
             </mat-accordion>
           </section>
           <!-- Ranking: the decision first, then the evidence for it. -->
-          <section id="photo-panel-ranking" data-photo-panel="ranking" role="tabpanel" aria-labelledby="photo-rail-ranking" [hidden]="facetTab() !== 'ranking'" class="space-y-4">
+          <section id="photo-panel-ranking" data-photo-panel="ranking" role="tabpanel" aria-labelledby="photo-rail-ranking" [hidden]="rail.pageTab() !== 'ranking'" class="space-y-4">
             <!-- Account review controls -->
             @if (canReview()) {
               <section data-photo-review aria-labelledby="photo-review-title" class="space-y-1 bg-[var(--mat-sys-surface-container-lowest)] lg:sticky lg:-top-4 lg:z-10 lg:-mx-4 lg:-mt-4 lg:px-4 lg:pt-4 lg:pb-2">
@@ -804,7 +792,7 @@ function inDetectedSet(photo: Photo): boolean {
               }
             }
           </section>
-          <section id="photo-panel-view" data-photo-panel="view" role="tabpanel" aria-labelledby="photo-rail-view" [hidden]="facetTab() !== 'view'" class="flex min-h-0 flex-col gap-3 lg:h-full">
+          <section id="photo-panel-view" data-photo-panel="view" role="tabpanel" aria-labelledby="photo-rail-view" [hidden]="rail.pageTab() !== 'view'" class="flex min-h-0 flex-col gap-3 lg:h-full">
             <!-- What you are looking through: the collection, its filters, the way back to it, its photos. -->
             @if (collectionSidebarAvailable()) {
               <div data-view-collection class="flex items-center gap-2">
@@ -925,90 +913,24 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
       .then(fresh => { if (this.photo()?.path === path) this.fetchedTagSources.set({ path, sources: fresh.manual_tag_sources ?? {} }); })
       .catch(() => undefined));
   });
-  /** The installed add-ons, read once when this account has add-ons or a photo shows add-on tags: the rail's
-   *  add-on icons and the names of add-on tag groups ("Astro"). */
-  private readonly addonRegistry = signal<readonly Addon[]>([]);
-  private readonly addonNames = computed(() => new Map(this.addonRegistry().map(addon => [addon.id, addon.name])));
-  private addonRegistryRequested = false;
-  private readonly addonRegistryEffect = effect(() => {
-    if (this.addonRegistryRequested || (!this.auth.hasFeature('addons') && !this.tagGroups().addons.length)) return;
-    this.addonRegistryRequested = true;
-    // Resolved only now: a page that needs no add-on never starts the add-on service.
-    const addons = this.injector.get(AddonsService);
-    untracked(async () => {
-      const list = addons.list() ?? (addons.available() ? await addons.load() : null);
-      if (list) this.addonRegistry.set(list.addons);
-    });
+  /** The right rail: Content, Ranking, View or an add-on's panel, remembered per browser. */
+  protected readonly rail: AddonRail<FacetTab> = new AddonRail<FacetTab>({
+    storageKey: 'facet_photo_rail_tab', tabs: ['content', 'ranking', 'view'], defaultTab: 'content',
+    needsRegistry: () => this.tagGroups().addons.length > 0,
   });
-
-  /** The right rail: one of Facet's three panels, or an add-on's panel (`addon:<id>`), remembered per browser. */
   protected readonly facetRailTabs = [
     { id: 'content', icon: 'info', label: I18N.photo_detail.rail.content },
     { id: 'ranking', icon: 'star_half', label: I18N.photo_detail.rail.ranking },
     { id: 'view', icon: 'filter_alt', label: I18N.photo_detail.rail.view },
   ] as const;
-  protected readonly railTab = signal<string>(readRailTab());
-  /** The Facet panel shown when no add-on is (and below lg, where add-ons keep their own dock). */
-  protected readonly facetTab = signal<FacetTab>(asFacetTab(readRailTab()));
-  private readonly addonPanels = inject(AddonPanelService);
-  /** Add-ons with a sidebar panel, plus the open panel's add-on when the registry has not been read. */
-  protected readonly railAddons = computed(() => {
-    const listed: RailAddon[] = this.addonRegistry().filter(addon => addon.slots.includes('sidebar'));
-    const open = this.addonPanels.panel()?.addon;
-    return open && !listed.some(addon => addon.id === open.id) ? [...listed, open] : listed;
-  });
-  /** An add-on tab is shown only once its panel is open; until then the Facet panel stays. */
-  protected readonly addonTabActive = computed(() => {
-    const open = this.addonPanels.panel();
-    return !!open && this.railTab() === 'addon:' + open.addon.id;
-  });
-  private lastAddonPanel: string | null | undefined = undefined;
-  /** A panel opened from anywhere (toolbar, puzzle menu, rail) selects its tab; a closed one gives way to the Facet panel. */
-  private readonly railPanelEffect = effect(() => {
-    const open = this.addonPanels.panel();
-    const key = open ? `${open.addon.id}|${open.nonce}` : null;
-    const previous = this.lastAddonPanel;
-    this.lastAddonPanel = key;
-    untracked(() => {
-      const tab = this.railTab();
-      if (open && previous !== undefined && key !== previous) this.railTab.set('addon:' + open.addon.id);
-      else if (tab.startsWith('addon:') && tab !== 'addon:' + open?.addon.id) this.railTab.set(this.facetTab());
-    });
-  });
-  /** The shell's dock is the add-on's panel: hidden (still mounted) while a Facet panel is shown at lg and up. */
-  private readonly dockEffect = effect(() => this.addonPanels.dockHidden.set(!this.addonTabActive()));
-  private readonly railStorageEffect = effect(() => {
-    const tab = this.railTab();
-    try { localStorage.setItem(RAIL_KEY, tab); } catch { /* Storage blocked: the tab holds for this page only. */ }
-  });
+  /** Add-on id -> its name ("Astro"), for the add-on tag groups. */
+  private readonly addonNames = computed<ReadonlyMap<string, string>>(() => new Map(this.rail.registry().map(addon => [addon.id, addon.name])));
   /** The collection's active filters, as the gallery's criteria row shows them; the album is the panel's heading. */
   protected readonly viewFilterChips = computed(() => {
     if (!this.collectionSidebarAvailable()) return [];
     this.i18n.translations();
     return galleryFilterChips(this.store, key => this.i18n.t(key)).filter(chip => chip.id !== 'album');
   });
-
-  protected selectRail(tab: FacetTab): void {
-    this.facetTab.set(tab);
-    this.railTab.set(tab);
-  }
-
-  /** Show an add-on's panel; opening it (when another or none is open) selects its tab once it is there. */
-  protected selectAddon(addon: RailAddon): void {
-    if (this.addonPanels.panel()?.addon.id === addon.id) this.railTab.set('addon:' + addon.id);
-    else void this.addonPanels.openForCurrentView(addon);
-  }
-
-  /** Arrows, Home and End move focus along the rail; Enter or Space picks (an add-on tab may start the add-on). */
-  protected railKey(event: KeyboardEvent): void {
-    const tabs = [...(event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[role="tab"]')];
-    const index = tabs.indexOf(document.activeElement as HTMLElement);
-    const target = index < 0 ? undefined : ({ ArrowDown: index + 1, ArrowRight: index + 1, ArrowUp: index - 1, ArrowLeft: index - 1, Home: 0, End: tabs.length - 1 } as Record<string, number>)[event.key];
-    if (target === undefined) return;
-    event.preventDefault();
-    event.stopPropagation();
-    tabs[(target + tabs.length) % tabs.length].focus();
-  }
 
   protected toggleTagSource(source: string): void {
     this.expandedTagSources.update(open => {
@@ -1293,7 +1215,7 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
     const container = this.locationMapContainer();
     const p = this.photo();
     // The map is built only while the section is open, once it has its size, so it never measures a hidden box.
-    const open = this.locationOpen() && this.facetTab() === 'content' && !this.addonTabActive();
+    const open = this.locationOpen() && this.rail.pageTab() === 'content' && !this.rail.addonActive();
     if (this.locationMapTimeout !== null) {
       clearTimeout(this.locationMapTimeout);
       this.locationMapTimeout = null;
@@ -1333,8 +1255,6 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
       }
     });
     this.destroyRef.onDestroy(() => {
-      // Other pages have no panel of their own: the add-on dock shows again there.
-      this.addonPanels.dockHidden.set(false);
       if (this.locationMapTimeout !== null) clearTimeout(this.locationMapTimeout);
       if (this.locationMap) { this.locationMap.remove(); this.locationMap = null; }
     });
