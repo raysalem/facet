@@ -1292,7 +1292,7 @@ For older changes, see [Organization history](#organization-history).
 
 ## Progressive Web App
 
-Production builds can be installed to the home screen. The app shell loads offline; thumbnails and other library images are not cached offline. Before reusing a stored copy, the browser revalidates it with the server, so a revoked session cannot load it again; an image already shown in an open tab can stay visible there until the tab reloads. API responses are never cached, except translation bundles. A snackbar offers a reload when a new version is deployed.
+Production builds can be installed to the home screen. The app shell loads offline; thumbnails and other library images are not cached offline. Before reusing a stored copy, the browser revalidates it with the server, so a revoked session cannot load it again; an image already shown in an open tab can stay visible there until the tab reloads. API responses are never cached, except translation bundles. When a new version is deployed the app finds it at startup, when the tab becomes visible and every 10 minutes, then reloads onto it automatically. It waits while a dialog or menu is open or a text field has focus (a snackbar says so and offers **Reload** at once), and reloads as soon as the page is idle. Each build triggers one automatic reload per tab.
 
 > **Note:** the browser revalidates each image with the server before reusing it, so after logout or a revoked session a stored copy is not shown again. Bytes already delivered are not erased: accounts that must not see each other's photos should still not share a browser profile.
 

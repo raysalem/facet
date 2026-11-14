@@ -3738,6 +3738,7 @@
   },
   "pwa": {
     "update_available": "A new version is available",
+    "update_when_idle": "A new version is available. Facet will reload when you are done",
     "reload": "Reload"
   },
   "moments": {

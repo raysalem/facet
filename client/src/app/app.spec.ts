@@ -16,7 +16,7 @@ import { PersonsFiltersService } from './features/persons/persons-filters.servic
 import { AlbumsFiltersService } from './features/albums/albums-filters.service';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { SwUpdate } from '@angular/service-worker';
+import { AppUpdateService } from './core/services/app-update.service';
 import { I18N } from './core/i18n/keys';
 import { ScanService } from './core/services/scan.service';
 import { By } from '@angular/platform-browser';
@@ -205,38 +205,12 @@ describe('App', () => {
     });
   });
 
-  describe('service worker update toast', () => {
-    function withSw(isEnabled: boolean) {
-      const versionUpdates = new Subject<unknown>();
-      const onAction = vi.fn(() => new Subject<void>());
-      const open = vi.fn(() => ({ onAction }));
-      const { app } = createApp('/', [
-        { provide: SwUpdate, useValue: { isEnabled, versionUpdates } },
-        { provide: MatSnackBar, useValue: { open } },
-      ]);
-      return { app, versionUpdates, open, onAction };
-    }
-
-    it('opens a reload snackbar and wires its action on VERSION_READY', () => {
-      const { app, versionUpdates, open, onAction } = withSw(true);
+  describe('app update', () => {
+    it('starts the update service on init', () => {
+      const start = vi.fn();
+      const { app } = createApp('/', [{ provide: AppUpdateService, useValue: { start } }]);
       (app as any).setupUpdateNotifications();
-      versionUpdates.next({ type: 'VERSION_READY' });
-      expect(open).toHaveBeenCalledWith(I18N.pwa.update_available, I18N.pwa.reload);
-      expect(onAction).toHaveBeenCalled();
-    });
-
-    it('ignores version events other than VERSION_READY', () => {
-      const { app, versionUpdates, open } = withSw(true);
-      (app as any).setupUpdateNotifications();
-      versionUpdates.next({ type: 'VERSION_DETECTED' });
-      expect(open).not.toHaveBeenCalled();
-    });
-
-    it('does nothing when the service worker is disabled', () => {
-      const { app, versionUpdates, open } = withSw(false);
-      (app as any).setupUpdateNotifications();
-      versionUpdates.next({ type: 'VERSION_READY' });
-      expect(open).not.toHaveBeenCalled();
+      expect(start).toHaveBeenCalledTimes(1);
     });
   });
 

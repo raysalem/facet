@@ -3752,6 +3752,7 @@ export const I18N = {
   },
   pwa: {
     update_available: "pwa.update_available",
+    update_when_idle: "pwa.update_when_idle",
     reload: "pwa.reload",
   },
   moments: {

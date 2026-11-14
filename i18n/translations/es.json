@@ -3713,6 +3713,7 @@
   },
   "pwa": {
     "update_available": "Hay una nueva versión disponible",
+    "update_when_idle": "Hay una nueva versión disponible. Facet se recargará cuando termine",
     "reload": "Recargar"
   },
   "moments": {
