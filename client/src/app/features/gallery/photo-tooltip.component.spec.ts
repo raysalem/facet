@@ -75,6 +75,24 @@ describe('PhotoTooltipComponent', () => {
     fixture.detectChanges();
     expect(capture().classList).not.toContain('w-0');
   });
+  it('the tags and people rows wrap inside the floating card instead of widening it; docked keeps its own width', () => {
+    fixture.componentInstance.photo.set(makePhoto({ filename: 'a.jpg', tags_list: ['sky', 'moon', 'nebula'], persons: [{ id: 1, name: 'Alice' }] }));
+    const root = fixture.nativeElement as HTMLElement;
+    const rows = () => ['[data-tags-row]', '[data-people-row]'].map(sel => root.querySelector<HTMLElement>(sel)!);
+    fixture.detectChanges();
+    for (const row of rows()) {
+      expect(row.classList).toContain('w-0');
+      expect(row.classList).toContain('min-w-full');
+    }
+    fixture.componentInstance.docked.set(true);
+    fixture.componentInstance.section.set('content');
+    fixture.detectChanges();
+    for (const row of rows()) {
+      expect(row).not.toBeNull();
+      expect(row.classList).not.toContain('w-0');
+      expect(row.classList).not.toContain('min-w-full');
+    }
+  });
   it('docked, shows one part per panel the way the photo page splits it: Grade, Camera, Content', () => {
     fixture.componentInstance.photo.set(makePhoto({ filename: 'a.jpg', category: 'astro', star_rating: 4, camera_model: 'X100V', tags_list: ['sky'], caption: 'Night' }));
     fixture.componentInstance.docked.set(true);

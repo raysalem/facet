@@ -263,7 +263,7 @@ const KEY_SCORES = [
 
         <!-- Zone C: Tags (full width) -->
         @if (shows().content && navigationTags().length) {
-          <div class="flex gap-1 flex-wrap mt-2 pt-1.5 border-[var(--facet-tooltip-divider)]" [class.border-t]="!docked()">
+          <div data-tags-row class="flex gap-1 flex-wrap mt-2 pt-1.5 border-[var(--facet-tooltip-divider)]" [class.border-t]="!docked()" [class.w-0]="!docked()" [class.min-w-full]="!docked()">
             @for (tag of navigationTags(); track tag) {
               @if (personLinks() && showInteractiveControls()) {
                 <button type="button" data-testid="tooltip-tag" class="min-h-9 px-1.5 py-0.5 bg-[var(--facet-accent-badge)] text-[var(--facet-accent-text)] rounded text-[10px] hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mat-sys-primary)]"
@@ -296,7 +296,7 @@ const KEY_SCORES = [
              surface where large avatars would cost width against the
              scoring grid, whether or not it happens to be click-pinned. -->
         @if (shows().content && p.persons.length) {
-          <div class="flex items-center gap-1.5 flex-wrap mt-2 pt-1.5 border-[var(--facet-tooltip-divider)]" [class.border-t]="!docked()">
+          <div data-people-row class="flex items-center gap-1.5 flex-wrap mt-2 pt-1.5 border-[var(--facet-tooltip-divider)]" [class.border-t]="!docked()" [class.w-0]="!docked()" [class.min-w-full]="!docked()">
             @for (person of p.persons; track person.id) {
               @if (personLinks() && showInteractiveControls()) {
                 <button type="button"
