@@ -3684,6 +3684,7 @@
   },
   "pwa": {
     "update_available": "有新版本可用",
+    "update_when_idle": "有新版本可用。完成当前操作后，Facet 将自动重新加载",
     "reload": "重新加载"
   },
   "moments": {

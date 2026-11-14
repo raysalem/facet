@@ -3684,6 +3684,7 @@
   },
   "pwa": {
     "update_available": "È disponibile una nuova versione",
+    "update_when_idle": "È disponibile una nuova versione. Facet si ricaricherà quando avrai finito",
     "reload": "Ricarica"
   },
   "moments": {

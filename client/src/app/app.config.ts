@@ -38,7 +38,10 @@ export const appConfig: ApplicationConfig = {
     provideAgentTools(),
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),
-      registrationStrategy: 'registerWhenStable:30000',
+      // Immediately: AppUpdateService checks for a newer build at startup, and the
+      // 'registerWhenStable' wait (up to 30 s, longer while requests are in flight)
+      // would leave the old cached shell running until it elapsed.
+      registrationStrategy: 'registerImmediately',
     }),
   ],
 };

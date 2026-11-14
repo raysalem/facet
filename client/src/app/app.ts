@@ -6,7 +6,6 @@ import { Router, RouterOutlet, RouterLink, NavigationEnd } from '@angular/router
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map, firstValueFrom } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatIconModule } from '@angular/material/icon';
@@ -29,6 +28,7 @@ import { AddonImportNotifier } from './core/addons/addon-import-notifier.service
 import { AddonSidebarComponent } from './shared/components/addon-sidebar/addon-sidebar.component';
 import { AddonLauncherComponent } from './shared/components/addon-sidebar/addon-launcher.component';
 import { I18nService } from './core/services/i18n.service';
+import { AppUpdateService } from './core/services/app-update.service';
 import { ThemeService } from './core/services/theme.service';
 import { PageHelpService } from './core/services/page-help.service';
 import { HeaderSlotService } from './core/services/header-slot.service';
@@ -350,19 +350,11 @@ export class App implements OnInit {
   }
 
   private readonly snackBar = inject(MatSnackBar);
-  private readonly swUpdate = inject(SwUpdate, { optional: true });
+  private readonly appUpdate = inject(AppUpdateService);
 
-  /** Offer a reload when the service worker has installed a new version. */
+  /** Apply new app builds automatically (see AppUpdateService); the snackbar is the busy-page fallback. */
   private setupUpdateNotifications(): void {
-    if (!this.swUpdate?.isEnabled) return;
-    this.swUpdate.versionUpdates
-      .pipe(filter((e): e is VersionReadyEvent => e.type === 'VERSION_READY'))
-      .subscribe(() => {
-        const ref = this.snackBar.open(
-          this.i18n.t(I18N.pwa.update_available), this.i18n.t(I18N.pwa.reload),
-        );
-        ref.onAction().subscribe(() => location.reload());
-      });
+    this.appUpdate.start();
   }
 
   /**
