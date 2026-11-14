@@ -68,6 +68,7 @@ const KEY_SCORES = [
         [style.position]="docked() ? 'static' : null"
         [style.pointer-events]="showInteractiveControls() ? 'auto' : null"
         [style.width]="docked() ? '100%' : null"
+        [style.max-width]="docked() ? null : 'min(640px, calc(100vw - 2rem))'"
         [style.padding]="docked() ? '16px' : null"
         [style.background]="docked() ? 'transparent' : 'var(--facet-tooltip-bg)'"
         [style.border]="docked() ? 'none' : '1px solid var(--facet-tooltip-border)'"
@@ -194,7 +195,10 @@ const KEY_SCORES = [
              where they join the column beside it so nothing spans under a tall
              image. -->
         <ng-template #captureLine let-p>
-          <div data-capture-line class="mt-1.5 truncate text-[var(--facet-tooltip-text-secondary)] [&>span+span]:before:content-['_·_']">
+          <!-- Floating: w-0 + min-w-full, like the caption, so this nowrap line takes the width the
+               photo and scores give the bubble instead of stretching it past the picture. -->
+          <div data-capture-line class="mt-1.5 truncate text-[var(--facet-tooltip-text-secondary)] [&>span+span]:before:content-['_·_']"
+               [class.w-0]="!docked()" [class.min-w-full]="!docked()">
             @if (p.camera_model) {<span>{{ p.camera_model }}</span>}
             @if (p.focal_length) {<span>{{ p.focal_length }}mm</span>}
             @if (p.f_stop) {<span>f/{{ p.f_stop }}</span>}
@@ -259,7 +263,7 @@ const KEY_SCORES = [
 
         <!-- Zone C: Tags (full width) -->
         @if (shows().content && navigationTags().length) {
-          <div class="flex gap-1 flex-wrap mt-2 pt-1.5 border-[var(--facet-tooltip-divider)]" [class.border-t]="!docked()">
+          <div data-tags-row class="flex gap-1 flex-wrap mt-2 pt-1.5 border-[var(--facet-tooltip-divider)]" [class.border-t]="!docked()" [class.w-0]="!docked()" [class.min-w-full]="!docked()">
             @for (tag of navigationTags(); track tag) {
               @if (personLinks() && showInteractiveControls()) {
                 <button type="button" data-testid="tooltip-tag" class="min-h-9 px-1.5 py-0.5 bg-[var(--facet-accent-badge)] text-[var(--facet-accent-text)] rounded text-[10px] hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mat-sys-primary)]"
@@ -292,7 +296,7 @@ const KEY_SCORES = [
              surface where large avatars would cost width against the
              scoring grid, whether or not it happens to be click-pinned. -->
         @if (shows().content && p.persons.length) {
-          <div class="flex items-center gap-1.5 flex-wrap mt-2 pt-1.5 border-[var(--facet-tooltip-divider)]" [class.border-t]="!docked()">
+          <div data-people-row class="flex items-center gap-1.5 flex-wrap mt-2 pt-1.5 border-[var(--facet-tooltip-divider)]" [class.border-t]="!docked()" [class.w-0]="!docked()" [class.min-w-full]="!docked()">
             @for (person of p.persons; track person.id) {
               @if (personLinks() && showInteractiveControls()) {
                 <button type="button"
