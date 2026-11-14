@@ -2285,6 +2285,13 @@ export class GalleryComponent implements OnInit, OnDestroy {
     const routeAlbumId = this.route.snapshot.paramMap.get('albumId');
     if (this.revisit) this.store.viewSnapshot.set(null);
     if (!setScope && !this.revisit && this.tryRestoreView()) return;
+    // The root store still holds the rows of the album (or plain gallery) shown last. This visit
+    // reloads anyway (loadPhotos clears without retainRows), but only after the config and album
+    // reads: until then a different album's grid would show, and open, the other album's photos.
+    if (String(this.store.currentAlbum()?.id ?? '') !== (routeAlbumId ?? '')) {
+      this.store.photos.set([]);
+      this.store.total.set(0);
+    }
     // Reset album state to avoid stale singleton data; loadConfig() resets filters from scratch
     this.store.currentAlbum.set(null);
     this.store.initializing.set(true);

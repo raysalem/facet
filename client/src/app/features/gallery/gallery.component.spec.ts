@@ -2010,6 +2010,40 @@ describe('GalleryComponent', () => {
       expect(mockStore.applySessionQuery).not.toHaveBeenCalled();
     });
 
+    // B39: the root store still held the previous album's rows while this visit's config and
+    // album reads ran, so the new album's grid showed (and opened) the other album's photos.
+    it.each([
+      ['another album', { id: 3 }, '7'],
+      ['an album, opening the plain gallery', { id: 3 }, null],
+      ['the plain gallery, opening an album', null, '7'],
+    ])('drops the rows of %s as soon as the visit starts, before its own load', async (_case, shown, routeAlbum) => {
+      routeMock.snapshot.paramMap.get = vi.fn((k: string) => (k === 'albumId' ? routeAlbum : null));
+      routeMock.snapshot.queryParams = {};
+      mockStore.currentAlbum.set(shown);
+      mockStore.photos.set([{ path: '/other-album/a.jpg' }]);
+      mockStore.total.set(586);
+      let releaseConfig!: () => void;
+      mockStore.loadConfig.mockImplementation(() => new Promise<boolean>(resolve => { releaseConfig = () => resolve(true); }));
+
+      const init = component.ngOnInit();
+
+      expect(mockStore.photos()).toEqual([]);
+      expect(mockStore.total()).toBe(0);
+      expect(mockStore.loadPhotos).not.toHaveBeenCalled();
+      releaseConfig();
+      await init;
+      expect(mockStore.loadPhotos).toHaveBeenCalledOnce();
+    });
+
+    it('keeps the rows of a view it restores', async () => {
+      mockStore.photos.set([{ path: '/a.jpg' }]);
+      mockStore.viewSnapshot.set({ scrollTop: 0, albumId: null, filterKey: mockStore.filterKey(), photoSession: privateImageSessionKey() });
+
+      await component.ngOnInit();
+
+      expect(mockStore.photos()).toEqual([{ path: '/a.jpg' }]);
+    });
+
     it('should show photos and stop initializing when a filter-option request never resolves', async () => {
       mockStore.loadFilterOptions.mockImplementation(() => new Promise<void>(() => {}));
       mockStore.loadPhotos.mockImplementation(() => {
