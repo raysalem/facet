@@ -89,7 +89,9 @@ export interface Photo {
   tags_list: string[];
   /** Tags the user typed by hand, sorted. Always on the wire (`[]` when none); never shown on a share link. */
   manual_tags: string[];
-  /** Only on `GET /api/photo`: tag -> id of the add-on that wrote it, for the manual tags an add-on wrote. */
+  /** Album (organisation) tags: event, part, photographer. Kept off the photo page's tag list. */
+  album_tags?: string[];
+  /** On `GET /api/photo` and gallery rows (never on a share link): tag -> id of the add-on that wrote it (object tags). */
   manual_tag_sources?: Record<string, string> | null;
   is_monochrome?: boolean | null;
   is_silhouette?: boolean | null;

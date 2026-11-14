@@ -3281,22 +3281,25 @@
     "gps_clear": "Rimuovi posizione",
     "caption": "Didascalia",
     "no_caption": "Nessuna didascalia disponibile",
-    "persons": "Persone",
+    "people_tags": "Tag persone",
     "quality": "Qualità",
     "composition": "Composizione",
     "saliency": "Salienza del soggetto",
     "technical": "Tecnico",
     "exif": "Dati EXIF",
     "tags": "Tag",
-    "tag_groups": {
-      "ai": "IA",
-      "yours": "Tuoi"
-    },
-    "detections": {
-      "summary": "{name} · {count} rilevamenti",
-      "summary_one": "{name} · {count} rilevamento",
-      "label": "Rilevamenti di {name}: {count}",
+    "object_tags": {
+      "summary": "{name} · {count} tag oggetto",
+      "summary_one": "{name} · {count} tag oggetto",
+      "label": "Tag oggetto di {name}: {count}",
+      "indexed": "tutti ({count})",
+      "indexed_label": "Tutti i tag oggetto di {name}: {count}",
       "search": "Mostra le foto con {label}"
+    },
+    "album_tags": {
+      "summary": "Tag album · {count}",
+      "label": "Tag album: {count}",
+      "hint": "I tag album classificano la foto per filtrare; non la descrivono."
     },
     "rating": "Valutazione",
     "generate_caption": "Genera",
@@ -3487,7 +3490,6 @@
     "remove_action": "Rimuovi",
     "remove_tag": "Rimuovi il tag {tag}",
     "manual": "Tag manuale",
-    "addon_group": "Tag di {name}: {count}",
     "error": "Impossibile modificare il tag. Controllalo e riprova.",
     "already_present": "Questo tag è già presente sulla foto."
   },

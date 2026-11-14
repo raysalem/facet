@@ -71,6 +71,7 @@ import { PanelRailComponent } from '../../shared/components/panel-rail/panel-rai
 import { definingFilters, galleryFilterChips } from '../gallery/gallery-filter-chips';
 import { PluralKeyPipe } from '../../shared/pipes/plural-key.pipe';
 import { PanelWidth } from '../../shared/utils/panel-width';
+import { tagKinds } from '../../shared/utils/tag-kinds';
 import type { CategoryOverrideResult } from './category-override-dialog.component';
 import { StackNavigatorComponent } from './stack-navigator.component';
 import { PhotoStackService } from '../../core/services/photo-stack.service';
@@ -89,6 +90,8 @@ interface PhotoTagOrigin {
 const LOCATION_OPEN_KEY = 'facet_photo_location_open';
 /** The key an add-on's objects chip opens under, beside its tag group's own key. */
 const OBJECTS = 'objects:';
+/** The album tags' fold, kept with the add-on folds (an add-on id never starts with a colon). */
+const ALBUM = ':album';
 type FacetTab = 'grade' | 'camera' | 'content' | 'filter';
 
 /**
@@ -619,46 +622,47 @@ function inDetectedSet(photo: Photo): boolean {
                 </div>
               }
 
-                <!-- Tags: AI chips, then manual chips (marked, removable for editors), then + Tag -->
-              @if (p.tags_list.length || p.manual_tags.length || tagInputOpen() || tagGroups().addons.length) {
+              <!-- A manual tag's chip (marked, removable for editors) and the tag menu, shared by Tags, Object tags and Album tags. -->
+              <ng-template #manualTagChip let-tag>
+                <span data-testid="manual-tag-chip"
+                      class="inline-flex min-w-0 max-w-full items-center rounded-full border border-dashed border-[var(--facet-accent-text)] text-[var(--facet-accent-text)] text-xs">
+                  <button class="inline-flex items-center min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 max-sm:min-w-11 pointer-coarse:min-w-11 min-w-0 gap-1 pl-2 pr-2 py-0.5 cursor-pointer hover:opacity-80 transition-opacity"
+                          [attr.title]="I18N.manual_tags.manual | translate"
+                          [matMenuTriggerFor]="tagNavigationMenu" [matMenuTriggerData]="{ tag: tag }">
+                    <mat-icon class="!text-xs !w-3 !h-3 !leading-3" aria-hidden="true">sell</mat-icon>
+                    <span class="sr-only">{{ I18N.manual_tags.manual | translate }}:</span>
+                    <span class="min-w-0 [overflow-wrap:anywhere] text-left">{{ tag }}</span>
+                  </button>
+                  @if (auth.isEdition()) {
+                    <button data-testid="manual-tag-remove"
+                            class="inline-flex items-center justify-center shrink-0 min-w-6 min-h-6 max-sm:min-w-11 max-sm:min-h-11 pointer-coarse:min-w-11 pointer-coarse:min-h-11 -ml-1 max-sm:ml-0 pointer-coarse:ml-0 cursor-pointer hover:opacity-80"
+                            [attr.aria-label]="I18N.manual_tags.remove_tag | translate:{ tag: tag }"
+                            (click)="removeManualTag(p, tag)">
+                      <mat-icon class="!text-xs !w-3 !h-3 !leading-3" aria-hidden="true">close</mat-icon>
+                    </button>
+                  }
+                </span>
+              </ng-template>
+              <mat-menu #tagNavigationMenu="matMenu">
+                <ng-template matMenuContent let-tag="tag">
+                  @if (tagCollectionAvailable()) {
+                    <button mat-menu-item (click)="navigateTag(tag, 'collection')"><mat-icon>filter_alt</mat-icon>{{ I18N.photo_detail.tag_refine_collection | translate }}</button>
+                  }
+                  <button mat-menu-item (click)="navigateTag(tag, 'library')"><mat-icon>search</mat-icon>{{ I18N.photo_detail.tag_search_library | translate }}</button>
+                </ng-template>
+              </mat-menu>
+
+              <!-- Tags: what the photo shows. AI chips, then the user's own (dashed), then + Tag. -->
+              @if (p.tags_list.length || tagGroups().own.length || tagInputOpen()) {
                 <div data-testid="tags-section">
                   <div class="text-xs text-[var(--mat-sys-on-surface-variant)] mb-2">{{ I18N.photo_detail.tags | translate }}</div>
-                  <!-- AI, then Yours, then one folded chip per add-on; a group is named only when another one shows. -->
-                  <div class="space-y-1.5">
-                    <ng-template #manualTagChip let-tag>
-                      <span data-testid="manual-tag-chip"
-                            class="inline-flex min-w-0 max-w-full items-center rounded-full border border-dashed border-[var(--facet-accent-text)] text-[var(--facet-accent-text)] text-xs">
-                        <button class="inline-flex items-center min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 max-sm:min-w-11 pointer-coarse:min-w-11 min-w-0 gap-1 pl-2 pr-2 py-0.5 cursor-pointer hover:opacity-80 transition-opacity"
-                                [attr.title]="I18N.manual_tags.manual | translate"
-                                [matMenuTriggerFor]="tagNavigationMenu" [matMenuTriggerData]="{ tag: tag }">
-                          <mat-icon class="!text-xs !w-3 !h-3 !leading-3" aria-hidden="true">sell</mat-icon>
-                          <span class="sr-only">{{ I18N.manual_tags.manual | translate }}:</span>
-                          <span class="min-w-0 [overflow-wrap:anywhere] text-left">{{ tag }}</span>
-                        </button>
-                        @if (auth.isEdition()) {
-                          <button data-testid="manual-tag-remove"
-                                  class="inline-flex items-center justify-center shrink-0 min-w-6 min-h-6 max-sm:min-w-11 max-sm:min-h-11 pointer-coarse:min-w-11 pointer-coarse:min-h-11 -ml-1 max-sm:ml-0 pointer-coarse:ml-0 cursor-pointer hover:opacity-80"
-                                  [attr.aria-label]="I18N.manual_tags.remove_tag | translate:{ tag: tag }"
-                                  (click)="removeManualTag(p, tag)">
-                            <mat-icon class="!text-xs !w-3 !h-3 !leading-3" aria-hidden="true">close</mat-icon>
-                          </button>
-                        }
-                      </span>
-                    </ng-template>
-                  @if (p.tags_list.length) {
-                  <div data-tag-group="ai" class="flex gap-1.5 flex-wrap items-center">
-                    @if (tagGroups().labelled) { <span class="text-[0.6875rem] text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.tag_groups.ai | translate }}</span> }
+                  <div data-tag-group="tags" class="flex gap-1.5 flex-wrap items-center">
                     @for (tag of p.tags_list; track tag) {
                       <span data-testid="ai-tag-chip" class="inline-flex min-w-0 max-w-full">
                         <button class="inline-flex items-center min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 max-sm:min-w-11 pointer-coarse:min-w-11 max-w-full [overflow-wrap:anywhere] text-left px-2 py-0.5 bg-[var(--facet-accent-badge)] text-[var(--facet-accent-text)] rounded-full text-xs cursor-pointer hover:opacity-80 transition-opacity"
                                 [matMenuTriggerFor]="tagNavigationMenu" [matMenuTriggerData]="{ tag: tag }">{{ tag }}</button>
                       </span>
                     }
-                  </div>
-                  }
-                  @if (tagGroups().own.length || (auth.isEdition() && !tagInputOpen())) {
-                  <div data-tag-group="yours" class="flex gap-1.5 flex-wrap items-center">
-                    @if (tagGroups().labelled && tagGroups().own.length) { <span class="text-[0.6875rem] text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.tag_groups.yours | translate }}</span> }
                     @for (tag of tagGroups().own; track tag) {
                       <ng-container [ngTemplateOutlet]="manualTagChip" [ngTemplateOutletContext]="{ $implicit: tag }" />
                     }
@@ -669,58 +673,6 @@ function inDetectedSet(photo: Photo): boolean {
                       </button>
                     }
                   </div>
-                  }
-                  @if (tagGroups().addons.length) {
-                  <!-- An add-on's tags fold into one muted chip per add-on, collapsed until asked for. -->
-                  <div data-tag-group="addons" class="flex gap-1.5 flex-wrap items-center">
-                    @if (tagGroups().labelled) { <span class="text-[0.6875rem] text-[var(--mat-sys-on-surface-variant)]">{{ I18N.addons.title | translate }}</span> }
-                    @for (group of tagGroups().addons; track group.source) {
-                      @if (group.tags.length) {
-                      <button type="button" data-addon-tag-group [attr.data-source]="group.source" [attr.aria-expanded]="group.expanded"
-                              class="inline-flex min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 items-center gap-0.5 rounded-full border border-[var(--mat-sys-outline-variant)] px-2 py-0.5 text-xs text-[var(--mat-sys-on-surface-variant)] cursor-pointer hover:bg-[var(--mat-sys-surface-container-high)]"
-                              [attr.aria-label]="I18N.manual_tags.addon_group | translate:{ name: group.name, count: group.tags.length }" (click)="toggleTagSource(group.source)">
-                        <span aria-hidden="true">{{ group.name }} · {{ group.tags.length }}</span>
-                        <mat-icon class="!text-sm !w-3.5 !h-3.5 !leading-3.5" aria-hidden="true">{{ group.expanded ? 'expand_less' : 'chevron_right' }}</mat-icon>
-                      </button>
-                      @if (group.expanded) {
-                        @for (tag of group.tags; track tag) {
-                          <ng-container [ngTemplateOutlet]="manualTagChip" [ngTemplateOutletContext]="{ $implicit: tag }" />
-                        }
-                      }
-                      }
-                      <!-- What the add-on found in the frame, folded; each label opens the gallery on photos with it. -->
-                      @if (group.objects) {
-                        <button type="button" data-addon-objects [attr.data-source]="group.source" [attr.aria-expanded]="group.objectsExpanded"
-                                class="inline-flex min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 items-center gap-0.5 rounded-full border border-[var(--mat-sys-outline-variant)] px-2 py-0.5 text-xs text-[var(--mat-sys-on-surface-variant)] cursor-pointer hover:bg-[var(--mat-sys-surface-container-high)]"
-                                [attr.aria-label]="I18N.photo_detail.detections.label | translate:{ name: group.name, count: group.objects }" (click)="toggleDetections(group.source)">
-                          <span aria-hidden="true">{{ (group.objects === 1 ? I18N.photo_detail.detections.summary_one : I18N.photo_detail.detections.summary) | translate:{ name: group.name, count: group.objects } }}</span>
-                          <mat-icon class="!text-sm !w-3.5 !h-3.5 !leading-3.5" aria-hidden="true">{{ group.objectsExpanded ? 'expand_less' : 'chevron_right' }}</mat-icon>
-                        </button>
-                        @if (group.objectsExpanded) {
-                          @if (group.labels === 'loading') {
-                            <span role="status" class="text-xs text-[var(--mat-sys-on-surface-variant)]">{{ I18N.ui.labels.loading | translate }}</span>
-                          } @else if (group.labels === 'failed') {
-                            <span role="alert" class="text-xs text-[var(--mat-sys-on-surface-variant)]">{{ I18N.errors.action_failed | translate }}</span>
-                          } @else {
-                            @for (label of group.labels; track label) {
-                              <button type="button" data-detection-chip [title]="I18N.photo_detail.detections.search | translate:{ label: label }" (click)="navigateDetection(label)"
-                                      class="inline-flex min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 max-w-full items-center rounded-full bg-[var(--mat-sys-surface-container-high)] px-2 py-0.5 text-left text-xs [overflow-wrap:anywhere] cursor-pointer hover:opacity-80">{{ label }}</button>
-                            }
-                          }
-                        }
-                      }
-                    }
-                  </div>
-                  }
-                  </div>
-                  <mat-menu #tagNavigationMenu="matMenu">
-                    <ng-template matMenuContent let-tag="tag">
-                      @if (tagCollectionAvailable()) {
-                        <button mat-menu-item (click)="navigateTag(tag, 'collection')"><mat-icon>filter_alt</mat-icon>{{ I18N.photo_detail.tag_refine_collection | translate }}</button>
-                      }
-                      <button mat-menu-item (click)="navigateTag(tag, 'library')"><mat-icon>search</mat-icon>{{ I18N.photo_detail.tag_search_library | translate }}</button>
-                    </ng-template>
-                  </mat-menu>
                   @if (auth.isEdition() && tagInputOpen()) {
                     <div class="flex items-center gap-1 mt-2" data-testid="manual-tag-add">
                       <input type="text" maxlength="64"
@@ -740,9 +692,10 @@ function inDetectedSet(photo: Photo): boolean {
                 </div>
               }
 
+              <!-- People tags: who is in it. -->
               @if (p.persons.length || p.unassigned_faces) {
                 <section data-photo-people aria-labelledby="photo-people-title">
-                  <h2 id="photo-people-title" class="m-0 mb-1 text-xs font-normal text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.persons | translate }}</h2>
+                  <h2 id="photo-people-title" class="m-0 mb-1 text-xs font-normal text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.people_tags | translate }}</h2>
                   @if (p.unassigned_faces) { <p class="m-0 pb-2 text-xs text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.unassigned_faces | translate:{ count: p.unassigned_faces } }}</p> }
                   <div class="flex gap-3 flex-wrap">
                     @for (person of p.persons; track person.id) {
@@ -761,7 +714,71 @@ function inDetectedSet(photo: Photo): boolean {
                 </section>
               }
 
-              @if (auth.isEdition() && (!p.caption || (!p.tags_list.length && !p.manual_tags.length && !tagInputOpen()) || p.gps_latitude === null || p.gps_longitude === null)) {
+              <!-- Object tags: what an add-on found, one folded row per add-on, opened on demand. -->
+              @if (tagGroups().addons.length) {
+                <div data-object-tags class="space-y-1.5">
+                  @for (group of tagGroups().addons; track group.source) {
+                    <div data-object-tag-row [attr.data-source]="group.source" class="flex gap-1.5 flex-wrap items-center">
+                      @if (group.tags.length) {
+                        <button type="button" data-addon-tag-group [attr.data-source]="group.source" [attr.aria-expanded]="group.expanded"
+                                class="inline-flex min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 items-center gap-0.5 rounded-full border border-[var(--mat-sys-outline-variant)] px-2 py-0.5 text-xs text-[var(--mat-sys-on-surface-variant)] cursor-pointer hover:bg-[var(--mat-sys-surface-container-high)]"
+                                [attr.aria-label]="I18N.photo_detail.object_tags.label | translate:{ name: group.name, count: group.tags.length }" (click)="toggleTagSource(group.source)">
+                          <span aria-hidden="true">{{ (group.tags.length === 1 ? I18N.photo_detail.object_tags.summary_one : I18N.photo_detail.object_tags.summary) | translate:{ name: group.name, count: group.tags.length } }}</span>
+                          <mat-icon class="!text-sm !w-3.5 !h-3.5 !leading-3.5" aria-hidden="true">{{ group.expanded ? 'expand_less' : 'chevron_right' }}</mat-icon>
+                        </button>
+                        @if (group.expanded) {
+                          @for (tag of group.tags; track tag) {
+                            <ng-container [ngTemplateOutlet]="manualTagChip" [ngTemplateOutletContext]="{ $implicit: tag }" />
+                          }
+                        }
+                      }
+                      <!-- Everything the add-on indexed (Model D), folded; each label opens the gallery on photos with it. -->
+                      @if (group.objects) {
+                        <button type="button" data-addon-objects [attr.data-source]="group.source" [attr.aria-expanded]="group.objectsExpanded"
+                                class="inline-flex min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 items-center gap-0.5 rounded-full border border-[var(--mat-sys-outline-variant)] px-2 py-0.5 text-xs text-[var(--mat-sys-on-surface-variant)] cursor-pointer hover:bg-[var(--mat-sys-surface-container-high)]"
+                                [attr.aria-label]="I18N.photo_detail.object_tags.indexed_label | translate:{ name: group.name, count: group.objects }" (click)="toggleDetections(group.source)">
+                          <span aria-hidden="true">{{ (group.tags.length ? I18N.photo_detail.object_tags.indexed : group.objects === 1 ? I18N.photo_detail.object_tags.summary_one : I18N.photo_detail.object_tags.summary) | translate:{ name: group.name, count: group.objects } }}</span>
+                          <mat-icon class="!text-sm !w-3.5 !h-3.5 !leading-3.5" aria-hidden="true">{{ group.objectsExpanded ? 'expand_less' : 'chevron_right' }}</mat-icon>
+                        </button>
+                        @if (group.objectsExpanded) {
+                          @if (group.labels === 'loading') {
+                            <span role="status" class="text-xs text-[var(--mat-sys-on-surface-variant)]">{{ I18N.ui.labels.loading | translate }}</span>
+                          } @else if (group.labels === 'failed') {
+                            <span role="alert" class="text-xs text-[var(--mat-sys-on-surface-variant)]">{{ I18N.errors.action_failed | translate }}</span>
+                          } @else {
+                            @for (label of group.labels; track label) {
+                              <button type="button" data-detection-chip [title]="I18N.photo_detail.object_tags.search | translate:{ label: label }" (click)="navigateDetection(label)"
+                                      class="inline-flex min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 max-w-full items-center rounded-full bg-[var(--mat-sys-surface-container-high)] px-2 py-0.5 text-left text-xs [overflow-wrap:anywhere] cursor-pointer hover:opacity-80">{{ label }}</button>
+                            }
+                          }
+                        }
+                      }
+                    </div>
+                  }
+                </div>
+              }
+
+              <!-- Album tags: filing, only for filtering; muted, folded, last. Each chip's menu filters by it. -->
+              @if (tagGroups().album.length) {
+                <div data-album-tags class="flex gap-1.5 flex-wrap items-center">
+                  <button type="button" data-album-tag-group [attr.aria-expanded]="tagGroups().albumExpanded"
+                          class="inline-flex min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 items-center gap-0.5 rounded-full px-2 py-0.5 text-xs text-[var(--mat-sys-on-surface-variant)] opacity-80 cursor-pointer hover:bg-[var(--mat-sys-surface-container-high)]"
+                          [attr.title]="I18N.photo_detail.album_tags.hint | translate"
+                          [attr.aria-label]="I18N.photo_detail.album_tags.label | translate:{ count: tagGroups().album.length }" (click)="toggleAlbumTags()">
+                    <span aria-hidden="true">{{ I18N.photo_detail.album_tags.summary | translate:{ count: tagGroups().album.length } }}</span>
+                    <mat-icon class="!text-sm !w-3.5 !h-3.5 !leading-3.5" aria-hidden="true">{{ tagGroups().albumExpanded ? 'expand_less' : 'chevron_right' }}</mat-icon>
+                  </button>
+                  @if (tagGroups().albumExpanded) {
+                    @for (tag of tagGroups().album; track tag) {
+                      <button type="button" data-album-tag-chip
+                              class="inline-flex min-h-6 max-sm:min-h-11 pointer-coarse:min-h-11 max-w-full items-center rounded-full border border-[var(--mat-sys-outline-variant)] px-2 py-0.5 text-left text-xs text-[var(--mat-sys-on-surface-variant)] [overflow-wrap:anywhere] cursor-pointer hover:opacity-80"
+                              [matMenuTriggerFor]="tagNavigationMenu" [matMenuTriggerData]="{ tag: tag }">{{ tag }}</button>
+                    }
+                  }
+                </div>
+              }
+
+              @if (auth.isEdition() && (!p.caption || (!p.tags_list.length && !tagGroups().own.length && !tagInputOpen()) || p.gps_latitude === null || p.gps_longitude === null)) {
                 <div data-photo-add class="flex flex-wrap items-center gap-1">
                   @if (!p.caption) {
                     <button mat-stroked-button class="!h-8 !min-w-0 !px-2.5 !text-xs max-sm:!h-11 pointer-coarse:!h-11" (click)="editCaption(p)" [attr.aria-label]="I18N.photo_detail.add_caption | translate">
@@ -777,7 +794,7 @@ function inDetectedSet(photo: Photo): boolean {
                       </button>
                     }
                   }
-                  @if (!p.tags_list.length && !p.manual_tags.length && !tagInputOpen()) {
+                  @if (!p.tags_list.length && !tagGroups().own.length && !tagInputOpen()) {
                     <button mat-stroked-button data-add-tag class="!h-8 !min-w-0 !px-2.5 !text-xs max-sm:!h-11 pointer-coarse:!h-11" (click)="openTagInput()" [attr.aria-label]="I18N.manual_tags.add | translate">
                       <mat-icon class="!text-base !w-4 !h-4 !leading-4" aria-hidden="true">sell</mat-icon>{{ I18N.manual_tags.tag_label | translate }}
                     </button>
@@ -905,37 +922,30 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   private readonly expandedTagSources = linkedSignal<string | undefined, ReadonlySet<string>>({
     source: () => this.photo()?.path, computation: () => new Set<string>(),
   });
-  /** Manual tags split into the user's own (typed or imported) and one group per add-on that wrote some. */
+  /**
+   * The photo's tags in the four kinds (F25d): Tags (AI + own) open, People tags open, Object tags folded one row per
+   * add-on, Album tags folded and last. Never mixed: an add-on's or an album's tag never shows as a Tag.
+   */
   protected readonly tagGroups = computed(() => {
     const photo = this.photo();
     const fetched = this.fetchedTagSources();
     const current = fetched && fetched.path === photo?.path ? fetched : null;
     const modelD = photo as (Photo & AddonPhotoFields) | null;
-    // An add-on's tag: named by manual_tag_sources (this fork) or plugin_tags (Model D); either kind leaves Yours.
+    // An object tag: named by manual_tag_sources (this fork) or plugin_tags (Model D).
     const sources: Record<string, string> = { ...(photo?.manual_tag_sources ?? current?.sources ?? {}) };
     for (const { tag, source } of modelD?.plugin_tags ?? current?.pluginTags ?? []) sources[tag] = source;
-    const own: string[] = [];
-    const bySource = new Map<string, string[]>();
-    for (const tag of photo?.manual_tags ?? []) {
-      const source = sources[tag];
-      if (!source) own.push(tag);
-      else bySource.set(source, [...(bySource.get(source) ?? []), tag]);
-    }
-    const objects = new Map<string, number>();
-    for (const { source, count } of modelD?.detections ?? current?.detections ?? []) if (count > 0) objects.set(source, count);
+    const kinds = tagKinds(photo, sources);
+    const indexed = new Map<string, number>();
+    for (const { source, count } of modelD?.detections ?? current?.detections ?? []) if (count > 0) indexed.set(source, count);
+    const written = new Map(kinds.objects.map(group => [group.source, group.tags]));
     const names = this.addonNames();
     const expanded = this.expandedTagSources();
     const labels = this.detectionLabels();
-    const addons = [...new Set([...bySource.keys(), ...objects.keys()])].map(source => ({
-      source, tags: bySource.get(source) ?? [], name: names.get(source) ?? source, expanded: expanded.has(source),
-      objects: objects.get(source) ?? 0, objectsExpanded: expanded.has(OBJECTS + source), labels: labels.get(source) ?? 'loading' as DetectionLabels,
+    const addons = [...new Set([...written.keys(), ...indexed.keys()])].map(source => ({
+      source, tags: written.get(source) ?? [], name: names.get(source) ?? source, expanded: expanded.has(source),
+      objects: indexed.get(source) ?? 0, objectsExpanded: expanded.has(OBJECTS + source), labels: labels.get(source) ?? 'loading' as DetectionLabels,
     }));
-    return {
-      own,
-      addons,
-      /** Each group is named (AI, Yours, Add-ons) only when another one is shown beside it. */
-      labelled: [!!photo?.tags_list.length, own.length > 0, addons.length > 0].filter(Boolean).length > 1,
-    };
+    return { own: kinds.own, addons, album: kinds.album, albumExpanded: expanded.has(ALBUM) };
   });
   /** Only `GET /api/photo` names a tag's add-on and carries its detections; a photo opened from a gallery, album or
    *  collection row has neither, so they are read for it here (when it has manual tags, or add-ons are on). */
@@ -945,8 +955,12 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   } | null>(null);
   private readonly tagSourcesPath = computed(() => {
     const photo = this.photo();
-    // An add-on can index detections without writing a tag, so with add-ons on every row photo is read once.
-    return photo && photo.manual_tag_sources === undefined && (photo.manual_tags.length || this.auth.hasFeature('addons')) ? photo.path : null;
+    if (!photo) return null;
+    // Gallery rows name an add-on's tags now; only GET /api/photo carries Model D's detections, and an add-on can index
+    // them without writing a tag, so with add-ons on a photo without them is read once.
+    const unnamed = photo.manual_tag_sources == null && photo.manual_tags.length > 0;
+    const noDetections = this.auth.hasFeature('addons') && (photo as Photo & AddonPhotoFields).detections === undefined;
+    return unnamed || noDetections ? photo.path : null;
   });
   private readonly tagSourcesEffect = effect(() => {
     const path = this.tagSourcesPath();
@@ -1016,6 +1030,10 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
     // As for tags: the chip must not take another viewer (a different account, a share link) into this library.
     if (!this.isCurrentViewer()) return;
     this.router.navigate(['/'], { info: GALLERY_REVISIT, queryParams: { detected: label } });
+  }
+
+  protected toggleAlbumTags(): void {
+    this.toggleTagSource(ALBUM);
   }
 
   protected toggleTagSource(source: string): void {

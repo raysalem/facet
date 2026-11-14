@@ -3277,22 +3277,25 @@
     "downloading": "Wird heruntergeladen…",
     "caption": "Beschriftung",
     "no_caption": "Keine Beschriftung verfügbar",
-    "persons": "Personen",
+    "people_tags": "Personen-Tags",
     "quality": "Qualität",
     "composition": "Komposition",
     "saliency": "Motivhervorhebung",
     "technical": "Technisch",
     "exif": "EXIF-Daten",
     "tags": "Schlagwörter",
-    "tag_groups": {
-      "ai": "KI",
-      "yours": "Eigene"
-    },
-    "detections": {
-      "summary": "{name} · {count} Erkennungen",
-      "summary_one": "{name} · {count} Erkennung",
-      "label": "Erkennungen von {name}: {count}",
+    "object_tags": {
+      "summary": "{name} · {count} Objekt-Tags",
+      "summary_one": "{name} · {count} Objekt-Tag",
+      "label": "Objekt-Tags von {name}: {count}",
+      "indexed": "alle {count}",
+      "indexed_label": "Alle Objekt-Tags von {name}: {count}",
       "search": "Fotos mit {label} zeigen"
+    },
+    "album_tags": {
+      "summary": "Album-Tags · {count}",
+      "label": "Album-Tags: {count}",
+      "hint": "Album-Tags ordnen das Foto zum Filtern ein; sie beschreiben es nicht."
     },
     "rating": "Bewertung",
     "generate_caption": "Generieren",
@@ -3487,7 +3490,6 @@
     "remove_action": "Entfernen",
     "remove_tag": "Schlagwort {tag} entfernen",
     "manual": "Manuelles Schlagwort",
-    "addon_group": "Schlagwörter von {name}: {count}",
     "error": "Das Schlagwort konnte nicht geändert werden. Bitte prüfen und erneut versuchen.",
     "already_present": "Dieser Tag ist bereits am Foto vorhanden."
   },

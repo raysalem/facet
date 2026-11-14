@@ -3306,22 +3306,25 @@
     "gps_clear": "Clear location",
     "caption": "Caption",
     "no_caption": "No caption available",
-    "persons": "Persons",
+    "people_tags": "People tags",
     "quality": "Quality",
     "composition": "Composition",
     "saliency": "Subject Saliency",
     "technical": "Technical",
     "exif": "EXIF Data",
     "tags": "Tags",
-    "tag_groups": {
-      "ai": "AI",
-      "yours": "Yours"
-    },
-    "detections": {
-      "summary": "{name} · {count} detections",
-      "summary_one": "{name} · {count} detection",
-      "label": "Detections by {name}: {count}",
+    "object_tags": {
+      "summary": "{name} · {count} object tags",
+      "summary_one": "{name} · {count} object tag",
+      "label": "Object tags from {name}: {count}",
+      "indexed": "all {count}",
+      "indexed_label": "All object tags from {name}: {count}",
       "search": "Show photos with {label}"
+    },
+    "album_tags": {
+      "summary": "Album tags · {count}",
+      "label": "Album tags: {count}",
+      "hint": "Album tags file the photo for filtering; they do not describe it."
     },
     "rating": "Rating",
     "generate_caption": "Generate",
@@ -3512,7 +3515,6 @@
     "remove_action": "Remove",
     "remove_tag": "Remove tag {tag}",
     "manual": "Manual tag",
-    "addon_group": "Tags from {name}: {count}",
     "error": "Could not update the tag. Check it and try again.",
     "already_present": "This tag is already on the photo."
   },

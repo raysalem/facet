@@ -1,5 +1,5 @@
 import { CategoryLabelPipe } from '../../shared/pipes/category-label.pipe';
-import { Component, DestroyRef, computed, effect, inject, input, output, signal, untracked, viewChild, viewChildren, ElementRef, ChangeDetectionStrategy } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, input, linkedSignal, output, signal, untracked, viewChild, viewChildren, ElementRef, ChangeDetectionStrategy } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
@@ -23,8 +23,12 @@ import { PhotoMetricsTabsComponent } from '../../shared/components/photo-metrics
 import { CaptureDatePipe } from '../../shared/pipes/capture-date.pipe';
 import { PhotoAssessmentComponent } from '../../shared/components/photo-assessment/photo-assessment.component';
 import { CAMERA_METRICS, GRADE_METRICS, METRICS_TABS, type MetricsPanel, type MetricsTab } from '../../core/services/metrics-tab-state.service';
+import { tagKinds } from '../../shared/utils/tag-kinds';
 
 export type TooltipSection = 'all' | 'grade' | 'camera' | 'content';
+
+/** The album tags' fold key, beside the add-on ids (an add-on id never starts with a colon). */
+const ALBUM_FOLD = ':album';
 
 /** How long the pointer must rest on a photo before the tooltip fetches the
  *  frame count + EV span for its set. Kind and this frame's own EV offset are
@@ -319,6 +323,62 @@ const KEY_SCORES = [
             }
           </div>
         }
+
+        <!-- Zone E: Object tags, what an add-on found: one folded row per add-on. The floating bubble keeps only
+             the count (a glance should not wade through an add-on's bulk); the docked panel opens it to chips. -->
+        @if (shows().content && objectGroups().length) {
+          <div data-object-tags class="flex flex-col gap-1 mt-2 pt-1.5 border-[var(--facet-tooltip-divider)]" [class.border-t]="!docked()" [class.w-0]="!docked()" [class.min-w-full]="!docked()">
+            @for (group of objectGroups(); track group.source) {
+              @if (docked()) {
+                <div data-object-tag-row [attr.data-source]="group.source" class="flex gap-1 flex-wrap items-center">
+                  <button type="button" data-object-tag-group [attr.aria-expanded]="group.expanded"
+                          class="inline-flex min-h-9 items-center gap-0.5 rounded-full border border-[var(--facet-tooltip-divider)] px-1.5 py-0.5 text-[10px] text-[var(--mat-sys-on-surface-variant)] cursor-pointer hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mat-sys-primary)]"
+                          [attr.aria-label]="'photo_detail.object_tags.label' | translate:{ name: group.name, count: group.tags.length }"
+                          (click)="toggleFold(group.source)">
+                    <span aria-hidden="true">{{ (group.tags.length === 1 ? 'photo_detail.object_tags.summary_one' : 'photo_detail.object_tags.summary') | translate:{ name: group.name, count: group.tags.length } }}</span>
+                    <mat-icon class="!text-sm !w-3.5 !h-3.5 !leading-3.5" aria-hidden="true">{{ group.expanded ? 'expand_less' : 'chevron_right' }}</mat-icon>
+                  </button>
+                  @if (group.expanded) {
+                    @for (tag of group.tags; track tag) {
+                      <ng-container [ngTemplateOutlet]="mutedTag" [ngTemplateOutletContext]="{ $implicit: tag }" />
+                    }
+                  }
+                </div>
+              } @else {
+                <span data-object-tag-count class="text-[10px] text-[var(--mat-sys-on-surface-variant)]">{{ (group.tags.length === 1 ? 'photo_detail.object_tags.summary_one' : 'photo_detail.object_tags.summary') | translate:{ name: group.name, count: group.tags.length } }}</span>
+              }
+            }
+          </div>
+        }
+
+        <!-- Zone F: Album tags, filing only, so only in the docked Content panel: muted, folded, last. Never in the
+             floating bubble, which is the photo's description at a glance. -->
+        @if (shows().content && docked() && albumTags().length) {
+          <div data-album-tags class="flex gap-1 flex-wrap items-center mt-2 pt-1.5">
+            <button type="button" data-album-tag-group [attr.aria-expanded]="albumExpanded()"
+                    class="inline-flex min-h-9 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] text-[var(--mat-sys-on-surface-variant)] opacity-80 cursor-pointer hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mat-sys-primary)]"
+                    [title]="'photo_detail.album_tags.hint' | translate"
+                    [attr.aria-label]="'photo_detail.album_tags.label' | translate:{ count: albumTags().length }"
+                    (click)="toggleFold(ALBUM_FOLD)">
+              <span aria-hidden="true">{{ 'photo_detail.album_tags.summary' | translate:{ count: albumTags().length } }}</span>
+              <mat-icon class="!text-sm !w-3.5 !h-3.5 !leading-3.5" aria-hidden="true">{{ albumExpanded() ? 'expand_less' : 'chevron_right' }}</mat-icon>
+            </button>
+            @if (albumExpanded()) {
+              @for (tag of albumTags(); track tag) {
+                <ng-container [ngTemplateOutlet]="mutedTag" [ngTemplateOutletContext]="{ $implicit: tag }" />
+              }
+            }
+          </div>
+        }
+        <!-- An object or album tag's chip: muted; in the interactive panel its menu filters by it, like a tag's. -->
+        <ng-template #mutedTag let-tag>
+          @if (personLinks() && showInteractiveControls()) {
+            <button type="button" data-muted-tag class="min-h-9 px-1.5 py-0.5 rounded border border-[var(--facet-tooltip-divider)] text-[var(--mat-sys-on-surface-variant)] text-[10px] hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mat-sys-primary)]"
+              [matMenuTriggerFor]="tagMenu" [matMenuTriggerData]="{ tag: tag }">{{ tag }}</button>
+          } @else {
+            <span data-muted-tag class="px-1.5 py-0.5 rounded border border-[var(--facet-tooltip-divider)] text-[var(--mat-sys-on-surface-variant)] text-[10px]">{{ tag }}</span>
+          }
+        </ng-template>
         </ng-template>
 
       </div>
@@ -530,9 +590,32 @@ export class PhotoTooltipComponent {
     for (const menu of this.menus()) menu.closeMenu();
   }
   readonly tagCollectionAvailable = input(true);
-  protected readonly navigationTags = computed(() => [...new Set([
-    ...(this.photo()?.tags_list ?? []), ...(this.photo()?.manual_tags ?? []),
-  ])]);
+  /** Add-on id -> its name ("Astro"), for the object-tag rows; the id stands in until the registry is read. */
+  readonly addonNames = input<ReadonlyMap<string, string>>(new Map());
+  /** The photo's tags by kind (F25d): Tags (AI + own), Object tags per add-on, Album tags. */
+  private readonly kinds = computed(() => tagKinds(this.photo(), this.photo()?.manual_tag_sources ?? {}));
+  /** Tags: what the photo shows, never an add-on's or an album's. */
+  protected readonly navigationTags = computed(() => [...new Set([...this.kinds().ai, ...this.kinds().own])]);
+  protected readonly albumTags = computed(() => this.kinds().album);
+  protected readonly ALBUM_FOLD = ALBUM_FOLD;
+  /** Folds opened on this photo (an add-on id, or the album fold); every photo starts folded. */
+  private readonly openFolds = linkedSignal<string | undefined, ReadonlySet<string>>({
+    source: () => this.photo()?.path, computation: () => new Set<string>(),
+  });
+  protected readonly albumExpanded = computed(() => this.openFolds().has(ALBUM_FOLD));
+  protected readonly objectGroups = computed(() => {
+    const names = this.addonNames();
+    const open = this.openFolds();
+    return this.kinds().objects.map(group => ({ ...group, name: names.get(group.source) ?? group.source, expanded: open.has(group.source) }));
+  });
+
+  protected toggleFold(key: string): void {
+    this.openFolds.update(open => {
+      const next = new Set(open);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+  }
 
   protected onTagClick(tag: string, scope: TagNavigation['scope']): void {
     if (!this.personLinks() || !this.showInteractiveControls() || (scope === 'collection' && !this.tagCollectionAvailable())) return;
