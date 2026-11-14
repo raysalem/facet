@@ -1797,7 +1797,7 @@
     },
     "rail": {
       "label": "Gallery panels",
-      "filter": "Filter",
+      "showing": "Showing",
       "filters_one": "{count} filter",
       "filters": "{count} filters"
     }
@@ -3458,7 +3458,7 @@
       "grade": "Grade",
       "camera": "Camera",
       "content": "Content",
-      "filter": "Filter"
+      "showing": "Showing"
     },
     "view": {
       "open_gallery": "Show in gallery",

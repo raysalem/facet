@@ -512,6 +512,28 @@ describe('GalleryComponent', () => {
       fixture.destroy();
     });
 
+    it('heads the panel Showing, with the statement of what the grid holds: the album named, not counted as a filter', () => {
+      const { fixture, root } = render(true);
+      const tab = root.querySelector<HTMLButtonElement>('app-panel-rail [data-rail-tab="filter"]')!;
+      expect(tab.getAttribute('aria-label')).toBe('gallery.rail.showing');
+      expect(tab.querySelector('mat-icon')!.textContent!.trim()).toBe('photo_library');
+      const panel = root.querySelector<HTMLElement>('[data-gallery-panel="filter"]')!;
+      expect(panel.querySelector('[data-panel-header] h2')!.textContent!.trim()).toBe('gallery.rail.showing');
+      const statement = () => panel.querySelector('[data-showing-statement]')!.textContent!.replace(/\s+/g, ' ').trim();
+      expect(statement()).toBe('gallery.all_photos');
+      mockStore.currentAlbum.set({ id: 7, name: 'Astro test (fixed)', is_smart: false });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, album_id: '7' });
+      fixture.detectChanges();
+      // The album is the name: no "· N filters" on the statement or the count line.
+      expect(statement()).toBe('Astro test (fixed)');
+      expect(root.querySelector('[data-collection-filter-summary]')).toBeNull();
+      mockStore.filters.set({ ...DEFAULT_FILTERS, album_id: '7', camera: 'X100V' });
+      fixture.detectChanges();
+      expect(statement()).toBe('Astro test (fixed) · gallery.rail.filters_one');
+      expect(root.querySelector('[data-collection-filter-summary]')!.textContent!.trim()).toBe('gallery.rail.filters_one');
+      fixture.destroy();
+    });
+
     it('pads the scroll by the pinned bar alone at every width', () => {
       for (const wide of [false, true]) {
         const { fixture } = render(wide);
@@ -3205,9 +3227,14 @@ describe('GalleryComponent', () => {
         fixture.detectChanges(); TestBed.flushEffects(); fixture.detectChanges();
         expect(fixture.componentInstance.detailsRailVisible()).toBe(false);
         expect((fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('[data-gallery-panel="filter"]')!.hidden).toBe(false);
+        const showing = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('[data-gallery-panel="filter"]')!;
+        const before = showing.querySelector('[data-showing-statement]')!.textContent;
         fixture.componentInstance.showTooltip(hoverEvent, mockStore.photos()[0]);
         fixture.detectChanges();
         expect(fixture.componentInstance.detailsRailVisible()).toBe(false);
+        // Showing is about the grid's content, not the held photo: the statement stays, no photo is named in it.
+        expect(showing.querySelector('[data-showing-statement]')!.textContent).toBe(before);
+        expect(showing.textContent).not.toContain('inspected.jpg');
         fixture.destroy();
         localStorage.removeItem('facet_gallery_rail_tab');
       });

@@ -9,7 +9,7 @@ import { MovableToolbarDirective, TOOLBAR_POSITION_EVENT } from '../../shared/di
 import { GalleryReviewNavigationService } from './gallery-review-navigation.service';
 import { GalleryViewControlsComponent } from './gallery-view-controls.component';
 import { GalleryCriteriaComponent } from './gallery-criteria.component';
-import { galleryFilterChips } from './gallery-filter-chips';
+import { definingFilters, galleryFilterChips } from './gallery-filter-chips';
 import { AddonRail } from '../../core/addons/addon-rail';
 import { PanelRailComponent, type RailTab } from '../../shared/components/panel-rail/panel-rail.component';
 import { StackActionsService } from './stack-actions.service';
@@ -969,12 +969,18 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
     </div>
     @if (lgDesktop.isDesktop()) {
       <app-panel-rail data-gallery-rail [rail]="rail" [tabs]="railTabs()" [wide]="true" [label]="I18N.gallery.rail.label | translate" idPrefix="gallery" />
-      <!-- Filter: what you are looking at and how to change it. The active filters first (album, people,
-           similarity), then the filter controls that were the Filters drawer, the album's rules last. -->
+      <!-- Showing: what the grid holds (the collection and the filters that define it), and where to change it.
+           The statement first, then the active filters, the filter controls, the album's rules last. A photo held
+           in the grid does not change it: the grid is the content, the photo's own facts are its tabs. -->
       <aside id="gallery-panel-filter" data-gallery-panel="filter" role="tabpanel" aria-labelledby="gallery-rail-filter" [hidden]="!filterPanelOpen()" (keydown)="closePanels($event)"
         class="flex w-80 shrink-0 flex-col border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] text-sm">
         <div data-panel-header class="flex shrink-0 items-center gap-2 px-4 pt-2">
-          <h2 class="m-0 min-w-0 flex-1 truncate py-1 text-sm font-medium">{{ I18N.gallery.rail.filter | translate }}</h2>
+          <div class="min-w-0 flex-1 py-1">
+            <h2 class="m-0 truncate text-sm font-medium">{{ I18N.gallery.rail.showing | translate }}</h2>
+            <p data-showing-statement class="m-0 truncate text-xs text-[var(--mat-sys-on-surface-variant)]" [title]="store.currentAlbum()?.name || (I18N.gallery.all_photos | translate)">
+              {{ store.currentAlbum()?.name || (I18N.gallery.all_photos | translate) }}@if (activeFilterCount()) { · {{ activeFilterCount() | pluralKey:I18N.gallery.rail.filters_one:I18N.gallery.rail.filters | translate:{ count: activeFilterCount() } }}}
+            </p>
+          </div>
           <button mat-icon-button data-close-panels class="!h-8 !w-8 !p-0 shrink-0" [matTooltip]="I18N.ui.buttons.close_panels | translate"
             [attr.aria-label]="I18N.ui.buttons.close_panels | translate" (click)="rail.closeAll()"><mat-icon class="!text-xl">close</mat-icon></button>
         </div>
@@ -1236,7 +1242,8 @@ export class GalleryComponent implements OnInit, OnDestroy {
     storageKey: 'facet_gallery_rail_tab', tabs: ['filter', ...PHOTO_TABS], defaultTab: null,
   });
   protected readonly PHOTO_TABS = PHOTO_TABS;
-  private readonly filterRailTab: RailTab = { id: 'filter', icon: 'filter_alt', label: this.I18N.gallery.rail.filter };
+  /** Showing (tab id `filter`): the collection on screen and the filters that define it. */
+  private readonly filterRailTab: RailTab = { id: 'filter', icon: 'photo_library', label: this.I18N.gallery.rail.showing };
   private readonly photoRailTabs: readonly RailTab[] = [
     { id: 'grade', icon: 'star_half', label: this.I18N.photo_detail.rail.grade },
     { id: 'camera', icon: 'photo_camera', label: this.I18N.photo_detail.rail.camera },
@@ -1293,11 +1300,11 @@ export class GalleryComponent implements OnInit, OnDestroy {
   protected closePanels(event: KeyboardEvent): void {
     if (this.rail.escape(event)) this.railElement()?.nativeElement.querySelector<HTMLElement>('[role="tab"][tabindex="0"]')?.focus();
   }
-  /** The active filters the View panel lists, counted for the slim summary on the count line. */
+  /** The filters that define what the grid shows (the album is its title, not one of them): the count line and Showing. */
   protected readonly activeFilterCount = computed(() => {
     if (this.pinned()) return 0;
     this.i18n.translations();
-    return galleryFilterChips(this.store, key => this.i18n.t(key)).length;
+    return definingFilters(galleryFilterChips(this.store, key => this.i18n.t(key))).length;
   });
   private readonly scrollDirective = viewChild(InfiniteScrollDirective);
   private readonly filterSidebar = viewChild(GalleryFilterSidebarComponent);

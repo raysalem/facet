@@ -56,6 +56,11 @@ export const RANGE_CHIPS: readonly { minKey: string; maxKey: string; labelKey: s
 
 const date = new CaptureDatePipe();
 
+/** The filters that define a collection, beside its name: an album chip is the name, not one of them. */
+export function definingFilters(chips: readonly GalleryFilterChip[]): GalleryFilterChip[] {
+  return chips.filter(chip => chip.id !== 'album');
+}
+
 /** The collection's active filters as labelled chips (`t` translates a chip value); the criteria row makes them removable. */
 export function galleryFilterChips(store: GalleryStore, t: (key: string) => string): GalleryFilterChip[] {
   const f = store.filters();
