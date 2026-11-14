@@ -58,6 +58,23 @@ describe('PhotoTooltipComponent', () => {
     fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
     expect(overlay.querySelector('[role="menu"]')).toBeNull();
   });
+  it('floating hover card is capped to the viewport and its capture line cannot stretch it; docked is not capped', () => {
+    fixture.componentInstance.photo.set(makePhoto({ filename: 'a.jpg', camera_model: 'X100V', iso: 100 }));
+    const root = fixture.nativeElement as HTMLElement;
+    const card = () => root.querySelector<HTMLElement>('app-photo-tooltip > div')!;
+    const capture = () => root.querySelector<HTMLElement>('[data-capture-line]')!;
+    fixture.detectChanges();
+    expect(card().style.maxWidth).toContain('640px');
+    expect(card().style.maxWidth).toContain('100vw');
+    expect(capture().classList).toContain('w-0');
+    expect(capture().classList).toContain('min-w-full');
+    fixture.componentInstance.docked.set(true);
+    fixture.detectChanges();
+    expect(card().style.maxWidth).toBe('');
+    fixture.componentInstance.section.set('camera');
+    fixture.detectChanges();
+    expect(capture().classList).not.toContain('w-0');
+  });
   it('docked, shows one part per panel the way the photo page splits it: Grade, Camera, Content', () => {
     fixture.componentInstance.photo.set(makePhoto({ filename: 'a.jpg', category: 'astro', star_rating: 4, camera_model: 'X100V', tags_list: ['sky'], caption: 'Night' }));
     fixture.componentInstance.docked.set(true);

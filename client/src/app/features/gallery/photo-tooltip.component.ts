@@ -68,6 +68,7 @@ const KEY_SCORES = [
         [style.position]="docked() ? 'static' : null"
         [style.pointer-events]="showInteractiveControls() ? 'auto' : null"
         [style.width]="docked() ? '100%' : null"
+        [style.max-width]="docked() ? null : 'min(640px, calc(100vw - 2rem))'"
         [style.padding]="docked() ? '16px' : null"
         [style.background]="docked() ? 'transparent' : 'var(--facet-tooltip-bg)'"
         [style.border]="docked() ? 'none' : '1px solid var(--facet-tooltip-border)'"
@@ -194,7 +195,10 @@ const KEY_SCORES = [
              where they join the column beside it so nothing spans under a tall
              image. -->
         <ng-template #captureLine let-p>
-          <div data-capture-line class="mt-1.5 truncate text-[var(--facet-tooltip-text-secondary)] [&>span+span]:before:content-['_·_']">
+          <!-- Floating: w-0 + min-w-full, like the caption, so this nowrap line takes the width the
+               photo and scores give the bubble instead of stretching it past the picture. -->
+          <div data-capture-line class="mt-1.5 truncate text-[var(--facet-tooltip-text-secondary)] [&>span+span]:before:content-['_·_']"
+               [class.w-0]="!docked()" [class.min-w-full]="!docked()">
             @if (p.camera_model) {<span>{{ p.camera_model }}</span>}
             @if (p.focal_length) {<span>{{ p.focal_length }}mm</span>}
             @if (p.f_stop) {<span>f/{{ p.f_stop }}</span>}
