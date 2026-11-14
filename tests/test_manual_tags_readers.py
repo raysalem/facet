@@ -305,3 +305,41 @@ class TestManualTagSources:
         assert shared.status_code == 200
         assert "manual_tag_sources" not in shared.json()
         assert "astro-id" not in shared.text
+
+    def test_gallery_rows_carry_sources(self, edition_client, astro_addon, addon_tags):
+        """A gallery card keeps an add-on's object tags out of the photo's own tags, as the photo page does."""
+        resp = edition_client.get("/api/photos", params={"camera": CAMERA, "per_page": 50})
+        assert resp.status_code == 200, resp.text
+        rows = {row["path"]: row for row in resp.json()["photos"]}
+        assert rows[MANUAL_ONLY]["manual_tag_sources"] == {"orion nebula": "astro-id"}
+        assert "orion nebula" in rows[MANUAL_ONLY]["manual_tags"]
+        # Every row says it was read: {} is "no object tags", not "unknown".
+        assert all(row["manual_tag_sources"] == {} for path, row in rows.items() if path != MANUAL_ONLY)
+
+    def test_by_paths_rows_carry_sources(self, edition_client, astro_addon, addon_tags):
+        resp = edition_client.post("/api/photos/by_paths", json={"paths": [MANUAL_ONLY, AI_ONLY]})
+        assert resp.status_code == 200, resp.text
+        rows = {row["path"]: row for row in resp.json()["photos"]}
+        assert rows[MANUAL_ONLY]["manual_tag_sources"] == {"orion nebula": "astro-id"}
+        assert rows[AI_ONLY]["manual_tag_sources"] == {}
+
+    def test_gallery_rows_without_addons_attribute_nothing(self, edition_client, addon_tags, monkeypatch):
+        from api.addons import manifest
+        monkeypatch.setattr(manifest, "_registry", manifest.Registry())
+        resp = edition_client.get("/api/photos", params={"camera": CAMERA, "per_page": 50})
+        rows = {row["path"]: row for row in resp.json()["photos"]}
+        assert rows[MANUAL_ONLY]["manual_tag_sources"] == {}
+
+    def test_sources_map_reads_in_chunks(self, edition_client, astro_addon, addon_tags, monkeypatch):
+        """More paths than one IN list holds are read in several statements, none lost."""
+        import asyncio
+        from api.database import get_async_db
+        from api.routers import gallery
+        monkeypatch.setattr(gallery, "_ADDON_TAG_SOURCES_CHUNK", 2)
+
+        async def read():
+            async with get_async_db() as conn:
+                return await gallery._addon_tag_sources_map_async(conn, [AI_ONLY, BOTH, PLAIN, MANUAL_ONLY, MANUAL_ONLY])
+
+        result = asyncio.run(read())
+        assert result == {AI_ONLY: {}, BOTH: {}, PLAIN: {}, MANUAL_ONLY: {"orion nebula": "astro-id"}}
