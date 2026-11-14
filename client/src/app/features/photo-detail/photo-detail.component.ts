@@ -68,7 +68,8 @@ import { KeyboardMappingService } from '../../core/services/keyboard-mapping.ser
 import { AddonRail } from '../../core/addons/addon-rail';
 import { CAMERA_METRICS, GRADE_METRICS } from '../../core/services/metrics-tab-state.service';
 import { PanelRailComponent } from '../../shared/components/panel-rail/panel-rail.component';
-import { galleryFilterChips } from '../gallery/gallery-filter-chips';
+import { definingFilters, galleryFilterChips } from '../gallery/gallery-filter-chips';
+import { PluralKeyPipe } from '../../shared/pipes/plural-key.pipe';
 import { PanelWidth } from '../../shared/utils/panel-width';
 import type { CategoryOverrideResult } from './category-override-dialog.component';
 import { StackNavigatorComponent } from './stack-navigator.component';
@@ -148,7 +149,7 @@ function inDetectedSet(photo: Photo): boolean {
     MatSnackBarModule,
     FixedPipe, ShutterSpeedPipe, MatExpansionModule,
     CaptureDatePipe, RenditionReadoutComponent,
-    TranslatePipe,
+    TranslatePipe, PluralKeyPipe,
     ThumbnailUrlPipe,
     PersonThumbnailUrlPipe,
     CategoryLabelPipe, FilenamePipe,
@@ -823,16 +824,23 @@ function inDetectedSet(photo: Photo): boolean {
             </mat-accordion>
           </section>
           <section id="photo-panel-filter" data-photo-panel="filter" role="tabpanel" aria-labelledby="photo-rail-filter" [hidden]="rail.shownPage() !== 'filter'" class="flex min-h-0 flex-col gap-3 lg:h-full">
-            <!-- What you are looking through: the collection, its filters, the way back to it, its photos. -->
+            <!-- Showing: the content this photo is one of. Its name and how many filters define it, where you are
+                 in it, then its photos; the filters themselves fold behind their count. -->
             @if (collectionSidebarAvailable()) {
-              <div data-view-collection class="flex items-center gap-2">
-                <mat-icon class="shrink-0 text-[var(--mat-sys-on-surface-variant)]" aria-hidden="true">{{ store.currentAlbum() ? 'photo_album' : 'photo_library' }}</mat-icon>
-                <div class="min-w-0 flex-1">
-                  <h2 class="m-0 truncate text-sm font-medium">{{ store.currentAlbum()?.name || (I18N.nav.gallery | translate) }}</h2>
-                  @if (store.currentAlbum(); as album) {
-                    <p class="m-0 text-xs text-[var(--mat-sys-on-surface-variant)]">{{ (album.is_smart ? I18N.albums.rules.smart : I18N.albums.rules.manual) | translate }}</p>
-                  }
-                </div>
+              <div data-view-collection class="min-w-0">
+                <h3 class="m-0 truncate text-sm font-medium" [title]="store.currentAlbum()?.name || (I18N.gallery.all_photos | translate)">{{ store.currentAlbum()?.name || (I18N.gallery.all_photos | translate) }}</h3>
+                @if (viewFilterChips().length) {
+                  <button type="button" data-view-filters-toggle aria-controls="photo-view-filters" [attr.aria-expanded]="viewFiltersOpen()" (click)="viewFiltersOpen.set(!viewFiltersOpen())"
+                    class="inline-flex min-h-7 cursor-pointer items-center gap-0.5 rounded p-0 text-left text-xs tabular-nums text-[var(--mat-sys-primary)] hover:underline focus-visible:outline-2 focus-visible:outline-[var(--mat-sys-primary)] max-sm:min-h-11 pointer-coarse:min-h-11">
+                    {{ viewFilterChips().length | pluralKey:I18N.gallery.rail.filters_one:I18N.gallery.rail.filters | translate:{ count: viewFilterChips().length } }}
+                    <mat-icon class="!text-base !w-4 !h-4 !leading-4" aria-hidden="true">{{ viewFiltersOpen() ? 'expand_less' : 'expand_more' }}</mat-icon>
+                  </button>
+                  <ul id="photo-view-filters" data-view-filters [attr.aria-label]="I18N.photo_detail.view.filters | translate" [hidden]="!viewFiltersOpen()" class="m-0 mt-1 flex list-none flex-wrap gap-1 p-0">
+                    @for (chip of viewFilterChips(); track chip.id) {
+                      <li class="rounded-full border border-[var(--mat-sys-outline-variant)] px-2 py-0.5 text-xs">{{ chip.labelKey | translate }}@if (chip.value) {: {{ chip.value }}}</li>
+                    }
+                  </ul>
+                }
               </div>
               <div class="flex items-center gap-1">
                 <button mat-icon-button data-view-previous class="!h-9 !w-9 max-sm:!h-11 max-sm:!w-11 pointer-coarse:!h-11 pointer-coarse:!w-11" [disabled]="!collectionNavigation().previous || store.loading()"
@@ -844,16 +852,6 @@ function inDetectedSet(photo: Photo): boolean {
                   <mat-icon class="!text-base !w-4 !h-4 !leading-4" aria-hidden="true">grid_view</mat-icon>{{ I18N.photo_detail.view.open_gallery | translate }}
                 </button>
               </div>
-              @if (viewFilterChips().length) {
-                <section data-view-filters aria-labelledby="photo-view-filters-title">
-                  <h3 id="photo-view-filters-title" class="m-0 mb-1 text-xs font-normal text-[var(--mat-sys-on-surface-variant)]">{{ I18N.photo_detail.view.filters | translate }}</h3>
-                  <ul class="m-0 flex list-none flex-wrap gap-1 p-0">
-                    @for (chip of viewFilterChips(); track chip.id) {
-                      <li class="rounded-full border border-[var(--mat-sys-outline-variant)] px-2 py-0.5 text-xs">{{ chip.labelKey | translate }}@if (chip.value) {: {{ chip.value }}}</li>
-                    }
-                  </ul>
-                </section>
-              }
               <app-photo-collection-sidebar class="min-h-0 flex-1" [photos]="store.photos()" [currentPath]="collectionEntry()?.path ?? p.path"
                 [total]="store.total()" [hasMore]="store.hasMore()" [loading]="store.loading()"
                 (choose)="openCollectionPhoto($event)" (more)="loadCollectionPage()" (step)="stepCollection($event)" />
@@ -972,7 +970,7 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
     { id: 'grade', icon: 'star_half', label: I18N.photo_detail.rail.grade },
     { id: 'camera', icon: 'photo_camera', label: I18N.photo_detail.rail.camera },
     { id: 'content', icon: 'info', label: I18N.photo_detail.rail.content },
-    { id: 'filter', icon: 'filter_alt', label: I18N.photo_detail.rail.filter },
+    { id: 'filter', icon: 'photo_library', label: I18N.photo_detail.rail.showing },
   ] as const;
   /** The open page panel's name, for the panel header. */
   protected readonly shownPanelLabel = computed(() => this.facetRailTabs.find(tab => tab.id === this.rail.shownPage())?.label ?? '');
@@ -984,12 +982,14 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   }
   /** Add-on id -> its name ("Astro"), for the add-on tag groups. */
   private readonly addonNames = computed<ReadonlyMap<string, string>>(() => new Map(this.rail.registry().map(addon => [addon.id, addon.name])));
-  /** The collection's active filters, as the gallery's criteria row shows them; the album is the panel's heading. */
+  /** The filters that define the collection, as the gallery's criteria row shows them; the album is its name. */
   protected readonly viewFilterChips = computed(() => {
     if (!this.collectionSidebarAvailable()) return [];
     this.i18n.translations();
-    return galleryFilterChips(this.store, key => this.i18n.t(key)).filter(chip => chip.id !== 'album');
+    return definingFilters(galleryFilterChips(this.store, key => this.i18n.t(key)));
   });
+  /** Showing's filter list, folded behind its count: the content comes first, its definition on demand. */
+  protected readonly viewFiltersOpen = signal(false);
 
   /** An add-on's detection labels for the open photo, read the first time its objects chip opens. */
   private readonly detectionLabels = linkedSignal<string | undefined, ReadonlyMap<string, DetectionLabels>>({

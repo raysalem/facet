@@ -416,9 +416,11 @@ describe('PhotoDetailComponent', () => {
       } finally { root.remove(); }
     });
 
-    it('shows the collection, its filters and the way back in Filter, and says so for a photo opened on its own', async () => {
+    it('shows the content in Showing: the collection, where you are and its photos, the filters folded behind their count', async () => {
       const photo = makePhoto({ path: samplePhoto.path });
-      const { view, panel } = await render(photo);
+      const { view, panel, tab } = await render(photo);
+      expect(tab('filter').getAttribute('aria-label')).toBe('photo_detail.rail.showing');
+      expect(tab('filter').querySelector('mat-icon')!.textContent!.trim()).toBe('photo_library');
       expect(panel('filter').querySelector('[data-view-standalone]')).not.toBeNull();
       const store = TestBed.inject(GalleryStore);
       store.photos.set([photo, makePhoto({ path: '/next.jpg' })]);
@@ -426,12 +428,40 @@ describe('PhotoDetailComponent', () => {
       view.detectChanges();
       const viewPanel = panel('filter');
       expect(viewPanel.querySelector('[data-view-standalone]')).toBeNull();
-      expect(viewPanel.querySelector('[data-view-collection] h2')!.textContent!.trim()).toBe('nav.gallery');
-      expect(viewPanel.querySelector('[data-view-filters]')!.textContent).toContain('X100V');
+      expect(viewPanel.querySelector('[data-view-collection] h3')!.textContent!.trim()).toBe('gallery.all_photos');
+      // The definition is one link under the name; its chips open on demand.
+      const toggle = viewPanel.querySelector<HTMLButtonElement>('[data-view-filters-toggle]')!;
+      expect(toggle.textContent!.trim()).toContain('gallery.rail.filters_one');
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      const chips = viewPanel.querySelector<HTMLElement>('[data-view-filters]')!;
+      expect(chips.hidden).toBe(true);
+      toggle.click(); view.detectChanges();
+      expect(toggle.getAttribute('aria-expanded')).toBe('true');
+      expect(chips.hidden).toBe(false);
+      expect(chips.textContent).toContain('X100V');
+      expect(viewPanel.querySelector('[data-view-position]')).not.toBeNull();
       expect(viewPanel.querySelector('[data-view-open-gallery]')).not.toBeNull();
+      // The content itself comes after the position, and the album's Manual/Smart line is gone.
       expect(viewPanel.querySelector('app-photo-collection-sidebar')).not.toBeNull();
+      expect(viewPanel.textContent).not.toContain('albums.rules');
       // The collection list has one place now: no strip left of the image.
       expect((view.nativeElement as HTMLElement).querySelectorAll('app-photo-collection-sidebar')).toHaveLength(1);
+    });
+
+    it('names an album as the content in Showing and does not count it as one of its filters', async () => {
+      const photo = makePhoto({ path: samplePhoto.path });
+      const { view, panel } = await render(photo);
+      const store = TestBed.inject(GalleryStore);
+      store.photos.set([photo]);
+      store.currentAlbum.set({ id: 7, name: 'Astro test (fixed)', is_smart: true } as never);
+      store.filters.update(filters => ({ ...filters, album_id: '7' }));
+      view.detectChanges();
+      const viewPanel = panel('filter');
+      expect(viewPanel.querySelector('[data-view-collection] h3')!.textContent!.trim()).toBe('Astro test (fixed)');
+      expect(viewPanel.querySelector('[data-view-filters-toggle]')).toBeNull();
+      store.filters.update(filters => ({ ...filters, camera: 'X100V', lens: '23mm' }));
+      view.detectChanges();
+      expect(viewPanel.querySelector('[data-view-filters]')!.querySelectorAll('li')).toHaveLength(2);
     });
 
     it('gives an open add-on its own tab, hides the dock (frame kept) while a Facet panel shows, and closes all when it closes', async () => {

@@ -1772,7 +1772,7 @@
     },
     "rail": {
       "label": "Paneles de la galería",
-      "filter": "Filtro",
+      "showing": "Mostrando",
       "filters_one": "{count} filtro",
       "filters": "{count} filtros"
     }
@@ -3433,7 +3433,7 @@
       "grade": "Valoración",
       "camera": "Cámara",
       "content": "Contenido",
-      "filter": "Filtro"
+      "showing": "Mostrando"
     },
     "view": {
       "open_gallery": "Mostrar en la galería",
