@@ -54,3 +54,4 @@ FACET_E2E_PYTHON=../venv/bin/python npm run e2e
 | `02-hide-bursts` | Hide bursts folds each burst behind its lead; Show all brings every frame back |
 | `03-reused-name-new-picture` | An edit imported under a deleted edit's name shows the new picture, not the cached thumbnail (fails without `apply_ai_edit_captions`' fresh `preview_revision`) |
 | `04-delete-burst-lead` | Deleting the AI edit that leads its burst keeps the burst in the gallery (fails without `_reassign_dead_burst_leads`) |
+| `06-app-update` | With the service worker on, a new build (the served shell re-marked, its ngsw.json hash updated) is applied by a reload without a click once the tab is shown again; it waits while a text field has focus or an unfocused field still holds unused typed text, and lands once the field is left or emptied. The flow restores `dist/` afterwards (fails without the automatic reload, the focus check, or the unsaved-text check) |
