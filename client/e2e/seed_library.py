@@ -44,7 +44,11 @@ PHOTOS = {
              ('IMG_0201.jpg', '#5f3dc4', 3.0, 0, None),
              ('IMG_0200_agy_1.jpg', '#f08c00', 7.0, 1, 'IMG_0200.jpg')],
 }
-DATE = {'burst': '2026:01:10 10:00:', 'reuse': '2026:01:11 10:00:', 'lead': '2026:01:12 10:00:'}
+DATE = {'burst': '2026:01:10 10:00:', 'reuse': '2026:01:11 10:00:', 'lead': '2026:01:12 10:00:',
+        'layout': '2026:01:15 10:00:'}
+# Layout geometry flow (read-only): one manual album with enough photos to overflow the grid, each
+# its own one-frame burst; the best-scored one carries LAYOUT_TAG_COUNT tags for the hover card.
+LAYOUT_ALBUM, LAYOUT_SIZE, LAYOUT_TAG_COUNT = 'E2E Layout', 80, 20
 
 
 def _jpeg(colour, size):
@@ -89,6 +93,25 @@ def _seed_folder(conn, folder):
                      (os.path.join(LIBRARY, folder, name), os.path.join(LIBRARY, folder, source), revision))
 
 
+def _seed_layout(conn):
+    os.makedirs(os.path.join(LIBRARY, 'layout'))
+    album_id = conn.execute('INSERT INTO albums (user_id, name) VALUES (NULL, ?)', (LAYOUT_ALBUM,)).lastrowid
+    for i in range(LAYOUT_SIZE):
+        # Scored below every other folder (the plain gallery's first page stays theirs); LAY_001\n        # scores highest of the album, so it is its first card under the default (score) sort.
+        path = _insert_photo(conn, 'layout', f'LAY_{i + 1:03d}.jpg', '#5c7cfa' if i else '#e8590c',
+                             2.0 - i * 0.01, 1, 1000 + i, i % 60)
+        conn.execute('INSERT INTO album_photos (album_id, photo_path, position) VALUES (?, ?, ?)',
+                     (album_id, path, i))
+    # The API sends at most display.tags_per_photo (4) AI tags, so the rest are the user's own tags,
+    # which all arrive: 20 tags on the card, as on a real library's well-tagged photo.
+    tags = [f'tag{n:02d}' for n in range(1, LAYOUT_TAG_COUNT + 1)]
+    first = os.path.join(LIBRARY, 'layout', 'LAY_001.jpg')
+    conn.execute('UPDATE photos SET tags = ? WHERE path = ?', (', '.join(tags[:4]), first))
+    conn.executemany('INSERT INTO photo_tags (photo_path, tag) VALUES (?, ?)', [(first, t) for t in tags[:4]])
+    conn.executemany("INSERT INTO photo_manual_tags (photo_path, tag, source) VALUES (?, ?, 'user')",
+                     [(first, t) for t in tags[4:]])
+
+
 def seed(edition_password):
     from db.schema import init_database
     shutil.rmtree(WORK, ignore_errors=True)
@@ -100,6 +123,7 @@ def seed(edition_password):
     conn = sqlite3.connect(DB_PATH)
     for folder in PHOTOS:
         _seed_folder(conn, folder)
+    _seed_layout(conn)
     conn.commit()
     conn.close()
 
