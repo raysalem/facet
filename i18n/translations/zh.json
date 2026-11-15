@@ -214,6 +214,7 @@
     "color_harmony": "色彩和谐度",
     "caption": "照片描述",
     "filter_by_person": "按 {name} 筛选",
+    "more_count": "还有 {count} 个",
     "histogram": "直方图"
   },
   "photoCard": {

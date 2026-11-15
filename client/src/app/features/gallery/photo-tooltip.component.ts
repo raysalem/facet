@@ -35,6 +35,9 @@ const ALBUM_FOLD = ':album';
  *  already on the Photo object and render with zero delay -- only the
  *  cross-photo fields (`GET /api/photo/set`) are worth debouncing across a
  *  dense gallery where the pointer crosses many tiles per second. */
+/** Chips (and avatars) the floating hover card shows before folding the rest into "+N". */
+const HOVER_CAP = 4;
+
 const SET_INFO_DWELL_MS = 300;
 
 /** The scores the floating bubble keeps: one per question a glance asks -- is it
@@ -267,14 +270,18 @@ const KEY_SCORES = [
 
         <!-- Zone C: Tags (full width) -->
         @if (shows().content && navigationTags().length) {
-          <div data-tags-row class="flex gap-1 flex-wrap mt-2 pt-1.5 border-[var(--facet-tooltip-divider)]" [class.border-t]="!docked()" [class.w-0]="!docked()" [class.min-w-full]="!docked()">
-            @for (tag of navigationTags(); track tag) {
+          <div data-tags-row class="flex gap-1 mt-2 pt-1.5 border-[var(--facet-tooltip-divider)]" [class.flex-wrap]="docked()" [class.overflow-hidden]="!docked()" [class.border-t]="!docked()" [class.w-0]="!docked()" [class.min-w-full]="!docked()">
+            @for (tag of shownTags(); track tag) {
               @if (personLinks() && showInteractiveControls()) {
-                <button type="button" data-testid="tooltip-tag" class="min-h-9 px-1.5 py-0.5 bg-[var(--facet-accent-badge)] text-[var(--facet-accent-text)] rounded text-[10px] hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mat-sys-primary)]"
+                <button type="button" data-testid="tooltip-tag" [class.truncate]="!docked()" class="min-h-9 min-w-0 px-1.5 py-0.5 bg-[var(--facet-accent-badge)] text-[var(--facet-accent-text)] rounded text-[10px] hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mat-sys-primary)]"
                   [matMenuTriggerFor]="tagMenu" [matMenuTriggerData]="{ tag: tag }">{{ tag }}</button>
               } @else {
-                <span class="px-1.5 py-0.5 bg-[var(--facet-accent-badge)] text-[var(--facet-accent-text)] rounded text-[10px]">{{ tag }}</span>
+                <span [class.truncate]="!docked()" class="min-w-0 px-1.5 py-0.5 bg-[var(--facet-accent-badge)] text-[var(--facet-accent-text)] rounded text-[10px]">{{ tag }}</span>
               }
+            }
+            @if (hiddenTags() > 0) {
+              <span data-tags-more class="shrink-0 px-0.5 py-0.5 text-[10px] text-[var(--facet-tooltip-text-muted)]"
+                    [attr.aria-label]="'tooltip.more_count' | translate:{ count: hiddenTags() }">+{{ hiddenTags() }}</span>
             }
           </div>
         }
@@ -300,11 +307,11 @@ const KEY_SCORES = [
              surface where large avatars would cost width against the
              scoring grid, whether or not it happens to be click-pinned. -->
         @if (shows().content && p.persons.length) {
-          <div data-people-row class="flex items-center gap-1.5 flex-wrap mt-2 pt-1.5 border-[var(--facet-tooltip-divider)]" [class.border-t]="!docked()" [class.w-0]="!docked()" [class.min-w-full]="!docked()">
-            @for (person of p.persons; track person.id) {
+          <div data-people-row class="flex items-center gap-1.5 mt-2 pt-1.5 border-[var(--facet-tooltip-divider)]" [class.flex-wrap]="docked()" [class.overflow-hidden]="!docked()" [class.border-t]="!docked()" [class.w-0]="!docked()" [class.min-w-full]="!docked()">
+            @for (person of shownPersons(); track person.id) {
               @if (personLinks() && showInteractiveControls()) {
                 <button type="button"
-                        class="rounded-full ring-1 ring-[var(--facet-tooltip-divider)] cursor-pointer hover:opacity-80 transition-opacity overflow-hidden"
+                        class="rounded-full ring-1 ring-[var(--facet-tooltip-divider)] cursor-pointer hover:opacity-80 transition-opacity overflow-hidden shrink-0"
                         [class.w-11]="docked()" [class.h-11]="docked()"
                         [class.w-6]="!docked()" [class.h-6]="!docked()"
                         [attr.aria-label]="'tooltip.filter_by_person' | translate:{ name: person.name }"
@@ -317,9 +324,13 @@ const KEY_SCORES = [
                   [src]="person.id | personThumbnailUrl"
                   [alt]="person.name"
                   [title]="person.name"
-                  class="w-6 h-6 rounded-full object-cover ring-1 ring-[var(--facet-tooltip-divider)]"
+                  class="w-6 h-6 shrink-0 rounded-full object-cover ring-1 ring-[var(--facet-tooltip-divider)]"
                 />
               }
+            }
+            @if (hiddenPersons() > 0) {
+              <span data-people-more class="shrink-0 text-[10px] text-[var(--facet-tooltip-text-muted)]"
+                    [attr.aria-label]="'tooltip.more_count' | translate:{ count: hiddenPersons() }">+{{ hiddenPersons() }}</span>
             }
           </div>
         }
@@ -345,7 +356,9 @@ const KEY_SCORES = [
                   }
                 </div>
               } @else {
-                <span data-object-tag-count class="text-[10px] text-[var(--mat-sys-on-surface-variant)]">{{ (group.tags.length === 1 ? 'photo_detail.object_tags.summary_one' : 'photo_detail.object_tags.summary') | translate:{ name: group.name, count: group.tags.length } }}</span>
+                @if ($first) {
+                  <span data-object-tag-count class="block truncate text-[10px] text-[var(--mat-sys-on-surface-variant)]">@if (objectGroups().length === 1) { {{ (group.tags.length === 1 ? 'photo_detail.object_tags.summary_one' : 'photo_detail.object_tags.summary') | translate:{ name: group.name, count: group.tags.length } }} } @else { {{ floatingObjectLine() }} }</span>
+                }
               }
             }
           </div>
@@ -596,6 +609,17 @@ export class PhotoTooltipComponent {
   private readonly kinds = computed(() => tagKinds(this.photo(), this.photo()?.manual_tag_sources ?? {}));
   /** Tags: what the photo shows, never an add-on's or an album's. */
   protected readonly navigationTags = computed(() => [...new Set([...this.kinds().ai, ...this.kinds().own])]);
+  /** The floating hover card is one line per row: the first HOVER_CAP chips, the rest folded into a muted "+N". A fixed cap
+   *  rather than a measured fit: it needs no layout pass, and a long chip truncates inside its row instead of wrapping. */
+  protected readonly shownTags = computed(() => this.docked() ? this.navigationTags() : this.navigationTags().slice(0, HOVER_CAP));
+  protected readonly hiddenTags = computed(() => this.navigationTags().length - this.shownTags().length);
+  protected readonly shownPersons = computed(() => {
+    const persons = this.photo()?.persons ?? [];
+    return this.docked() ? persons : persons.slice(0, HOVER_CAP);
+  });
+  protected readonly hiddenPersons = computed(() => (this.photo()?.persons.length ?? 0) - this.shownPersons().length);
+  /** Object tags on the hover card, several add-ons: "Astro 12 · Other 3" (one add-on uses the translated summary). */
+  protected readonly floatingObjectLine = computed(() => this.objectGroups().map(g => `${g.name} ${g.tags.length}`).join(' · '));
   protected readonly albumTags = computed(() => this.kinds().album);
   protected readonly ALBUM_FOLD = ALBUM_FOLD;
   /** Folds opened on this photo (an add-on id, or the album fold); every photo starts folded. */

@@ -214,6 +214,7 @@
     "star_rating": "Valoración",
     "topiq_score": "TOPIQ",
     "filter_by_person": "Filtrar por {name}",
+    "more_count": "+{count} más",
     "histogram": "Histograma"
   },
   "photoCard": {
