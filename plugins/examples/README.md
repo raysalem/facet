@@ -20,6 +20,58 @@ plugins in `scoring_config.json`:
 | `copy_to_folder.py.example` | `on_high_score` | Hard-links (or copies, across filesystems) each photo above the threshold into a destination folder, preserving its directory structure. |
 | `score_publisher.py.example` | `on_score_complete` | Writes each finished score as a JSON line to a rolling log file (works with `tail -F` or a log shipper). |
 
+## Photo annotations
+
+A plugin that knows *what is where* in a photo (a plate solve's stars and planets,
+a detector's labelled regions) can store it as an overlay: one payload per photo
+that carries everything needed to draw it and filter it (groups, a score,
+metric limits), so nothing calls the plugin again to change what is shown.
+
+```python
+import sqlite3
+from db.annotations import AnnotationError, upsert_annotation  # stdlib only
+
+payload = {
+    "version": 1, "source": "sky-labels", "title": "Sky annotations",
+    "image": {"width": 6000, "height": 4000},      # pixel frame of the coordinates below
+    "legend": "ASTAP grade A · 2452 stars",
+    "groups": [{"id": "planet", "label": "Planets", "default": True},
+               {"id": "star", "label": "Stars", "default": False}],
+    "metrics": [{"key": "mag", "label": "Max magnitude", "min": -5, "max": 8,
+                 "step": 0.5, "default": 6, "direction": "max"}],
+    "score": {"label": "Confidence", "min": 0, "max": 100, "default": 65},
+    "items": [
+        {"id": "uranus", "label": "Uranus", "group": "planet", "score": 100,
+         "shape": "point", "x": 5123.4, "y": 2210.8, "r": 18, "values": {"mag": 5.6}},
+        {"id": "orion", "label": "Orion", "group": "planet", "score": 100,
+         "shape": "lines", "segments": [[[10, 20], [30, 40]]], "label_at": [20, 30]},
+    ],
+}
+with sqlite3.connect(db_path) as conn:        # Facet's photo_scores_pro.db
+    upsert_annotation(conn, photo_path, "sky-labels", payload)
+```
+
+- `photo_path` must be a photo already in the library (`LookupError` otherwise);
+  `source` is your plugin's id (lowercase letters, digits, `.`, `_`, `-`).
+  Writing again replaces your earlier row for that photo; other plugins' rows
+  are untouched. `delete_annotation(conn, photo_path, source)` removes it.
+- Coordinates are pixels of `image` (origin top-left), and `image` must have the
+  same aspect ratio as the photo as Facet displays it (upright, after EXIF
+  rotation), since the overlay is scaled onto the displayed frame.
+- `shape` is `point` (`x`, `y`, optional `r`), `circle` (`x`, `y`, `r`) or `lines`
+  (`segments` of two `[x, y]` points, optional `label_at`). `member_of` names the
+  item a part belongs to, so a viewer can hide the parts while the whole shows.
+- An item is meant to show when its group is on, its `score` is at least the
+  score limit and, for each metric, `values[key]` is at most (`direction: "max"`)
+  or at least (`"min"`) that metric's limit. An item without a value is not
+  filtered by it.
+- `upsert_annotation` validates the payload (`AnnotationError`: `version` must be
+  1, the shapes need their coordinates, item ids are unique, a point's optional
+  `r` is positive, every range has `min <= max` and a positive `step`, at most
+  5,000 items and 512 KB of JSON) and does not commit; `with conn:` does. Unknown
+  fields are kept. `PUT /api/photo/annotations` and the MCP `set_annotations`
+  tool apply the same checks.
+
 ## Webhook payload shape
 
 Outgoing HTTP webhooks (configured under `plugins.webhooks` in

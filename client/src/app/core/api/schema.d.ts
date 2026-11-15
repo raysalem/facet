@@ -3327,6 +3327,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/photo/annotations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Photo Annotations
+         * @description Every source's annotations for one photo (or ``source``'s only); empty for a photo the caller cannot see.
+         */
+        get: operations["list_photo_annotations_api_photo_annotations_get"];
+        /**
+         * Put Photo Annotation
+         * @description Store (or replace) one source's annotations for a photo; 422 on a payload that fails validation.
+         */
+        put: operations["put_photo_annotation_api_photo_annotations_put"];
+        post?: never;
+        /**
+         * Delete Photo Annotation
+         * @description Remove one source's annotations from a photo (the plugin can write them again).
+         */
+        delete: operations["delete_photo_annotation_api_photo_annotations_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/photo/assign_all_faces": {
         parameters: {
             query?: never;
@@ -9619,6 +9647,50 @@ export interface components {
             is_smart: boolean;
             /** Name */
             name: string;
+        };
+        /**
+         * PhotoAnnotation
+         * @description One source's overlay for a photo. ``payload`` is the stored v1 JSON object
+         *     (see ``db.annotations``); the viewer draws and filters it client-side.
+         */
+        PhotoAnnotation: {
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Source */
+            source: string;
+        };
+        /** PhotoAnnotationDelete */
+        PhotoAnnotationDelete: {
+            /** Removed */
+            removed: boolean;
+            /** Success */
+            success: boolean;
+        };
+        /**
+         * PhotoAnnotationPut
+         * @description One source's overlay for one photo, replacing any earlier row of that source.
+         */
+        PhotoAnnotationPut: {
+            /** Path */
+            path: string;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Source */
+            source: string;
+        };
+        /** PhotoAnnotationSaved */
+        PhotoAnnotationSaved: {
+            /** Success */
+            success: boolean;
+        };
+        /** PhotoAnnotationsResponse */
+        PhotoAnnotationsResponse: {
+            /** Annotations */
+            annotations: components["schemas"]["PhotoAnnotation"][];
         };
         /**
          * PhotoAssessmentStates
@@ -17078,6 +17150,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PhotoAlbum"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_photo_annotations_api_photo_annotations_get: {
+        parameters: {
+            query: {
+                path: string;
+                source?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoAnnotationsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_photo_annotation_api_photo_annotations_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhotoAnnotationPut"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoAnnotationSaved"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_photo_annotation_api_photo_annotations_delete: {
+        parameters: {
+            query: {
+                path: string;
+                source: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoAnnotationDelete"];
                 };
             };
             /** @description Validation Error */

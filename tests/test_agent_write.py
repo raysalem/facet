@@ -101,6 +101,10 @@ class TestGrantMatrix:
         "cull_apply": {"action": "copy_keeps", "paths": [P[0]]}, "delete_photos": {"paths": [P[0]]},
         "assign_faces": {"person_id": 999999, "face_ids": [1]},
         "set_caption": {"path": P[0], "caption": "x"}, "export_metadata": {"paths": [P[0]]},
+        "get_annotations": {"path": AGENT_DIR + "nope1.jpg"},
+        "set_annotations": {"path": AGENT_DIR + "nope1.jpg", "source": "test-plugin",
+                            "payload": {"version": 1, "image": {"width": 1, "height": 1}, "items": []}},
+        "clear_annotations": {"path": AGENT_DIR + "nope1.jpg", "source": "test-plugin"},
         "override_sequence": {"paths": [AGENT_DIR + "nope1.jpg", AGENT_DIR + "nope2.jpg"], "kind": "panorama"},
         "clear_sequence_override": {"paths": [AGENT_DIR + "nope1.jpg"]},
         "override_category": {"path": AGENT_DIR + "nope1.jpg", "category": "portrait"},
@@ -119,7 +123,7 @@ class TestGrantMatrix:
     }
     READ_ONLY = ("junk_list", "scan_status", "comparison_status", "group_compare", "cull_report",
                  "explain_score", "category_weights", "preview_weights", "list_weight_snapshots",
-                 "recompute_status", "learned_weights", "misassigned_categories")
+                 "recompute_status", "learned_weights", "misassigned_categories", "get_annotations")
 
     def test_every_write_tool_has_args_and_a_level(self):
         assert set(self.ARGS) == set(WRITE_TOOL_LEVELS)
@@ -678,6 +682,46 @@ class TestNonceModule:
         with pytest.raises(nonce.NonceCapacityError):
             nonce.issue(1, "act", "h")
         assert nonce._pending == before
+
+
+class TestAnnotations:
+    PAYLOAD = {"version": 1, "image": {"width": 10, "height": 10}, "groups": [{"id": "stars", "label": "Stars"}],
+               "items": [{"id": "s1", "label": "Vega", "group": "stars", "shape": "point", "x": 1, "y": 2}]}
+
+    def teardown_method(self):
+        conn = sqlite3.connect(_TEST_DB_FILE.name)
+        conn.execute("DELETE FROM photo_annotations WHERE photo_path LIKE ?", (AGENT_DIR + "%",))
+        conn.commit()
+        conn.close()
+
+    def test_a_write_without_source_is_invalid_input(self, edition, photos, counting):
+        env, token = edition
+        assert env.call(token, "set_annotations", {"path": P[0], "payload": self.PAYLOAD})["error"] == "invalid_input"
+        assert env.call(token, "clear_annotations", {"path": P[0]})["error"] == "invalid_input"
+        assert "annotations.set" not in counting and "annotations.clear" not in counting
+
+    def test_get_answers_a_summary_unless_the_payloads_are_asked(self, edition, photos):
+        env, token = edition
+        assert env.call(token, "set_annotations", {"path": P[0], "source": "sky-labels", "payload": self.PAYLOAD})["ok"]
+        assert env.call(token, "set_annotations", {"path": P[0], "source": "other", "payload": self.PAYLOAD})["ok"]
+        summary = env.call(token, "get_annotations", {"path": P[0], "source": "sky-labels"})["data"]
+        assert "annotations" not in summary
+        assert summary["summary"] == [{"source": "sky-labels", "version": 1, "title": None, "legend": None,
+                                       "image": {"width": 10, "height": 10},
+                                       "groups": [{"id": "stars", "label": "Stars", "count": 1}],
+                                       "metrics": [], "score": None, "items": 1}]
+        every = env.call(token, "get_annotations", {"path": P[0]})["data"]["summary"]
+        assert [s["source"] for s in every] == ["other", "sky-labels"]
+        full = env.call(token, "get_annotations", {"path": P[0], "source": "sky-labels", "summary": False})["data"]
+        assert [a["source"] for a in full["annotations"]] == ["sky-labels"]
+        assert full["annotations"][0]["payload"]["items"][0]["label"] == "Vega"
+        assert env.call(token, "clear_annotations", {"path": P[0], "source": "sky-labels"})["data"]["removed"] is True
+
+    def test_overlay_writes_send_no_live_update(self):
+        # An overlay changes no photo row: neither write may make an open tab reload its view.
+        from api.agent.live_updates import frame_for
+        assert frame_for("annotations.set", {"path": P[0], "source": "s", "payload": {}}, {"success": True}) is None
+        assert frame_for("annotations.clear", None, {"success": True, "removed": True}) is None
 
 
 class TestSetCaption:

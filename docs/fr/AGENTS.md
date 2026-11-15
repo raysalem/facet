@@ -283,6 +283,9 @@ Les outils d'écriture figurent dans la même liste `/mcp` que les outils de lec
 | `album_remove_photos` | `edition` | Retire des photos d'un album ; les photos ne sont pas touchées | 1000 chemins |
 | `assign_faces` | `edition` | Déplace des visages vers une personne ; ceux qu'une autre personne possède sont laissés tels quels sauf `allow_reassign`, et le résultat liste ce qui a été ignoré | 50 ids de visage |
 | `set_caption` | `edition` | Définit la légende d'une photo (sémantique d'ensemble ; une légende inchangée revient en `already`) | 1 photo, 2000 caractères |
+| `get_annotations` | `readonly` | Les surcouches de plugins stockées pour une photo (tous les plugins ou seulement `source`) : par défaut un résumé sans géométrie (source, titre, légende, cadre, groupes avec nombre d'éléments, plages) ; `summary: false` renvoie les payloads | 1 photo |
+| `set_annotations` | `edition` | Stocke ou remplace la surcouche d'un plugin pour une photo (payload v1, voir API.md) ; `source` est obligatoire | 1 photo, 512 Ko |
+| `clear_annotations` | `edition` | Retire la surcouche d'un plugin d'une photo (`removed: false` s'il n'y en avait pas) ; `source` est obligatoire | 1 photo |
 | `export_metadata` | `edition` | Écrit des sidecars XMP à côté des fichiers | 100 chemins, ou `filters`, ou `target` |
 | `junk_list` | `readonly` | Liste les candidates du tri des ratés, éventuellement d'un seul `kind`; `show: true` ouvre `/junk` sur ce `kind` | 100 par page |
 | `junk_reject` | `edition` | Rejette les candidates du tri des ratés (comme `batch_set_rejected`) | 1000 chemins, ou `target: "selection"` (page galerie uniquement) |

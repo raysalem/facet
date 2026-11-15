@@ -38,7 +38,9 @@ PHOTO_EFFECT_TOOLS = frozenset({
 NO_PHOTO_EFFECT_TOOLS = frozenset({"create_album", "export_metadata", "scan_start", "update_weights", "restore_weights",
                                    "recompute_start",
                                    # A new file plus a scan of it, like scan_start: no existing row changes.
-                                   "import_ai_edit"})
+                                   "import_ai_edit",
+                                   # An overlay changes no photo row and nothing the gallery shows.
+                                   "annotations.set", "annotations.clear"})
 
 # ``(principal, tool, request body, response body)``, sync or async.
 WriteSink = Callable[[str, str, Any, Any], Any]

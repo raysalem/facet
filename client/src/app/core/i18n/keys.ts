@@ -3944,6 +3944,8 @@ export const I18N = {
       remove_tags: "assistant_activity.tools.remove_tags",
       restore_weight_snapshot: "assistant_activity.tools.restore_weight_snapshot",
       set_caption: "assistant_activity.tools.set_caption",
+      set_annotations: "assistant_activity.tools.set_annotations",
+      clear_annotations: "assistant_activity.tools.clear_annotations",
       set_favorite: "assistant_activity.tools.set_favorite",
       set_rating: "assistant_activity.tools.set_rating",
       set_rejected: "assistant_activity.tools.set_rejected",

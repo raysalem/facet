@@ -58,6 +58,7 @@ WRITE_TOOL_LEVELS: dict[str, str] = {
     "junk_list": "readonly", "junk_reject": "edition", "junk_clear": "edition",
     "cull_apply": "edition", "delete_photos": "edition",
     "assign_faces": "edition", "set_caption": "edition", "export_metadata": "edition",
+    "get_annotations": "readonly", "set_annotations": "edition", "clear_annotations": "edition",
     "start_scan": "edition", "scan_status": "edition", "comparison_status": "edition",
     # Registered by tools_corrections / tools_report; listed here so one table holds every non-darkroom level.
     "override_sequence": "edition", "clear_sequence_override": "edition",

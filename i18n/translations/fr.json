@@ -3905,6 +3905,8 @@
       "remove_tags": "Tags retirés",
       "restore_weight_snapshot": "Pondérations restaurées",
       "set_caption": "Légende définie",
+      "set_annotations": "Calque enregistré",
+      "clear_annotations": "Calque retiré",
       "set_favorite": "Favoris modifiés",
       "set_rating": "Notation",
       "set_rejected": "Rejet",

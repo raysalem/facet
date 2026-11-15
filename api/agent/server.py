@@ -38,6 +38,7 @@ from api.agent.bridge import TabRegistry, same_origin
 from api.agent.runtime import SETTINGS_SCOPE_KEY, bearer_token, level_refusal, resolve_context, to_result
 from api.agent.tools_common import TOOL_LEVELS, tool_visible
 from api.agent.tools_corrections import register_correction_tools
+from api.agent.tools_annotations import register_annotation_tools
 from api.agent.tools_culling import register_culling_tools
 from api.agent.tools_report import register_report_tools
 from api.agent.tools_scoring import register_scoring_tools
@@ -289,6 +290,7 @@ def register_all_tools(server: MCPServer, app: Any, client: InternalClient, stat
     register_ui_tools(server, registry)
     register_culling_tools(server, app, registry, on_write)
     register_correction_tools(server, client)
+    register_annotation_tools(server, client)
     register_report_tools(server, app, client, on_write)
     register_scoring_tools(server, client, registry)
     prompts.register_prompts(server)

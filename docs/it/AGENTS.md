@@ -283,6 +283,9 @@ Gli strumenti di scrittura stanno nella stessa lista `/mcp` di quelli di lettura
 | `album_remove_photos` | `edition` | Toglie foto da un album; le foto non sono toccate | 1000 percorsi |
 | `assign_faces` | `edition` | Sposta volti su una persona; quelli di un'altra persona restano com'erano salvo `allow_reassign`, e il risultato elenca ciò che è stato saltato | 50 id di volto |
 | `set_caption` | `edition` | Imposta la didascalia di una foto (semantica di insieme; una didascalia invariata torna come `already`) | 1 foto, 2000 caratteri |
+| `get_annotations` | `readonly` | Gli overlay dei plugin salvati per una foto (tutti i plugin o solo `source`): per impostazione predefinita un riepilogo senza geometria (sorgente, titolo, legenda, riquadro, gruppi con numero di elementi, intervalli); `summary: false` restituisce i payload | 1 foto |
+| `set_annotations` | `edition` | Salva o sostituisce l'overlay di un plugin per una foto (payload v1, vedi API.md); `source` è obbligatorio | 1 foto, 512 KB |
+| `clear_annotations` | `edition` | Rimuove l'overlay di un plugin da una foto (`removed: false` se non c'era); `source` è obbligatorio | 1 foto |
 | `export_metadata` | `edition` | Scrive sidecar XMP accanto ai file | 100 percorsi, oppure `filters`, oppure `target` |
 | `junk_list` | `readonly` | Elenca i candidati della pulizia degli scarti, eventualmente di un solo `kind`; `show: true` apre `/junk` su quel `kind` | 100 per pagina |
 | `junk_reject` | `edition` | Scarta i candidati della pulizia (come `batch_set_rejected`) | 1000 percorsi, oppure `target: "selection"` (solo pagina galleria) |

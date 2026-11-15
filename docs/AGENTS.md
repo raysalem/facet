@@ -283,6 +283,9 @@ Write tools are in the same `/mcp` list as the read tools. Each goes through the
 | `album_remove_photos` | `edition` | Remove photos from an album; the photos are untouched | 1000 paths |
 | `assign_faces` | `edition` | Move faces to a person; faces another person owns are left alone unless `allow_reassign` is set, and the result lists what was skipped | 50 face ids |
 | `set_caption` | `edition` | Set a photo's caption (set semantics; an unchanged caption comes back as `already`) | 1 photo, 2000 characters |
+| `get_annotations` | `readonly` | The plugin overlays stored for one photo (every plugin, or only `source`): a summary without geometry by default (source, title, legend, frame, groups with item counts, ranges); `summary: false` returns the payloads | 1 photo |
+| `set_annotations` | `edition` | Store or replace one plugin's overlay for one photo (payload v1, see API.md); `source` is required | 1 photo, 512 KB |
+| `clear_annotations` | `edition` | Remove one plugin's overlay from one photo (`removed: false` when there was none); `source` is required | 1 photo |
 | `export_metadata` | `edition` | Write XMP sidecars next to the files | 100 paths, or `filters`, or `target` |
 | `junk_list` | `readonly` | List junk-sweep candidates, optionally of one `kind`; `show: true` opens `/junk` on that kind | 100 per page |
 | `junk_reject` | `edition` | Reject junk-sweep candidates (same as `batch_set_rejected`) | 1000 paths, or `target: "selection"` (gallery page only) |

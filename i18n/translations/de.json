@@ -3905,6 +3905,8 @@
       "remove_tags": "Tags entfernt",
       "restore_weight_snapshot": "Gewichtungen wiederhergestellt",
       "set_caption": "Beschriftung gesetzt",
+      "set_annotations": "Overlay gespeichert",
+      "clear_annotations": "Overlay entfernt",
       "set_favorite": "Favoriten geändert",
       "set_rating": "Bewertet",
       "set_rejected": "Abgelehnt",

@@ -3905,6 +3905,8 @@
       "remove_tags": "Etiquetas quitadas",
       "restore_weight_snapshot": "Pesos restaurados",
       "set_caption": "Descripción establecida",
+      "set_annotations": "Superposición guardada",
+      "clear_annotations": "Superposición quitada",
       "set_favorite": "Favoritos modificados",
       "set_rating": "Valoración",
       "set_rejected": "Rechazo",

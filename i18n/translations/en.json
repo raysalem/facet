@@ -3930,6 +3930,8 @@
       "remove_tags": "Removed tags",
       "restore_weight_snapshot": "Restored scoring weights",
       "set_caption": "Set a caption",
+      "set_annotations": "Saved an overlay",
+      "clear_annotations": "Cleared an overlay",
       "set_favorite": "Changed a favorite",
       "set_rating": "Rated",
       "set_rejected": "Rejected",

@@ -283,6 +283,9 @@ curl -s -X POST http://localhost:5000/api/mcp/tokens -H "Authorization: Bearer $
 | `album_remove_photos` | `edition` | 从相册移除照片；照片本身不受影响 | 1000 个路径 |
 | `assign_faces` | `edition` | 将人脸移到某个人物;属于其他人物的人脸保持不变,除非设置 `allow_reassign`,结果会列出被跳过的内容 | 50 个人脸 id |
 | `set_caption` | `edition` | 设置照片的说明文字(集合语义;未变化的说明文字返回 `already`) | 1 张照片,2000 个字符 |
+| `get_annotations` | `readonly` | 一张照片已存储的插件叠加层(全部插件,或仅 `source` 指定的插件)：默认返回不含几何数据的摘要(来源、标题、图例、画面尺寸、各组及其条目数、范围),`summary: false` 时返回完整 payload | 1 张照片 |
+| `set_annotations` | `edition` | 为一张照片存储或替换某个插件的叠加层(payload v1,见 API.md);必须提供 `source` | 1 张照片,512 KB |
+| `clear_annotations` | `edition` | 从一张照片移除某个插件的叠加层(若原本没有则返回 `removed: false`);必须提供 `source` | 1 张照片 |
 | `export_metadata` | `edition` | 在文件旁写入 XMP 附属文件 | 100 个路径,或 `filters`,或 `target` |
 | `junk_list` | `readonly` | 列出废片清理的候选，可只列某一种 `kind`;`show: true` 会在 `/junk` 上打开该 `kind` | 每页 100 条 |
 | `junk_reject` | `edition` | 淘汰废片清理的候选（与 `batch_set_rejected` 相同） | 1000 个路径,或 `target: "selection"`(仅限图库页面) |

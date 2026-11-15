@@ -283,6 +283,9 @@ As ferramentas de escrita estão na mesma lista `/mcp` que as de leitura. Cada u
 | `album_remove_photos` | `edition` | Remove fotos de um álbum; as fotos não são tocadas | 1000 caminhos |
 | `assign_faces` | `edition` | Move rostos para uma pessoa; os de outra pessoa ficam como estão salvo `allow_reassign`, e o resultado lista o que foi ignorado | 50 ids de rosto |
 | `set_caption` | `edition` | Define a legenda de uma foto (semântica de conjunto; uma legenda inalterada volta como `already`) | 1 foto, 2000 caracteres |
+| `get_annotations` | `readonly` | As sobreposições de plugins salvas para uma foto (todos os plugins ou só `source`): por padrão um resumo sem geometria (fonte, título, legenda, quadro, grupos com número de itens, intervalos); `summary: false` retorna os payloads | 1 foto |
+| `set_annotations` | `edition` | Salva ou substitui a sobreposição de um plugin para uma foto (payload v1, veja API.md); `source` é obrigatório | 1 foto, 512 KB |
+| `clear_annotations` | `edition` | Remove a sobreposição de um plugin de uma foto (`removed: false` quando não havia nenhuma); `source` é obrigatório | 1 foto |
 | `export_metadata` | `edition` | Escreve sidecars XMP junto aos arquivos | 100 caminhos, ou `filters`, ou `target` |
 | `junk_list` | `readonly` | Lista os candidatos da limpeza de rejeitadas, opcionalmente de um só `kind`; `show: true` abre `/junk` nesse `kind` | 100 por página |
 | `junk_reject` | `edition` | Rejeita candidatos da limpeza (igual a `batch_set_rejected`) | 1000 caminhos, ou `target: "selection"` (só na página da galeria) |
