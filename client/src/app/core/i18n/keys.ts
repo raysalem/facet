@@ -3532,6 +3532,15 @@ export const I18N = {
     error: "manual_tags.error",
     already_present: "manual_tags.already_present",
   },
+  album_tags: {
+    group: "album_tags.group",
+    content_group: "album_tags.content_group",
+    mark: "album_tags.mark",
+    label: "album_tags.label",
+    set_label: "album_tags.set_label",
+    photographer_label: "album_tags.photographer_label",
+    mark_hint: "album_tags.mark_hint",
+  },
   photo: {
     category_override: {
       menu_tooltip: "photo.category_override.menu_tooltip",

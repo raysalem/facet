@@ -627,6 +627,7 @@
   },
   "smart_album_exclude_keys": [
     "album_id",
+    "album_set",
     "burst_group_id",
     "duplicate_group_id",
     "gps_lat",
@@ -643,6 +644,7 @@
     "page",
     "panel_activation",
     "per_page",
+    "photographer",
     "search_threshold",
     "semanticQuery",
     "sequence_group_id",

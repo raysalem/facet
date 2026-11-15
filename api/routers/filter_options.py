@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends
 from api.auth import CurrentUser, get_optional_user, require_authenticated
 from api.config import VIEWER_CONFIG, is_multi_user_enabled
 from api.database import get_async_db, get_db
+from db.manual_tags import load_album_tag_set
 from api.db_helpers import is_manual_tags_available, is_photo_tags_available, get_visibility_clause
 from api.types import JUNK_NOT_JUNK
 from api.models.media import (
@@ -128,6 +129,16 @@ def _tag_tables_ready():
         return is_photo_tags_available(sync_conn), is_manual_tags_available(sync_conn)
 
 
+def _album_tag_set():
+    """The album (organisation) tags; the dropdown lists content tags only."""
+    with get_db() as sync_conn:
+        return load_album_tag_set(sync_conn)
+
+
+def _without_album_tags(rows, album_set, limit):
+    return [(t, n) for t, n in rows if t not in album_set][:limit]
+
+
 @router.get("/tags", response_model=MediaFilterOptionTagsResponse, response_model_exclude_unset=True)
 async def tags(user: Optional[CurrentUser] = Depends(get_optional_user)):
     """Lazy-load tag options with counts.
@@ -141,12 +152,16 @@ async def tags(user: Optional[CurrentUser] = Depends(get_optional_user)):
 
     max_tags = VIEWER_CONFIG['dropdowns']['max_tags']
     vis, vp = _vis_where(user)
+    # Album tags have their own group (GET /api/album_tags), so they are dropped
+    # here; the queries over-fetch by that many so the list still fills max_tags.
+    album_set = await asyncio.to_thread(_album_tag_set)
+    fetch_n = max_tags + len(album_set)
 
     if not vis and not is_multi_user_enabled():
         data, is_fresh = await asyncio.to_thread(
             get_cached_stat, DEFAULT_DB_PATH, 'tags', max_age_seconds=300)
         if data and is_fresh:
-            return {'tags': data[:max_tags], 'cached': True}
+            return {'tags': _without_album_tags(data, album_set, max_tags), 'cached': True}
 
     async with get_async_db() as conn:
         # Both probes are cached, but a cache miss opens a sync connection and
@@ -174,7 +189,7 @@ async def tags(user: Optional[CurrentUser] = Depends(get_optional_user)):
                         ORDER BY cnt DESC, tag ASC
                         LIMIT ?
                         """,
-                        vp + [max_tags],
+                        vp + [fetch_n],
                     )
                 else:
                     # Whole library: count the AI pairs with an index-only GROUP BY on
@@ -197,9 +212,9 @@ async def tags(user: Optional[CurrentUser] = Depends(get_optional_user)):
                         ORDER BY cnt DESC, tag ASC
                         LIMIT ?
                         """,
-                        [max_tags],
+                        [fetch_n],
                     )
-                return {'tags': [(r[0], r[1]) for r in rows], 'cached': False}
+                return {'tags': _without_album_tags(rows, album_set, max_tags), 'cached': False}
             except sqlite3.Error:
                 logger.debug("photo_tags query failed, falling back to split", exc_info=True)
 
@@ -225,8 +240,8 @@ async def tags(user: Optional[CurrentUser] = Depends(get_optional_user)):
             LIMIT ?
         """
         try:
-            rows = await _fetch_all(conn, tag_query, vp + (vp if manual_ready else []) + [max_tags])
-            return {'tags': [(r[0], r[1]) for r in rows], 'cached': False}
+            rows = await _fetch_all(conn, tag_query, vp + (vp if manual_ready else []) + [fetch_n])
+            return {'tags': _without_album_tags(rows, album_set, max_tags), 'cached': False}
         except sqlite3.Error:
             logger.exception("Failed to query tags")
             return {'tags': [], 'cached': False}

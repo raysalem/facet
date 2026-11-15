@@ -4,6 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { isDefinitiveRejection } from '../../shared/utils/write-rejection';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
@@ -45,7 +46,7 @@ export interface ManualTagsDialogResult {
 @Component({
   selector: 'app-manual-tags-dialog',
   standalone: true,
-  imports: [MatDialogModule, MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, TranslatePipe],
+  imports: [MatDialogModule, MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, MatCheckboxModule, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h2 mat-dialog-title class="flex items-center gap-2 !text-lg"><mat-icon aria-hidden="true">sell</mat-icon>{{ I18N.manual_tags.title | translate }}</h2>
@@ -100,6 +101,12 @@ export interface ManualTagsDialogResult {
           <textarea matInput rows="3" maxlength="3300" [value]="tag()" (input)="onInput($event)"></textarea>
           <mat-hint>{{ I18N.manual_tags.batch.tag_list_hint | translate }}</mat-hint>
         </mat-form-field>
+        <div class="mt-3">
+          <mat-checkbox data-testid="album-tag-toggle" [checked]="albumTag()" (change)="albumTag.set($event.checked)">
+            {{ I18N.album_tags.mark | translate }}
+          </mat-checkbox>
+          <p class="text-xs opacity-70 ml-10 -mt-1">{{ I18N.album_tags.mark_hint | translate }}</p>
+        </div>
         <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--mat-sys-outline-variant)] pt-3">
           <button mat-button (click)="preview('add')" [disabled]="invalidValues() || values().length !== 1">{{ I18N.manual_tags.add_action | translate }}</button>
           <button mat-button (click)="preview('delete')" [disabled]="invalidValues() || values().length !== 1">{{ I18N.manual_tags.remove_action | translate }}</button>
@@ -148,6 +155,8 @@ export class ManualTagsDialogComponent {
   protected readonly values = computed(() => [...new Set(this.tag().split(/\r?\n/).map(value => value.trim()).filter(Boolean))]);
   protected readonly invalidValues = computed(() => this.values().some(value => /[,\p{Cc}\p{Cf}]/u.test(value) || [...value.normalize('NFC')].length > 64));
   readonly saving = signal(false);
+  /** Also mark the tag as an album tag (organisation), library-wide, after an add. */
+  readonly albumTag = signal(false);
   readonly failed = signal(false);
   readonly uncertain = signal(false);
   readonly confirmed = signal(0);
@@ -237,6 +246,9 @@ export class ManualTagsDialogComponent {
         }));
         this.confirmed.update(count => count + response.count);
         this.completedBatches.set(index + 1);
+      }
+      if (plan.action === 'add' && this.albumTag()) {
+        await firstValueFrom(this.api.put<{ tag: string }>('/album_tags', { tag: plan.tag }));
       }
       complete = true;
     } catch (error) {

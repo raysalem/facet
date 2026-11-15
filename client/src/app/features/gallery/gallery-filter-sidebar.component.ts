@@ -24,6 +24,7 @@ import { toIsoDateString } from '../../shared/utils/date-format';
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
+import { AlbumTagFiltersComponent } from './album-tag-filters.component';
 import { GalleryStore } from './gallery.store';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { FilterDisplayPipe } from '../../shared/pipes/filter-display.pipe';
@@ -173,7 +174,7 @@ export const UNIT_PANEL: Record<string, string> = {
   score_presence: 'score_presence',
   person_id: 'persons', faces_need_names: 'persons',
   date_from: 'date', date_to: 'date', no_capture_date: 'date',
-  type: 'content', tag: 'content', keyword_branch: 'content', tag_groups: 'tag_rules',
+  type: 'content', tag: 'content', album_set: 'content', photographer: 'content', keyword_branch: 'content', tag_groups: 'tag_rules',
   composition_pattern: COMPOSITION_SECTION,
   camera: 'equipment', lens: 'equipment',
   review_status: 'refine', favorites_only: 'refine', is_monochrome: 'refine', show_rejected: 'refine',
@@ -235,6 +236,7 @@ type RatingOption = 'any' | '1' | '2' | '3' | '4' | '5' | 'zero';
   standalone: true,
   host: { class: 'contents' },
   imports: [
+    AlbumTagFiltersComponent,
     ContextHelpComponent,
     MarkTonePipe,
     SectionOpenPipe,
@@ -579,17 +581,31 @@ type RatingOption = 'any' | '1' | '2' | '3' | '4' | '5' | 'zero';
                 </mat-select>
               </mat-form-field>
             }
-            @if (store.tags().length) {
+            @if (store.tags().length || store.albumTags().length) {
               <mat-form-field subscriptSizing="dynamic" class="w-full">
-                <mat-label>{{ I18N.gallery.tag | translate }}</mat-label>
+                <mat-label>{{ (selectedIsAlbumTag() ? I18N.album_tags.label : I18N.gallery.tag) | translate }}</mat-label>
                 <mat-select [value]="store.filters().tag" (selectionChange)="store.updateFilter('tag', $event.value)">
                   <mat-option value="">{{ I18N.gallery.all | translate }}</mat-option>
-                  @for (t of store.tags(); track t.value) {
-                    <mat-option [value]="t.value">{{ t.value }} ({{ t.count }})</mat-option>
+                  @if (store.albumTags().length) {
+                    <mat-optgroup data-testid="album-tag-group" [label]="I18N.album_tags.group | translate">
+                      @for (t of store.albumTags(); track t.value) {
+                        <mat-option [value]="t.value">{{ t.value }} ({{ t.count }})</mat-option>
+                      }
+                    </mat-optgroup>
+                    <mat-optgroup [label]="I18N.album_tags.content_group | translate">
+                      @for (t of store.tags(); track t.value) {
+                        <mat-option [value]="t.value">{{ t.value }} ({{ t.count }})</mat-option>
+                      }
+                    </mat-optgroup>
+                  } @else {
+                    @for (t of store.tags(); track t.value) {
+                      <mat-option [value]="t.value">{{ t.value }} ({{ t.count }})</mat-option>
+                    }
                   }
                 </mat-select>
               </mat-form-field>
             }
+            <app-album-tag-filters />
             <app-keyword-catalog />
             <app-keyword-tree />
           </div>
@@ -1252,6 +1268,11 @@ export class GalleryFilterSidebarComponent {
     if (el) el.value = '';
   }
 
+  /** The chosen tag is an album tag, so the field reads "Album tag", not "Tag". */
+  readonly selectedIsAlbumTag = computed(() => {
+    const tag = this.store.filters().tag;
+    return !!tag && this.store.albumTags().some(t => t.value === tag);
+  });
   readonly currentFolderName = computed(() => folderDisplayName(this.store.filters().path_prefix));
 
   readonly sectionIcons = SECTION_ICONS;

@@ -1196,6 +1196,16 @@ def _sync_viewer_db(dest_conn, thumbnail_size, verbose, path_mapping):
                 count = dest_conn.execute("SELECT COUNT(*) FROM main.photo_manual_tags").fetchone()[0]
                 logger.info("  Merged manual tags (%d rows)", count)
 
+    # --- Merge album_tags (which manual tags are organisation; additive only) ---
+    # Same contract: a tag marked on either side stays marked. No photo guard,
+    # the registry is keyed by tag alone.
+    if 'album_tags' in dest_tables and 'album_tags' in src_tables:
+        dest_conn.execute(
+            "INSERT OR IGNORE INTO main.album_tags (tag, created_by, created_at) "
+            "SELECT tag, created_by, created_at FROM src.album_tags"
+        )
+        dest_conn.commit()
+
     # --- Merge photo_objects (user-marked labelled boxes; additive only) ---
     # Same contract as photo_manual_tags. The table has an AUTOINCREMENT id that
     # must not be copied (it would collide with the destination's own), so a row

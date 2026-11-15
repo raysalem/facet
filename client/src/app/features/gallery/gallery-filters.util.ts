@@ -68,6 +68,10 @@ export interface GalleryFilters {
   tag_groups: string;
   keyword_branch: string;
   score_presence: string;
+  /** An album's set (`peter/communion/church`): a view inside the album, never saved into it. */
+  album_set: string;
+  /** An album's photographer (`photographer[robin]`): a view inside the album, never saved into it. */
+  photographer: string;
   person_id: string;
   person_match: 'all' | 'any';
   // Score ranges
@@ -294,7 +298,7 @@ export function seededSearchThreshold(searchThresholdDefault: number | null | un
 
 /** Keys excluded when building smart album filter JSON (display-only, ephemeral, or handled separately). */
 export const SMART_ALBUM_EXCLUDE_KEYS = new Set([
-  'page', 'per_page', 'semanticQuery', 'search_threshold', 'album_id',
+  'page', 'per_page', 'semanticQuery', 'search_threshold', 'album_id', 'album_set', 'photographer',
   'similar_to', 'similarity_mode', 'min_similarity',
   'hide_details', 'tooltip_mode', 'panel_activation', 'tile_fit', 'hide_blinks', 'hide_bursts',
   'hide_duplicates', 'hide_brackets', 'hide_panoramas', 'hide_rejected',
@@ -326,7 +330,7 @@ export function applySavedAlbumFilters(current: GalleryFilters, savedJson: strin
   if (saved.score_presence !== undefined && !parseScorePresence(saved.score_presence)) throw new Error('Invalid measurement policies');
   if (saved.keyword_branch !== undefined && (typeof saved.keyword_branch !== 'string'
     || (saved.keyword_branch !== '' && !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/.test(saved.keyword_branch)))) throw new Error('Invalid keyword branch identity');
-  return { ...current, person_match: 'all', tag_groups: '', score_presence: '', keyword_branch: '', ...saved, ...exclusiveHidePatch(saved), album_id: albumId };
+  return { ...current, person_match: 'all', tag_groups: '', score_presence: '', keyword_branch: '', ...saved, ...exclusiveHidePatch(saved), album_set: '', photographer: '', album_id: albumId };
 }
 
 /** The store's mutual-exclusion rule: "hide rejected" and "favourites only" cannot both hold, so
@@ -394,7 +398,7 @@ export function setScopePatch(
 
 /** Common string-typed filter keys shared across URL sync, API params, and filter counting. */
 export const RANGE_AND_SELECT_KEYS: (keyof GalleryFilters)[] = [
-  'type', 'camera', 'lens', 'tag', 'tag_groups', 'keyword_branch', 'score_presence', 'person_id', 'person_match', 'composition_pattern', 'search',
+  'type', 'camera', 'lens', 'tag', 'album_set', 'photographer', 'tag_groups', 'keyword_branch', 'score_presence', 'person_id', 'person_match', 'composition_pattern', 'search',
   'color_temp', 'hue_bucket', 'quality_tier', 'sequence_override', 'review_status',
   'min_score', 'max_score', 'min_aesthetic', 'max_aesthetic',
   'min_quality_score', 'max_quality_score', 'min_topiq', 'max_topiq',
@@ -436,6 +440,8 @@ export const DEFAULT_FILTERS: GalleryFilters = {
   tag_groups: '',
   keyword_branch: '',
   score_presence: '',
+  album_set: '',
+  photographer: '',
   person_id: '',
   person_match: 'all',
   min_score: '',
@@ -834,6 +840,13 @@ export function buildApiParams(
     if (f.search_threshold && f.search_threshold !== seededSearchThreshold(searchThresholdDefault))
       params['semantic_threshold'] = +f.search_threshold / 100;
   }
+
+  // The album's Set and Photographer pull-downs narrow together: the server's
+  // `album_tags` requires every one (`require_tags` would match any).
+  delete params['album_set'];
+  delete params['photographer'];
+  const albumTags = [f.album_set, f.photographer].filter(Boolean);
+  if (albumTags.length) params['album_tags'] = albumTags.join(',');
 
   // Smart albums apply their filters directly — don't send album_id
   // (server would do an empty album_photos JOIN otherwise).

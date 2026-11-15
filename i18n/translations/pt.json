@@ -3493,6 +3493,15 @@
     "error": "Não foi possível alterar a etiqueta. Verifique-a e tente novamente.",
     "already_present": "Esta etiqueta já está na foto."
   },
+  "album_tags": {
+    "group": "Tags de álbum",
+    "content_group": "Tags",
+    "mark": "Tag de álbum",
+    "label": "Tag de álbum",
+    "set_label": "Parte",
+    "photographer_label": "Fotógrafo",
+    "mark_hint": "Organiza álbuns (evento, parte, fotógrafo). Não aparece com as tags de conteúdo da foto."
+  },
   "photo": {
     "category_override": {
       "menu_tooltip": "Categoria de pontuação",

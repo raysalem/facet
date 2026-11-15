@@ -371,6 +371,7 @@ class GalleryParams(BaseModel):
     min_aggregate: str = ''
     is_silhouette: str = ''
     require_tags: str = ''
+    album_tags: str = ''        # comma list; a photo must carry every one (album pull-downs: set, photographer)
     exclude_tags: str = ''
     exclude_art: str = ''
     top_picks_filter: str = ''

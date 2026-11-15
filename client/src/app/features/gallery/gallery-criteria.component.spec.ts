@@ -16,7 +16,7 @@ function createCriteria(edition = false) {
  const navigation = new Subject<Event>();
  const filtersSignal=signal<GalleryFilters>({...DEFAULT_FILTERS});
  const personsSignal=signal<{id:number;name:string|null}[]>([]);
- const mockStore={filters:filtersSignal, persons:personsSignal, config:signal<any>(null), pinnedPaths:signal<string[]|null>(null), currentAlbum:signal(null), temporaryReviewQueue:signal(null), gpsLocationName:signal(''), updateFilter:vi.fn(),updateFilters:vi.fn(),resetFilters:vi.fn()};
+ const mockStore={filters:filtersSignal, persons:personsSignal, config:signal<any>(null), pinnedPaths:signal<string[]|null>(null), currentAlbum:signal(null), temporaryReviewQueue:signal(null), gpsLocationName:signal(''), albumTags:signal<{value:string;count:number}[]>([]), updateFilter:vi.fn(),updateFilters:vi.fn(),resetFilters:vi.fn()};
  const mockRouter={events:navigation,navigate:vi.fn(),navigateByUrl:vi.fn()};
  const authStatus=signal<object|null>(null);
  const api = { get: vi.fn(() => of([])), post: vi.fn(() => of({})) };
@@ -207,6 +207,23 @@ describe('activeFilterChips', () => {;
       const chip = (app as any).activeFilterChips().find((c: any) => c.id === 'tag');
       expect(chip).toBeDefined();
       expect(chip?.value).toBe('nature');
+    });
+
+    it('labels the tag chip Tag for a content tag and Album tag for an album tag', () => {
+      const { app, filtersSignal, mockStore } = createCriteria();
+      mockStore.albumTags.set([{ value: 'peter/communion/church', count: 48 }]);
+      filtersSignal.set({ ...DEFAULT_FILTERS, tag: 'nature' });
+      expect((app as any).activeFilterChips().find((c: any) => c.id === 'tag')?.labelKey).toBe('gallery.tag');
+      filtersSignal.set({ ...DEFAULT_FILTERS, tag: 'peter/communion/church' });
+      expect((app as any).activeFilterChips().find((c: any) => c.id === 'tag')?.labelKey).toBe('album_tags.label');
+    });
+
+    it('shows a Set chip and a Photographer chip by their short names', () => {
+      const { app, filtersSignal } = createCriteria();
+      filtersSignal.set({ ...DEFAULT_FILTERS, album_set: 'peter/communion/church', photographer: 'photographer[robin]' });
+      const chips = (app as any).activeFilterChips();
+      expect(chips.find((c: any) => c.id === 'album_set')).toMatchObject({ labelKey: 'album_tags.set_label', value: 'church', clearKeys: ['album_set'] });
+      expect(chips.find((c: any) => c.id === 'photographer')).toMatchObject({ labelKey: 'album_tags.photographer_label', value: 'robin', clearKeys: ['photographer'] });
     });
 
     it('produces chip for active search filter', () => {

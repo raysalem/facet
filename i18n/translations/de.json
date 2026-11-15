@@ -3493,6 +3493,15 @@
     "error": "Das Schlagwort konnte nicht geändert werden. Bitte prüfen und erneut versuchen.",
     "already_present": "Dieser Tag ist bereits am Foto vorhanden."
   },
+  "album_tags": {
+    "group": "Album-Tags",
+    "content_group": "Schlagwörter",
+    "mark": "Album-Tag",
+    "label": "Album-Tag",
+    "set_label": "Teil",
+    "photographer_label": "Fotograf",
+    "mark_hint": "Ordnet Alben (Ereignis, Teil, Fotograf). Wird nicht bei den Inhalts-Tags des Fotos angezeigt."
+  },
   "photo": {
     "category_override": {
       "menu_tooltip": "Bewertungskategorie",

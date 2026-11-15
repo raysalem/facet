@@ -114,6 +114,29 @@ describe('countActiveFilters', () => {
   });
 });
 
+describe('album Set and Photographer pull-downs', () => {
+  it('send both as one album_tags list, never as their own keys', () => {
+    const p = buildApiParams(filters({ album_set: 'peter/communion/church', photographer: 'photographer[robin]' }), false, undefined);
+    expect(p['album_tags']).toBe('peter/communion/church,photographer[robin]');
+    expect(p).not.toHaveProperty('album_set');
+    expect(p).not.toHaveProperty('photographer');
+    expect(buildApiParams(filters({ photographer: 'photographer[ray]' }), false, undefined)['album_tags']).toBe('photographer[ray]');
+    expect(buildApiParams(filters(), false, undefined)).not.toHaveProperty('album_tags');
+  });
+  it('are never saved into an album, and opening an album clears them', () => {
+    const json = JSON.parse(smartAlbumFilterJson(filters({ album_set: 'peter/communion/church', photographer: 'photographer[robin]', camera: 'Canon' })));
+    expect(json).toMatchObject({ camera: 'Canon' });
+    expect(json).not.toHaveProperty('album_set');
+    expect(json).not.toHaveProperty('photographer');
+    const opened = applySavedAlbumFilters(filters({ album_set: 'a/b', photographer: 'photographer[x]' }), '{}', '7');
+    expect([opened.album_set, opened.photographer, opened.album_id]).toEqual(['', '', '7']);
+  });
+  it('ride in the URL', () => {
+    const f = applyQueryParams(DEFAULT_FILTERS, { album_set: 'peter/communion/lunch', photographer: 'photographer[robin]' });
+    expect([f.album_set, f.photographer]).toEqual(['peter/communion/lunch', 'photographer[robin]']);
+  });
+});
+
 describe('buildApiParams', () => {
   it('always includes pagination + sort', () => {
     expect(buildApiParams(DEFAULT_FILTERS, false, undefined)).toMatchObject({

@@ -196,8 +196,9 @@ def _schema_caches_warm(now: float) -> bool:
                 or now - _config_mod._photo_tags_checked_at >= PHOTO_TAGS_CACHE_TTL / 2):
             return False
     # Refreshed at half its lifetime, like photo_tags above.
-    if _side_table_cached((str(DEFAULT_DB_PATH), 'photo_manual_tags'), now, PHOTO_TAGS_CACHE_TTL / 2) is None:
-        return False
+    for table in ('photo_manual_tags', 'album_tags'):
+        if _side_table_cached((str(DEFAULT_DB_PATH), table), now, PHOTO_TAGS_CACHE_TTL / 2) is None:
+            return False
     from api.change_token import change_token_sentinel_open
     return change_token_sentinel_open(DEFAULT_DB_PATH)
 
@@ -209,11 +210,13 @@ def _warm_schema_caches() -> None:
         if time.monotonic() - _config_mod._photo_tags_checked_at >= PHOTO_TAGS_CACHE_TTL / 2:
             # Expire it so the call below re-probes instead of answering from cache.
             _config_mod._photo_tags_checked_at = 0.0
-    key = (str(DEFAULT_DB_PATH), 'photo_manual_tags')
-    if _side_table_cached(key, time.monotonic(), PHOTO_TAGS_CACHE_TTL / 2) is None:
-        _side_table_present.pop(key, None)
+    for table in ('photo_manual_tags', 'album_tags'):
+        key = (str(DEFAULT_DB_PATH), table)
+        if _side_table_cached(key, time.monotonic(), PHOTO_TAGS_CACHE_TTL / 2) is None:
+            _side_table_present.pop(key, None)
     is_photo_tags_available()
     is_manual_tags_available()
+    is_album_tags_available()
     db_change_token(DEFAULT_DB_PATH)
 
 
@@ -657,6 +660,20 @@ MANUAL_TAGS_SELECT = (
     "(SELECT GROUP_CONCAT(tag, char(31)) FROM photo_manual_tags "
     f"WHERE photo_path = photos.path) AS {MANUAL_TAGS_RAW_COLUMN}"
 )
+# With the album-tag registry present, the photo's tags split in two: content
+# tags (``manual_tags``, shown with the AI tags) and album tags (``album_tags``,
+# organisation: event, part, photographer), which the photo page leaves out.
+ALBUM_TAGS_RAW_COLUMN = 'album_tags_raw'
+MANUAL_TAGS_CONTENT_SELECT = (
+    "(SELECT GROUP_CONCAT(tag, char(31)) FROM photo_manual_tags "
+    "WHERE photo_path = photos.path AND tag NOT IN (SELECT tag FROM album_tags)) "
+    f"AS {MANUAL_TAGS_RAW_COLUMN}"
+)
+ALBUM_TAGS_SELECT = (
+    "(SELECT GROUP_CONCAT(tag, char(31)) FROM photo_manual_tags "
+    "WHERE photo_path = photos.path AND tag IN (SELECT tag FROM album_tags)) "
+    f"AS {ALBUM_TAGS_RAW_COLUMN}"
+)
 
 # Whether that correction is still waiting on a detection run. Separate from the
 # value above because the two answer different questions: the correction stays
@@ -818,6 +835,11 @@ def _side_table_available(name: str, conn=None) -> bool:
 def is_manual_tags_available(conn=None):
     """True when the ``photo_manual_tags`` table exists."""
     return _side_table_available('photo_manual_tags', conn)
+
+
+def is_album_tags_available(conn=None):
+    """True when the ``album_tags`` registry table exists."""
+    return _side_table_available('album_tags', conn)
 
 
 def is_photo_objects_available(conn=None):
@@ -1187,7 +1209,11 @@ def build_photo_select_columns(conn, user_id=None, include_manual_tags=True, *, 
     select_cols.append(SEQUENCE_OVERRIDE_SELECT)
     select_cols.append(SEQUENCE_OVERRIDE_PENDING_SELECT)
     if include_manual_tags and is_manual_tags_available(conn):
-        select_cols.append(MANUAL_TAGS_SELECT)
+        if is_album_tags_available(conn):
+            select_cols.append(MANUAL_TAGS_CONTENT_SELECT)
+            select_cols.append(ALBUM_TAGS_SELECT)
+        else:
+            select_cols.append(MANUAL_TAGS_SELECT)
     return select_cols
 
 
@@ -1320,21 +1346,26 @@ def reassign_faces_to_person(conn, person_id, face_ids):
 
 
 def split_photo_tags(rows, tags_limit, include_manual_tags=True):
-    """Convert DB rows to dicts with pre-split ``tags_list`` and ``manual_tags``.
+    """Convert DB rows to dicts with pre-split ``tags_list``, ``manual_tags`` and ``album_tags``.
 
     ``tags_list`` is the AI tags truncated to ``tags_limit``. ``manual_tags`` is
-    the photo's user-authored tags, sorted and NEVER truncated, and is always
-    set (``[]`` when there are none, the table is absent, or
-    ``include_manual_tags`` is False): ``response_model_exclude_unset`` would
-    otherwise drop the field from the wire. The raw GROUP_CONCAT alias is
-    removed even when it is ignored, so it can never leak into a payload.
+    the photo's user-authored content tags and ``album_tags`` its album
+    (organisation) tags, each sorted and NEVER truncated, and always set (``[]``
+    when there are none, the table is absent, or ``include_manual_tags`` is
+    False): ``response_model_exclude_unset`` would otherwise drop the field from
+    the wire. The raw GROUP_CONCAT aliases are removed even when ignored, so they
+    can never leak into a payload.
     """
     photos = []
     for row in rows:
         photo = dict(row)
         raw_manual = photo.pop(MANUAL_TAGS_RAW_COLUMN, None)
+        raw_album = photo.pop(ALBUM_TAGS_RAW_COLUMN, None)
         photo['manual_tags'] = (
             sorted(raw_manual.split(TAG_SEPARATOR)) if include_manual_tags and raw_manual else []
+        )
+        photo['album_tags'] = (
+            sorted(raw_album.split(TAG_SEPARATOR)) if include_manual_tags and raw_album else []
         )
         if photo.get('tags'):
             photo['tags_list'] = [t.strip() for t in photo['tags'].split(',')[:tags_limit]]

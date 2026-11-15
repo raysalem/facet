@@ -2,6 +2,7 @@ import { I18N } from '../../core/i18n/keys';
 import { CaptureDatePipe } from '../../shared/pipes/capture-date.pipe';
 import { isUnavailableKey, unavailableSet } from '../../shared/utils/unavailable-metrics';
 import { folderDisplayName } from '../folders/folders.util';
+import { albumTagLabel } from './album-tag-groups.util';
 import type { GalleryStore } from './gallery.store';
 import { parseScorePresence } from './score-presence.util';
 import { parseTagQuery, TAG_QUERY_GROUPS } from './tag-query.util';
@@ -91,7 +92,12 @@ export function galleryFilterChips(store: GalleryStore, t: (key: string) => stri
   }
 
   // Simple string/select filters
-  if (f.tag) chips.push({ id: 'tag', labelKey: 'gallery.tag', value: f.tag, clearKeys: ['tag'] });
+  if (f.tag) {
+    const isAlbumTag = store.albumTags().some(t => t.value === f.tag);
+    chips.push({ id: 'tag', labelKey: isAlbumTag ? 'album_tags.label' : 'gallery.tag', value: f.tag, clearKeys: ['tag'] });
+  }
+  if (f.album_set) chips.push({ id: 'album_set', labelKey: 'album_tags.set_label', value: albumTagLabel(f.album_set), clearKeys: ['album_set'] });
+  if (f.photographer) chips.push({ id: 'photographer', labelKey: 'album_tags.photographer_label', value: albumTagLabel(f.photographer), clearKeys: ['photographer'] });
   if (f.keyword_branch) chips.push({ id: 'keyword_branch', labelKey: I18N.keyword_hierarchy.title,
     value: f.keyword_branch, clearKeys: ['keyword_branch'] });
   if (f.tag_groups) {

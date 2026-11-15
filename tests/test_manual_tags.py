@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from api import create_app
 from api.auth import CurrentUser, get_optional_user
 from api.db_helpers import (
-    MANUAL_TAGS_SELECT, _add_tag_filter, build_photo_select_columns, split_photo_tags,
+    MANUAL_TAGS_CONTENT_SELECT, MANUAL_TAGS_SELECT, _add_tag_filter, build_photo_select_columns, split_photo_tags,
 )
 from db import DEFAULT_DB_PATH, init_database
 from db.manual_tags import (
@@ -395,8 +395,9 @@ class TestDbHelpers:
             "/h/ai-only.jpg", "/h/manual-only.jpg"]
 
     def test_select_and_split(self, conn):
-        assert MANUAL_TAGS_SELECT in build_photo_select_columns(conn)
-        assert MANUAL_TAGS_SELECT not in build_photo_select_columns(conn, include_manual_tags=False)
+        # init_database also creates the album-tag registry, so the content-only form is used.
+        assert MANUAL_TAGS_CONTENT_SELECT in build_photo_select_columns(conn)
+        assert MANUAL_TAGS_CONTENT_SELECT not in build_photo_select_columns(conn, include_manual_tags=False)
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             f"SELECT path, tags, {MANUAL_TAGS_SELECT} FROM photos WHERE path = '/h/manual-only.jpg'"

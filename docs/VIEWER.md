@@ -516,6 +516,16 @@ Manual tags are tags you type yourself, kept next to the AI tags. They are store
 - **Imported tags.** `--import-sidecars` stores unknown sidecar keywords (not AI tags, not person names) as manual tags with source `xmp`.
 - **Tied to the file path.** Moving or renaming a file loses its manual tags.
 
+#### Album tags
+
+A manual tag can describe **what the photo shows** (`cake`, `first dance`) or **how your photos are organised**: the event, a part of it, who shot it (`peter/communion/church`, `photographer[robin]`). Mark the second kind as an **album tag** and Facet shows it where it is used, not beside the photo's content.
+
+- **Marking.** Tick **Album tag** in the **Edit tags** dialog when adding. The mark belongs to the tag, library-wide: every photo carrying it is affected. The photo rows are unchanged, so the tag filter, search, sidecars and exports treat it like any manual tag.
+- **Photo page.** Album tags are left out of the photo's **Tags**, which then hold only what describes the photo (the AI's tags and the ones you typed); they show last, in their own muted, folded **Album tags** chip.
+- **Set and Photographer.** In an album, the filter sidebar's **Content** section gets two pull-downs built from the album's tags: **Set** (each leaf tag, labelled with its last `/` segment, e.g. *church (69) · lunch (376) · party (505)*) and **Photographer** (`photographer[<name>]`, labelled with the name). Each starts on **All**. A tag that is the `/` parent of another (the event itself) and a photographer's sub-tag (`photographer[ray]/dslr`) are not offered; a pull-down with only one option is not shown. The two combine (*church* and *robin* shows robin's church photos) and appear as **Set** and **Photographer** filter chips. Neither is saved into the album, and reopening the album starts on **All**. Counts follow the view's other filters and hide toggles, not the other pull-down.
+- **Tag picker.** The gallery's tag dropdown lists album tags in their own **Album tags** group, all of them, above a **Tags** group with the rest, instead of competing with AI tags for the top slots. When the chosen tag is an album tag, the field and its filter chip read **Album tag**.
+- **Naming.** `/` separates levels (`person/event/part`); Facet does not interpret it beyond the pull-down labels and the parent rule above.
+
 ## Panoramas and exposure brackets
 
 A panorama's frames are meant to be stitched and a bracket's to be merged; they are not competing takes. Burst detection alone would group them and hide all but one, so Facet detects these sets separately.

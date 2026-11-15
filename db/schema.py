@@ -615,6 +615,18 @@ PHOTO_MANUAL_TAGS_INDEXES = [
     ('idx_photo_manual_tags_tag', 'photo_manual_tags', 'tag'),
 ]
 
+# Album tags: manual tags the user marked as organisation (event, part of an
+# event, photographer) rather than content. One row per tag, library-wide: the
+# kind belongs to the tag, not to one photo's copy of it. The photo rows stay in
+# photo_manual_tags, so filtering, export and sidecars are unchanged; readers
+# only use this registry to show the tag in the right place (album set chips and
+# the tag picker's album group, never the photo page's content tags).
+ALBUM_TAGS_COLUMNS = [
+    ('tag', 'TEXT PRIMARY KEY'),
+    ('created_by', 'TEXT'),
+    ('created_at', "TEXT DEFAULT (datetime('now'))"),
+]
+
 # User-marked objects: a labelled box on a photo (e.g. "cake"), for search and for
 # assistants to know which region is meant. Never a face: nothing in face detection,
 # clustering or persons reads this table. Box corners are normalised to the upright
@@ -1268,6 +1280,7 @@ _MIGRATED_TABLES = [
     ('person_centroid_dirty', PERSON_CENTROID_DIRTY_COLUMNS),
     ('photo_tags', PHOTO_TAGS_COLUMNS),
     ('photo_manual_tags', PHOTO_MANUAL_TAGS_COLUMNS),
+    ('album_tags', ALBUM_TAGS_COLUMNS),
     ('photo_objects', PHOTO_OBJECTS_COLUMNS),
     ('photo_annotations', PHOTO_ANNOTATIONS_COLUMNS),
     ('photo_ai_edits', PHOTO_AI_EDITS_COLUMNS),
@@ -1535,6 +1548,8 @@ def init_database(db_path='photo_scores_pro.db', build_photo_indexes=True):
         ))
         from db.keyword_hierarchy import create_keyword_hierarchy_schema
         create_keyword_hierarchy_schema(conn)
+        # Create album_tags (which manual tags are organisation, not content)
+        conn.execute(_build_create_table_sql('album_tags', ALBUM_TAGS_COLUMNS))
 
         # Create photo_objects (user-marked labelled boxes; side table, survives rescans)
         conn.execute(_build_create_table_sql('photo_objects', PHOTO_OBJECTS_COLUMNS))

@@ -471,11 +471,14 @@ export class GallerySelectionActions {
       const repair = async (result: ManualTagsDialogResult): Promise<void> => {
         if (this.auth.identity() !== owner || repaired.has(result) || !result.confirmedCount && !result.uncertain) return;
         repaired.add(result);
+        // A written tag can change the tag dropdown and the album's Set / By chips.
+        this.store.tagsRevision.update(n => n + 1);
+        void this.store.loadFilterOptions();
         // Tag/text membership may gain offscreen rows. The store retains parked
         // repair debt and respects the currently authorized view without selection reset.
         const filters = this.store.filters();
         const membershipMayChange = this.store.pinnedPaths() === null
-          && (viewScoped || !!filters.tag || !!filters.tag_groups || !!filters.search || !!this.store.currentAlbum()?.is_smart);
+          && (viewScoped || !!filters.tag || !!filters.album_set || !!filters.photographer || !!filters.tag_groups || !!filters.search || !!this.store.currentAlbum()?.is_smart);
         await this.store.refreshPaths(membershipMayChange ? null : paths);
       };
       const data: ManualTagsDialogData = {

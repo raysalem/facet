@@ -32,7 +32,7 @@ from api.db_helpers import (
     CAPTURE_DATE_MISSING_SQL,
     get_existing_columns, get_cached_count_async,
     get_cached_hidden_aggregates_async, snapshot_count_token, _add_tag_filter, _add_tag_groups,
-    get_art_tags_from_config, build_hide_clauses,
+    get_art_tags_from_config, build_hide_clauses, _manual_tag_match_key,
     hide_toggle_params,
     split_photo_tags, attach_person_data_async, sanitize_float_values,
     get_visibility_clause, get_photos_from_clause, get_preference_columns,
@@ -178,6 +178,27 @@ def _fts5_query_from(term: str) -> Optional[str]:
     return ' '.join(f'"{token}"*' for token in tokens) if tokens else None
 
 
+def _add_album_tags_filter(where_clauses, sql_params, album_tags: str, conn, include_manual=True):
+    """Narrow to photos that carry EVERY listed album tag (the album's Set and Photographer pull-downs).
+
+    ``require_tags`` matches any one of its tags, so it cannot combine a set with a
+    photographer. Album tags are manual tags, so only ``photo_manual_tags`` is read.
+    A share-link request (``include_manual=False``) must not probe private manual
+    tags, so there the filter matches nothing rather than being ignored.
+    """
+    from api.db_helpers import is_manual_tags_available
+    tags = [t.strip() for t in album_tags.split(',') if t.strip()]
+    if not tags:
+        return
+    if not include_manual or not is_manual_tags_available(conn):
+        where_clauses.append("0")
+        return
+    for tag in tags:
+        where_clauses.append(
+            "EXISTS (SELECT 1 FROM photo_manual_tags m WHERE m.photo_path = photos.path AND m.tag = ?)")
+        sql_params.append(_manual_tag_match_key(tag))
+
+
 def _apply_search_filter(where_clauses, sql_params, term: str, conn, include_manual=True):
     """Apply the gallery free-text search filter.
 
@@ -305,6 +326,9 @@ def _apply_text_filters(where_clauses, sql_params, params, conn, include_manual=
 
     if params.get('search'):
         _apply_search_filter(where_clauses, sql_params, params['search'], conn, include_manual=include_manual)
+
+    if params.get('album_tags'):
+        _add_album_tags_filter(where_clauses, sql_params, params['album_tags'], conn, include_manual)
 
     _add_tag_filter(
         where_clauses, sql_params,

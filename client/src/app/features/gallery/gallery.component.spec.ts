@@ -95,7 +95,7 @@ describe('GalleryComponent', () => {
 
    
   let mockStore: any;
-  let mockApi: { thumbnailUrl: Mock; post: Mock; downloadUrl: Mock; getRaw: Mock };
+  let mockApi: { thumbnailUrl: Mock; post: Mock; downloadUrl: Mock; getRaw: Mock; get: Mock };
   let mockAuth: Record<string, unknown>;
   // `translations` and `lang` are only read once the real template renders:
   // the translate pipe subscribes to the bundle even when `t` is stubbed.
@@ -165,6 +165,8 @@ describe('GalleryComponent', () => {
       cameras: signal([]),
       lenses: signal([]),
       tags: signal([]),
+      albumTags: signal([]),
+      tagsRevision: signal(0),
       persons: signal([]),
       config: signal(null),
       activeFilterCount: signal(0),
@@ -261,6 +263,7 @@ describe('GalleryComponent', () => {
       post: vi.fn(() => of({ success: true, overridden: 0, skipped: 0, kind: null })),
       downloadUrl: vi.fn((path: string) => `/download?path=${path}`),
       getRaw: vi.fn(() => of(new Blob(['x']))),
+      get: vi.fn(() => of({ tags: [] })),
     };
 
     const authStatus = signal<{ user_id: string }>({ user_id: "editor" });

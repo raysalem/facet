@@ -36,7 +36,7 @@ describe('rendered review progress with real store and HTTP', () => {
   const banner = () => fixture.nativeElement.querySelector('section[aria-label="gallery.review_progress.title {}"]') as HTMLElement | null;
   const progressRequests = () => http.match(request => request.url === '/api/photos/review_progress');
   const flushSideData = () => {
-    for (const request of http.match(request => request.url.startsWith('/api/filter_options/') || request.url === '/api/type_counts')) {
+    for (const request of http.match(request => request.url.startsWith('/api/filter_options/') || request.url === '/api/type_counts' || request.url.startsWith('/api/album_tags'))) {
       request.flush({ types: [], cameras: [], lenses: [], tags: [], persons: [], patterns: [], temps: [], hue_buckets: [], ranges: {} });
     }
     for (const request of http.match('/api/photos/keeper_hints')) request.flush({});

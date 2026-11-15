@@ -1,5 +1,6 @@
 [
   "album_id",
+  "album_tags",
   "blinks_only",
   "burst_group_id",
   "burst_only",

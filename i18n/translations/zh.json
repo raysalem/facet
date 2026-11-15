@@ -3493,6 +3493,15 @@
     "error": "无法更新标签，请检查后重试。",
     "already_present": "照片已有此标签。"
   },
+  "album_tags": {
+    "group": "相册标签",
+    "content_group": "标签",
+    "mark": "相册标签",
+    "label": "相册标签",
+    "set_label": "部分",
+    "photographer_label": "摄影师",
+    "mark_hint": "用于整理相册（活动、环节、摄影师）。不与照片的内容标签一起显示。"
+  },
   "photo": {
     "category_override": {
       "menu_tooltip": "评分类别",
