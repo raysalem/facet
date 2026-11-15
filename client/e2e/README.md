@@ -54,3 +54,4 @@ FACET_E2E_PYTHON=../venv/bin/python npm run e2e
 | `02-hide-bursts` | Hide bursts folds each burst behind its lead; Show all brings every frame back |
 | `03-reused-name-new-picture` | An edit imported under a deleted edit's name shows the new picture, not the cached thumbnail (fails without `apply_ai_edit_captions`' fresh `preview_revision`) |
 | `04-delete-burst-lead` | Deleting the AI edit that leads its burst keeps the burst in the gallery (fails without `_reassign_dead_burst_leads`) |
+| `07-layout-geometry` | On an 80-photo album with the rail's Showing panel open (1280 and 1600 px wide, 720 high), exactly two elements scroll: the grid's own scroller and the panel's list, never `<main>` or the page (B44); the floating hover card of a 20-tag photo is at most 640 px wide and its tags row is one line ending in `+N` (B38/B43). Measured geometry, not classes (fails with the panels' `relative overflow-hidden` or the hover tag cap removed) |
