@@ -971,9 +971,11 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
       <app-panel-rail data-gallery-rail [rail]="rail" [tabs]="railTabs()" [wide]="true" [label]="I18N.gallery.rail.label | translate" idPrefix="gallery" />
       <!-- Showing: what the grid holds (the collection and the filters that define it), and where to change it.
            The statement first, then the active filters, the filter controls, the album's rules last. A photo held
-           in the grid does not change it: the grid is the content, the photo's own facts are its tabs. -->
+           in the grid does not change it: the grid is the content, the photo's own facts are its tabs.
+           Both panels are relative + overflow-hidden: an sr-only label is absolutely placed, and without a positioned
+           ancestor it escapes the inner scroller and stretches the shell's <main> into a scrollbar of its own. -->
       <aside id="gallery-panel-filter" data-gallery-panel="filter" role="tabpanel" aria-labelledby="gallery-rail-filter" [hidden]="!filterPanelOpen()" (keydown)="closePanels($event)"
-        class="flex w-80 shrink-0 flex-col border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] text-sm">
+        class="relative flex w-80 shrink-0 flex-col overflow-hidden border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] text-sm">
         <div data-panel-header class="flex shrink-0 items-center gap-2 px-4 pt-2">
           <div class="min-w-0 flex-1 py-1">
             <h2 class="m-0 truncate text-sm font-medium">{{ I18N.gallery.rail.showing | translate }}</h2>
@@ -998,7 +1000,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
            Only with "Show details: Side panel" on a window wide enough for it. -->
       @if (detailsRailVisible()) {
         <aside data-details-rail data-gallery-panel="photo" tabindex="-1" (keydown.escape)="onRailEscape($event)" (keydown)="closePanels($event)" (focusout)="onGridFocusOut($event)"
-          class="flex w-80 shrink-0 flex-col border-l border-[var(--mat-sys-outline-variant)] bg-[var(--facet-rail-bg)]">
+          class="relative flex w-80 shrink-0 flex-col overflow-hidden border-l border-[var(--mat-sys-outline-variant)] bg-[var(--facet-rail-bg)]">
           <div data-panel-header class="flex shrink-0 items-center gap-2 border-b border-[var(--mat-sys-outline-variant)] px-4 py-2">
             <div class="min-w-0 flex-1">
               <h2 class="m-0 truncate text-sm font-medium text-[var(--mat-sys-on-surface)]">{{ photoPanelLabel() | translate }}</h2>

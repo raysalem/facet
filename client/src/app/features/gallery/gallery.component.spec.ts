@@ -464,6 +464,19 @@ describe('GalleryComponent', () => {
       fixture.destroy();
     });
 
+    it('from lg the Showing panel clips what it holds, so only the grid and the scroller inside the panel can scroll', () => {
+      const { fixture, root } = render(true);
+      const panel = root.querySelector<HTMLElement>('[data-gallery-panel="filter"]')!;
+      // An sr-only label is position: absolute; with no positioned ancestor it took the shell's <main> as containing
+      // block, escaped the panel's scroller and stretched <main> into a third scrollbar (919 px in a 583 px window).
+      expect(panel.classList).toContain('relative');
+      expect(panel.classList).toContain('overflow-hidden');
+      // The panel itself never scrolls: its criteria and its filter controls own their scrollers.
+      expect(panel.classList).not.toContain('overflow-y-auto');
+      expect(panel.querySelector('app-gallery-criteria')!.classList).toContain('overflow-y-auto');
+      fixture.destroy();
+    });
+
     it('from lg the Filters button (the drawer flag) opens and closes the Filter panel, and the drawer stays shut', () => {
       const { fixture, root } = render(true);
       const drawer = fixture.debugElement.query(By.directive(MatSidenav)).componentInstance as MatSidenav;
@@ -1813,6 +1826,11 @@ describe('GalleryComponent', () => {
       const floating = floatingTooltips();
       expect(floating.length).toBe(0); // no floating bubble beside the rail
       expect(fixture!.nativeElement.querySelector('[data-details-rail] app-photo-tooltip')).toBeTruthy(); // rail holds the photo
+      // Contains its absolutely placed content (sr-only labels), which would otherwise take the shell's <main> as
+      // containing block, escape the tab's scroller and give <main> a scrollbar of its own beside the grid's.
+      const detailsRail = fixture!.nativeElement.querySelector('[data-details-rail]') as HTMLElement;
+      expect(detailsRail.classList).toContain('relative');
+      expect(detailsRail.classList).toContain('overflow-hidden');
     });
   });
 
