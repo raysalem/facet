@@ -3,6 +3,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { SwUpdate } from '@angular/service-worker';
 import { Subject } from 'rxjs';
+import { signal } from '@angular/core';
+import { AddonPanelService } from '../addons/addon-panel.service';
 import { I18N } from '../i18n/keys';
 import {
   AppUpdateService, IDLE_RECHECK_INTERVAL_MS, PAGE_RELOAD, UNRECOVERABLE_RELOAD_WINDOW_MS, UPDATE_CHECK_INTERVAL_MS,
@@ -24,6 +26,7 @@ describe('AppUpdateService', () => {
   let onAction: Subject<void>;
   let dismiss: ReturnType<typeof vi.fn>;
   let dialogs: unknown[];
+  let addonPanel: ReturnType<typeof signal<unknown>>;
 
   function setup(isEnabled = true) {
     versionUpdates = new Subject();
@@ -38,12 +41,14 @@ describe('AppUpdateService', () => {
     dismiss = vi.fn();
     open = vi.fn(() => ({ onAction: () => onAction, dismiss }));
     dialogs = [];
+    addonPanel = signal<unknown>(null);
     TestBed.configureTestingModule({
       providers: [
         { provide: SwUpdate, useValue: sw },
         { provide: PAGE_RELOAD, useValue: reload },
         { provide: MatSnackBar, useValue: { open } },
         { provide: MatDialog, useValue: { get openDialogs() { return dialogs; } } },
+        { provide: AddonPanelService, useValue: { panel: addonPanel } },
         { provide: I18nService, useValue: { t: (k: string) => k } },
       ],
     });
@@ -138,6 +143,30 @@ describe('AppUpdateService', () => {
       expect(reload).not.toHaveBeenCalled();
       input.blur();
       await vi.advanceTimersByTimeAsync(IDLE_RECHECK_INTERVAL_MS);
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('defers while an add-on panel is open, shows the banner, then reloads after it is closed', async () => {
+      setup();
+      addonPanel.set({ addon: { id: 'astro', name: 'Astro', icon: 'x' }, nonce: 'n', src: '/s', scope: {} });
+      versionUpdates.next(ready('hash-addon'));
+      await flush();
+      expect(reload).not.toHaveBeenCalled();
+      expect(open).toHaveBeenCalledWith(I18N.pwa.update_when_idle, I18N.pwa.reload, { duration: 0 });
+      await vi.advanceTimersByTimeAsync(IDLE_RECHECK_INTERVAL_MS * 3);
+      expect(reload).not.toHaveBeenCalled();
+      addonPanel.set(null);
+      await vi.advanceTimersByTimeAsync(IDLE_RECHECK_INTERVAL_MS);
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('the banner Reload works at once even with an add-on panel open', async () => {
+      setup();
+      addonPanel.set({ addon: { id: 'astro', name: 'Astro', icon: 'x' }, nonce: 'n', src: '/s', scope: {} });
+      versionUpdates.next(ready('hash-addon2'));
+      await flush();
+      onAction.next();
+      await flush();
       expect(reload).toHaveBeenCalledTimes(1);
     });
 

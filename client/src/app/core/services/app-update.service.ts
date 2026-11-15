@@ -4,6 +4,7 @@ import { MatSnackBar, MatSnackBarRef, TextOnlySnackBar } from '@angular/material
 import { NavigationStart, Router } from '@angular/router';
 import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
 import { filter } from 'rxjs';
+import { AddonPanelService } from '../addons/addon-panel.service';
 import { I18N } from '../i18n/keys';
 import { I18nService } from './i18n.service';
 
@@ -46,6 +47,7 @@ export class AppUpdateService {
   private readonly dialog = inject(MatDialog);
   private readonly i18n = inject(I18nService);
   private readonly reloadPage = inject(PAGE_RELOAD);
+  private readonly addonPanel = inject(AddonPanelService);
   private readonly router = inject(Router, { optional: true });
   private readonly destroyRef = inject(DestroyRef);
 
@@ -107,9 +109,11 @@ export class AppUpdateService {
 
   /**
    * Whether reloading now could discard something the user is doing: a dialog or an overlay
-   * with a backdrop (open menu, select panel) is up, an editable field has focus, a field
+   * with a backdrop (open menu, select panel) is up, an add-on panel is open, an editable field has focus, a field
    * holds text typed since the last submit or navigation (even unfocused), or the page is
    * fullscreen or playing a slideshow.
+   *
+   * The idle recheck notices the panel closing within IDLE_RECHECK_INTERVAL_MS and reloads then.
    *
    * Not covered, on purpose: scans and exports run as server jobs that a reload does not
    * stop, and the client has no upload flow, so there is no in-page work to lose there.
@@ -118,6 +122,8 @@ export class AppUpdateService {
     if (this.dialog.openDialogs?.length) return true;
     if (document.querySelector('.cdk-overlay-container .cdk-overlay-backdrop')) return true;
     if (document.fullscreenElement || document.querySelector('app-slideshow')) return true;
+    // An add-on session (a finished plate solve not yet saved) lives in a sandboxed iframe a reload destroys.
+    if (this.addonPanel.panel()) return true;
     if (this.hasUnsavedText()) return true;
     const el = document.activeElement as HTMLElement | null;
     if (!el || el === document.body) return false;
