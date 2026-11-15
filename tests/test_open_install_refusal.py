@@ -95,6 +95,8 @@ EXPECTED_EDITION_ROUTES = frozenset({
     ('DELETE', '/api/stacks/suggestions/dismissals/{key}'),
     ('GET', '/api/organization_history'),
     ('POST', '/api/organization_history/{entry_id}/revert'),
+    ('DELETE', '/api/album_tags'),
+    ('PUT', '/api/album_tags'),
     ('DELETE', '/api/albums/{album_id}'),
     ('DELETE', '/api/albums/{album_id}/photos'),
     ('DELETE', '/api/albums/{album_id}/scoring_context'),
