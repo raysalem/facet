@@ -44,7 +44,13 @@ PHOTOS = {
              ('IMG_0201.jpg', '#5f3dc4', 3.0, 0, None),
              ('IMG_0200_agy_1.jpg', '#f08c00', 7.0, 1, 'IMG_0200.jpg')],
 }
-DATE = {'burst': '2026:01:10 10:00:', 'reuse': '2026:01:11 10:00:', 'lead': '2026:01:12 10:00:'}
+DATE = {'burst': '2026:01:10 10:00:', 'reuse': '2026:01:11 10:00:', 'lead': '2026:01:12 10:00:',
+        'album_a': '2026:01:13 10:00:', 'album_b': '2026:01:14 10:00:'}
+# folder -> (album name, colour, file prefix). Read-only: two manual albums with disjoint photos,
+# each photo its own one-frame burst so Hide bursts folds nothing. (album-switch flow)
+ALBUMS = {'album_a': ('E2E Album A', '#c92a2a', 'ALB_A'),
+          'album_b': ('E2E Album B', '#1864ab', 'ALB_B')}
+ALBUM_SIZE = 6
 
 
 def _jpeg(colour, size):
@@ -89,6 +95,17 @@ def _seed_folder(conn, folder):
                      (os.path.join(LIBRARY, folder, name), os.path.join(LIBRARY, folder, source), revision))
 
 
+def _seed_album(conn, folder):
+    name, colour, prefix = ALBUMS[folder]
+    os.makedirs(os.path.join(LIBRARY, folder))
+    album_id = conn.execute('INSERT INTO albums (user_id, name) VALUES (NULL, ?)', (name,)).lastrowid
+    base = 100 * (list(ALBUMS).index(folder) + 1)
+    for i in range(ALBUM_SIZE):
+        path = _insert_photo(conn, folder, f'{prefix}_{i + 1:02d}.jpg', colour, 5.0, 1, base + i, i)
+        conn.execute('INSERT INTO album_photos (album_id, photo_path, position) VALUES (?, ?, ?)',
+                     (album_id, path, i))
+
+
 def seed(edition_password):
     from db.schema import init_database
     shutil.rmtree(WORK, ignore_errors=True)
@@ -100,6 +117,8 @@ def seed(edition_password):
     conn = sqlite3.connect(DB_PATH)
     for folder in PHOTOS:
         _seed_folder(conn, folder)
+    for folder in ALBUMS:
+        _seed_album(conn, folder)
     conn.commit()
     conn.close()
 

@@ -54,3 +54,4 @@ FACET_E2E_PYTHON=../venv/bin/python npm run e2e
 | `02-hide-bursts` | Hide bursts folds each burst behind its lead; Show all brings every frame back |
 | `03-reused-name-new-picture` | An edit imported under a deleted edit's name shows the new picture, not the cached thumbnail (fails without `apply_ai_edit_captions`' fresh `preview_revision`) |
 | `04-delete-burst-lead` | Deleting the AI edit that leads its burst keeps the burst in the gallery (fails without `_reassign_dead_burst_leads`) |
+| `05-album-switch` | Opening an album on a slow network (its config and album reads held 1.5 s each) never shows a card of the view shown before it, the plain gallery or another album (fails without the clear at the start of `GalleryComponent`'s fresh visit) |
