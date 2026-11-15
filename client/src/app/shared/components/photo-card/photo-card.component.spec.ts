@@ -1298,6 +1298,11 @@ describe('PhotoCardComponent filter links', () => {
     expect([...el.querySelectorAll('[data-tag-chip]')].map(chip => chip.textContent?.trim())).toEqual(['trip', '夜景']);
   });
 
+  it('lists Tags only: an add-on\'s object tags and album tags are not the photo\'s description', () => {
+    const el = create({ photo: makePhoto({ tags_list: ['sky'], manual_tags: ['m42', 'trip'], manual_tag_sources: { m42: 'astro-id' }, album_tags: ['peter/communion'] }) });
+    expect([...el.querySelectorAll('[data-tag-chip]')].map(chip => chip.textContent?.trim())).toEqual(['sky', 'trip']);
+  });
+
   it('closes an open Find similar menu when closeOverlays is called', () => {
     TestBed.configureTestingModule({
       imports: [PhotoCardComponent],

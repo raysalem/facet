@@ -4,6 +4,7 @@ import { CategoryLabelPipe } from '../../pipes/category-label.pipe';
 import { FixedPipe } from '../../pipes/fixed.pipe';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { I18N } from '../../../core/i18n/keys';
+import { tagKinds } from '../../utils/tag-kinds';
 
 /** Extra columns follow the row container's width, including docked panels. */
 @Component({
@@ -30,7 +31,10 @@ import { I18N } from '../../../core/i18n/keys';
 export class PhotoListExtraComponent {
   protected readonly I18N = I18N;
   readonly photo = input.required<Photo>();
-  protected readonly tags = computed(() => [...new Set([...(this.photo().tags_list ?? []), ...(this.photo().manual_tags ?? [])])].join(', '));
+  protected readonly tags = computed(() => {
+    const kinds = tagKinds(this.photo(), this.photo().manual_tag_sources ?? {});
+    return [...new Set([...kinds.ai, ...kinds.own])].join(', ');
+  });
   protected readonly people = computed(() => (this.photo().persons ?? []).map(person => person.name).filter(Boolean).join(', '));
   protected readonly location = computed(() => typeof this.photo().gps_latitude === 'number' && typeof this.photo().gps_longitude === 'number' ? `${this.photo().gps_latitude!.toFixed(3)}, ${this.photo().gps_longitude!.toFixed(3)}` : '');
 }

@@ -3530,8 +3530,9 @@ describe('PhotoDetailComponent', () => {
       const astro = { ...untagged, tags_list: ['sky'], manual_tags: ['m42', 'orion', 'trip'], manual_tag_sources: { m42: 'astro-id', orion: 'astro-id' } };
       const addonsMock = (load = vi.fn()) => ({ provide: AddonsService, useValue: { list: signal(null), available: () => true, load } });
       const chipTexts = (el: HTMLElement) => [...el.querySelectorAll('[data-testid="manual-tag-chip"]')].map(chip => chip.querySelector('button span:last-child')!.textContent!.trim());
+      const groupNames = () => (tagsView.componentInstance as any).tagGroups().addons.map((group: { name: string }) => group.name);
 
-      it('folds an add-on\'s tags into one collapsed chip named after the add-on, keeping the user\'s own chips', async () => {
+      it('folds an add-on\'s object tags into one collapsed chip named after the add-on, keeping the user\'s own tags', async () => {
         const load = vi.fn().mockResolvedValue({ addons: [{ id: 'astro-id', name: 'Astro', icon: 'star', slots: ['sidebar'] }] });
         const el = await render(astro, true, [addonsMock(load)]);
         await settle();
@@ -3539,9 +3540,12 @@ describe('PhotoDetailComponent', () => {
         expect(chipTexts(el)).toEqual(['trip']);
         const group = el.querySelector<HTMLButtonElement>('[data-addon-tag-group]')!;
         expect(load).toHaveBeenCalledTimes(1);
-        expect(group.textContent).toContain('Astro · 2');
+        expect(group.textContent).toContain('photo_detail.object_tags.summary');
+        expect(groupNames()).toEqual(['Astro']);
         expect(group.getAttribute('aria-expanded')).toBe('false');
-        expect(group.getAttribute('aria-label')).toBe('manual_tags.addon_group');
+        expect(group.getAttribute('aria-label')).toBe('photo_detail.object_tags.label');
+        // Object tags sit outside the Tags section.
+        expect(el.querySelector('[data-testid="tags-section"] [data-addon-tag-group]')).toBeNull();
         group.click(); await settle();
         expect(group.getAttribute('aria-expanded')).toBe('true');
         expect(chipTexts(el)).toEqual(['trip', 'm42', 'orion']);
@@ -3553,7 +3557,7 @@ describe('PhotoDetailComponent', () => {
       it('names the group by the add-on id while the registry is unavailable, and folds again on the next photo', async () => {
         const el = await render(astro, false, [{ provide: AddonsService, useValue: { list: signal(null), available: () => false, load: vi.fn() } }]);
         const group = el.querySelector<HTMLButtonElement>('[data-addon-tag-group]')!;
-        expect(group.textContent).toContain('astro-id · 2');
+        expect(groupNames()).toEqual(['astro-id']);
         group.click(); await settle();
         expect(chipTexts(el)).toEqual(['trip', 'm42', 'orion']);
         tagsView.componentInstance.photo.set({ ...astro, path: '/photos/next.jpg' } as never); await settle();
@@ -3571,28 +3575,71 @@ describe('PhotoDetailComponent', () => {
         await settle(); await settle();
         expect(mockApi.get).toHaveBeenCalledWith('/photo', { path: '/photos/row.jpg' });
         expect(chipTexts(el)).toEqual(['trip']);
-        expect(el.querySelector('[data-addon-tag-group]')!.textContent).toContain('Astro · 2');
+        expect(groupNames()).toEqual(['Astro']);
         const calls = mockApi.get.mock.calls.filter(([url, params]) => url === '/photo' && (params as { path: string }).path === '/photos/row.jpg').length;
         tagsView.componentInstance.photo.set({ ...row, path: '/photos/row.jpg', star_rating: 4 } as never); await settle();
         expect(mockApi.get.mock.calls.filter(([url, params]) => url === '/photo' && (params as { path: string }).path === '/photos/row.jpg').length).toBe(calls);
       });
 
-      it('groups AI, Yours and add-on tags in that order, naming the groups only when more than one shows', async () => {
-        const el = await render({ ...astro, tags_list: ['sky'] }, true, [addonsMock(vi.fn().mockResolvedValue({ addons: [{ id: 'astro-id', name: 'Astro', icon: 'star', slots: ['sidebar'] }] }))]);
+      it('orders the four kinds: Tags, People tags, Object tags, Album tags last', async () => {
+        const photo = { ...astro, tags_list: ['sky'], persons: [{ id: 7, name: 'Ray' }], album_tags: ['peter/communion'] };
+        const el = await render(photo, true, [addonsMock(vi.fn().mockResolvedValue({ addons: [{ id: 'astro-id', name: 'Astro', icon: 'star', slots: ['sidebar'] }] }))]);
         await settle(); await settle();
-        const groups = [...el.querySelectorAll<HTMLElement>('[data-testid="tags-section"] [data-tag-group]')];
-        expect(groups.map(group => group.dataset['tagGroup'])).toEqual(['ai', 'yours', 'addons']);
-        expect(groups.map(group => group.firstElementChild!.textContent!.trim())).toEqual(['photo_detail.tag_groups.ai', 'photo_detail.tag_groups.yours', 'addons.title']);
-        expect(groups[0].querySelectorAll('[data-testid="ai-tag-chip"]').length).toBe(1);
-        expect(groups[1].querySelector('[data-add-tag]')).not.toBeNull();
-        expect(groups[2].querySelector('[data-addon-tag-group]')).not.toBeNull();
+        const order = [...el.querySelectorAll<HTMLElement>('[data-testid="tags-section"], [data-photo-people], [data-object-tags], [data-album-tags]')]
+          .map(node => node.dataset['testid'] ?? Object.keys(node.dataset)[0]);
+        expect(order).toEqual(['tags-section', 'photoPeople', 'objectTags', 'albumTags']);
+        expect(el.querySelector('[data-photo-people] h2')!.textContent).toContain('photo_detail.people_tags');
+        const tags = el.querySelector<HTMLElement>('[data-tag-group="tags"]')!;
+        expect(tags.querySelectorAll('[data-testid="ai-tag-chip"]').length).toBe(1);
+        expect(tags.querySelector('[data-add-tag]')).not.toBeNull();
       });
 
-      it('leaves a lone group unnamed', async () => {
-        const el = await render({ ...untagged, tags_list: ['sky', 'stars'] }, false);
+      it('shows AI and your tags as one Tags group, with no AI / Yours sub-labels', async () => {
+        const el = await render({ ...untagged, tags_list: ['sky', 'stars'], manual_tags: ['trip'] }, false);
         const groups = [...el.querySelectorAll<HTMLElement>('[data-tag-group]')];
-        expect(groups.map(group => group.dataset['tagGroup'])).toEqual(['ai']);
-        expect(groups[0].textContent).not.toContain('photo_detail.tag_groups.ai');
+        expect(groups.map(group => group.dataset['tagGroup'])).toEqual(['tags']);
+        expect(groups[0].querySelectorAll('[data-testid="ai-tag-chip"]').length).toBe(2);
+        expect(chipTexts(el)).toEqual(['trip']);
+        expect(groups[0].textContent).not.toContain('tag_groups');
+      });
+
+      describe('album tags', () => {
+        const filed = { ...untagged, tags_list: ['sky'], manual_tags: ['trip'], album_tags: ['peter/communion', 'photographer[robin]'] };
+
+        it('fold muted and last, never among the Tags, and open to chips that filter by them', async () => {
+          const el = await render(filed, true);
+          expect(chipTexts(el)).toEqual(['trip']);
+          expect(el.querySelector('[data-testid="tags-section"]')!.textContent).not.toContain('peter/communion');
+          const group = el.querySelector<HTMLButtonElement>('[data-album-tag-group]')!;
+          expect(group.textContent).toContain('photo_detail.album_tags.summary');
+          expect(group.getAttribute('aria-label')).toBe('photo_detail.album_tags.label');
+          expect(group.getAttribute('title')).toBe('photo_detail.album_tags.hint');
+          expect(group.getAttribute('aria-expanded')).toBe('false');
+          expect(el.querySelector('[data-album-tag-chip]')).toBeNull();
+          group.click(); await settle();
+          const chips = [...el.querySelectorAll<HTMLButtonElement>('[data-album-tag-chip]')];
+          expect(chips.map(chip => chip.textContent!.trim())).toEqual(['peter/communion', 'photographer[robin]']);
+          // Album tags are for filtering: no remove control, the chip's menu opens the gallery on the tag.
+          expect(el.querySelectorAll('[data-album-tags] [data-testid="manual-tag-remove"]').length).toBe(0);
+          chips[0].click(); await settle();
+          const actions = TestBed.inject(OverlayContainer).getContainerElement().querySelectorAll<HTMLButtonElement>('button[mat-menu-item]');
+          actions[actions.length - 1].click();
+          expect(mockRouter.navigate).toHaveBeenLastCalledWith(['/'], { info: GALLERY_REVISIT, queryParams: { tag_groups: JSON.stringify({ all: ['peter/communion'] }) } });
+        });
+
+        it('keep an album tag out of the Tags even when a server also lists it in manual_tags', async () => {
+          const el = await render({ ...filed, manual_tags: ['peter/communion', 'trip'] }, false);
+          expect(chipTexts(el)).toEqual(['trip']);
+        });
+
+        it('fold again on the next photo, and are absent when the server sends none', async () => {
+          const el = await render(filed, false);
+          el.querySelector<HTMLButtonElement>('[data-album-tag-group]')!.click(); await settle();
+          tagsView.componentInstance.photo.set({ ...filed, path: '/photos/next-filed.jpg' } as never); await settle();
+          expect(el.querySelector('[data-album-tag-group]')!.getAttribute('aria-expanded')).toBe('false');
+          tagsView.componentInstance.photo.set({ ...filed, path: '/photos/plain.jpg', album_tags: undefined } as never); await settle();
+          expect(el.querySelector('[data-album-tags]')).toBeNull();
+        });
       });
 
       describe('Model D fields (inert until the server sends them)', () => {
@@ -3604,10 +3651,11 @@ describe('PhotoDetailComponent', () => {
           const el = await render(solved, true, [addonsMock(vi.fn().mockResolvedValue({ addons: [{ id: 'astro-id', name: 'Astro', icon: 'star', slots: ['sidebar'] }] }))]);
           await settle(); await settle();
           expect(chipTexts(el)).toEqual(['trip']);
-          expect(el.querySelector('[data-addon-tag-group]')!.textContent).toContain('Astro · 2');
+          expect(groupNames()).toEqual(['Astro']);
+          expect(el.querySelector('[data-addon-tag-group]')!.textContent).toContain('photo_detail.object_tags.summary');
         });
 
-        it('shows what an add-on found as one folded chip whose labels open the gallery on them', async () => {
+        it('shows everything an add-on indexed as one folded chip in its row, whose labels open the gallery on them', async () => {
           const el = await render(solved, false, [addonsMock()]);
           mockApi.get.mockImplementation((url: string) => of(url === '/photo/detections'
             ? { detections: [{ label: 'M42', grp: 'dso', source: 'astro-id' }, { label: 'Orion', grp: 'constellation', source: 'astro-id' }, { label: 'M42', grp: 'dso', source: 'astro-id' }] }
@@ -3616,8 +3664,9 @@ describe('PhotoDetailComponent', () => {
           // A source with no detections gets no chip.
           expect(objects).toHaveLength(1);
           expect(objects[0].getAttribute('aria-expanded')).toBe('false');
-          expect(objects[0].textContent).toContain('photo_detail.detections.summary');
-          expect(objects[0].getAttribute('aria-label')).toBe('photo_detail.detections.label');
+          expect(objects[0].textContent).toContain('photo_detail.object_tags.indexed');
+          expect(objects[0].getAttribute('aria-label')).toBe('photo_detail.object_tags.indexed_label');
+          expect(objects[0].closest('[data-object-tag-row]')!.querySelector('[data-addon-tag-group]')).not.toBeNull();
           expect(el.querySelector('[data-detection-chip]')).toBeNull();
           objects[0].click(); await settle(); await settle();
           expect(mockApi.get).toHaveBeenCalledWith('/photo/detections', { path: solved.path, source: 'astro-id' });
@@ -3639,7 +3688,7 @@ describe('PhotoDetailComponent', () => {
             tagsView.componentInstance.photo.set({ ...row, path: '/photos/row-objects.jpg' } as never); await settle();
             await settle(); await settle();
             expect(mockApi.get).toHaveBeenCalledWith('/photo', { path: '/photos/row-objects.jpg' });
-            expect(el.querySelector('[data-addon-objects]')!.textContent).toContain('photo_detail.detections.summary');
+            expect(el.querySelector('[data-addon-objects]')!.textContent).toContain('photo_detail.object_tags.summary');
           } finally {
             mockAuth.hasFeature = () => false;
           }
@@ -3648,6 +3697,15 @@ describe('PhotoDetailComponent', () => {
           await render(row, false);
           tagsView.componentInstance.photo.set({ ...row, path: '/photos/row-plain.jpg' } as never); await settle();
           expect(mockApi.get).not.toHaveBeenCalledWith('/photo', { path: '/photos/row-plain.jpg' });
+        });
+
+        it('does not read a row that already names its object tags while add-ons are off', async () => {
+          const row = { ...untagged, manual_tags: ['m42'], manual_tag_sources: { m42: 'astro-id' } };
+          const el = await render(row, false, [addonsMock()]);
+          mockApi.get.mockClear();
+          tagsView.componentInstance.photo.set({ ...row, path: '/photos/row-named.jpg' } as never); await settle();
+          expect(mockApi.get).not.toHaveBeenCalledWith('/photo', { path: '/photos/row-named.jpg' });
+          expect(el.querySelector('[data-addon-tag-group]')).not.toBeNull();
         });
 
         it('reads the labels again when a failed read is reopened', async () => {
@@ -3675,11 +3733,12 @@ describe('PhotoDetailComponent', () => {
           expect(mockRouter.navigate).not.toHaveBeenCalled();
         });
 
-        it('shows the add-ons row for detections alone, with no tags', async () => {
+        it('shows the object-tag row for detections alone, with no Tags section', async () => {
           const el = await render({ ...untagged, detections: [{ source: 'astro-id', count: 1 }] }, false, [addonsMock()]);
-          expect(el.querySelector('[data-testid="tags-section"]')).not.toBeNull();
+          expect(el.querySelector('[data-testid="tags-section"]')).toBeNull();
+          expect(el.querySelector('[data-object-tags]')).not.toBeNull();
           expect(el.querySelector('[data-addon-tag-group]')).toBeNull();
-          expect(el.querySelector('[data-addon-objects]')!.textContent).toContain('photo_detail.detections.summary_one');
+          expect(el.querySelector('[data-addon-objects]')!.textContent).toContain('photo_detail.object_tags.summary_one');
         });
       });
 

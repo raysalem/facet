@@ -145,6 +145,7 @@ class PhotoMetadata(BaseModel):
     date_formatted: Optional[str] = None
     tags_list: list[str] = []
     manual_tags: list[str] = []
+    album_tags: list[str] = []
     persons: list[PhotoPerson] = []
     unassigned_faces: CoercedInt = None
     top_picks_score: Optional[float] = None
@@ -170,8 +171,8 @@ class Photo(PhotoMetadata):
 
     path: str
     logical_review: Optional[LogicalReviewState] = None
-    # Only `GET /api/photo` fills it (never on a share request): tag -> id of the add-on that wrote it,
-    # for the manual tags an add-on wrote. Additive: `manual_tags` still lists every manual tag.
+    # `GET /api/photo` and the gallery rows (`GET /api/photos`, `POST /api/photos/by_paths`) fill it, never a
+    # share request: tag -> id of the add-on that wrote it (object tags). Additive: `manual_tags` still lists them.
     manual_tag_sources: Optional[dict[str, str]] = None
     # Only explicit current-scan receipts support a missing-score reason.
     assessment_states: Optional[PhotoAssessmentStates] = None

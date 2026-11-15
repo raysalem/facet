@@ -20,7 +20,8 @@ import { OverlayContainer } from '@angular/cdk/overlay';
   changeDetection: ChangeDetectionStrategy.Eager,
   template: `<app-photo-tooltip [photo]="photo()" [x]="x()" [y]="y()" [flipped]="flipped()"
                                  [pinned]="pinned()" [docked]="docked()" [personLinks]="personLinks()"
-                                 [explainable]="explainable()" (explain)="explained = explained + 1" [section]="section()" />`,
+                                 [explainable]="explainable()" (explain)="explained = explained + 1" [section]="section()"
+                                 [addonNames]="addonNames()" />`,
 })
 class TestHostComponent {
   photo = signal<Photo | null>(null);
@@ -32,6 +33,7 @@ class TestHostComponent {
   personLinks = signal(true);
   explainable = signal(false);
   section = signal<TooltipSection>('all');
+  addonNames = signal<ReadonlyMap<string, string>>(new Map());
   explained = 0;
 }
 
@@ -92,6 +94,68 @@ describe('PhotoTooltipComponent', () => {
       expect(row.classList).not.toContain('w-0');
       expect(row.classList).not.toContain('min-w-full');
     }
+  });
+  describe('four tag kinds', () => {
+    const astro = () => makePhoto({
+      tags_list: ['sky'], manual_tags: ['m42', 'orion', 'trip'], manual_tag_sources: { m42: 'astro-id', orion: 'astro-id' },
+      album_tags: ['peter/communion'], persons: [{ id: 1, name: 'Alice' }],
+    });
+    const root = () => fixture.nativeElement as HTMLElement;
+    const texts = (selector: string) => [...root().querySelectorAll(selector)].map(node => node.textContent!.trim());
+
+    it('the hover card lists Tags only, counts object tags per add-on, and leaves album tags out', () => {
+      fixture.componentInstance.addonNames.set(new Map([['astro-id', 'Astro']]));
+      fixture.componentInstance.photo.set(astro());
+      fixture.detectChanges();
+      expect(texts('[data-tags-row] span')).toEqual(['sky', 'trip']);
+      expect(texts('[data-object-tag-count]')).toEqual(['photo_detail.object_tags.summary']);
+      expect(root().querySelector('[data-object-tag-group]')).toBeNull();
+      expect(root().querySelector('[data-album-tags]')).toBeNull();
+      expect(root().textContent).not.toContain('peter/communion');
+      const tooltip = fixture.debugElement.children[0].componentInstance as unknown as { objectGroups: () => { name: string; tags: string[] }[] };
+      expect(tooltip.objectGroups()).toEqual([expect.objectContaining({ name: 'Astro', tags: ['m42', 'orion'] })]);
+    });
+
+    it('the docked Content panel orders Tags, People tags, Object tags, Album tags, the last two folded', () => {
+      fixture.componentInstance.photo.set(astro());
+      fixture.componentInstance.docked.set(true);
+      fixture.componentInstance.section.set('content');
+      fixture.detectChanges();
+      const order = [...root().querySelectorAll<HTMLElement>('[data-tags-row], [data-people-row], [data-object-tags], [data-album-tags]')]
+        .map(node => Object.keys(node.dataset)[0]);
+      expect(order).toEqual(['tagsRow', 'peopleRow', 'objectTags', 'albumTags']);
+      expect(texts('[data-testid="tooltip-tag"]')).toEqual(['sky', 'trip']);
+      const objects = root().querySelector<HTMLButtonElement>('[data-object-tag-group]')!;
+      const album = root().querySelector<HTMLButtonElement>('[data-album-tag-group]')!;
+      expect(objects.getAttribute('aria-expanded')).toBe('false');
+      expect(album.getAttribute('aria-expanded')).toBe('false');
+      expect(album.getAttribute('title')).toBe('photo_detail.album_tags.hint');
+      expect(root().querySelector('[data-muted-tag]')).toBeNull();
+      objects.click(); fixture.detectChanges();
+      expect(texts('[data-object-tags] [data-muted-tag]')).toEqual(['m42', 'orion']);
+      album.click(); fixture.detectChanges();
+      expect(texts('[data-album-tags] [data-muted-tag]')).toEqual(['peter/communion']);
+      // The next photo starts folded.
+      fixture.componentInstance.photo.set({ ...astro(), path: '/next.jpg' });
+      fixture.detectChanges();
+      expect(root().querySelector('[data-muted-tag]')).toBeNull();
+    });
+
+    it('an album tag chip in the docked panel filters by it like a tag', async () => {
+      fixture.componentInstance.photo.set(astro());
+      fixture.componentInstance.docked.set(true);
+      fixture.componentInstance.section.set('content');
+      fixture.detectChanges();
+      const tooltip = fixture.debugElement.children[0].componentInstance as PhotoTooltipComponent;
+      const emitted: unknown[] = [];
+      tooltip.tagSelected.subscribe(event => emitted.push(event));
+      root().querySelector<HTMLButtonElement>('[data-album-tag-group]')!.click(); fixture.detectChanges();
+      root().querySelector<HTMLButtonElement>('[data-album-tags] button[data-muted-tag]')!.click();
+      fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
+      const overlay = TestBed.inject(OverlayContainer).getContainerElement();
+      [...overlay.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.includes('photo_detail.tag_search_library'))!.click();
+      expect(emitted).toEqual([{ tag: 'peter/communion', scope: 'library' }]);
+    });
   });
   it('docked, shows one part per panel the way the photo page splits it: Grade, Camera, Content', () => {
     fixture.componentInstance.photo.set(makePhoto({ filename: 'a.jpg', category: 'astro', star_rating: 4, camera_model: 'X100V', tags_list: ['sky'], caption: 'Night' }));

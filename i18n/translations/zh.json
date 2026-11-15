@@ -3281,22 +3281,25 @@
     "gps_clear": "清除位置",
     "caption": "照片描述",
     "no_caption": "暂无照片描述",
-    "persons": "人物",
+    "people_tags": "人物标签",
     "quality": "画质",
     "composition": "构图",
     "saliency": "主体显著性",
     "technical": "技术指标",
     "exif": "EXIF 信息",
     "tags": "标签",
-    "tag_groups": {
-      "ai": "AI",
-      "yours": "我的"
-    },
-    "detections": {
-      "summary": "{name} · {count} 次检测",
-      "summary_one": "{name} · {count} 次检测",
-      "label": "{name} 的检测：{count}",
+    "object_tags": {
+      "summary": "{name} · {count} 个对象标签",
+      "summary_one": "{name} · {count} 个对象标签",
+      "label": "{name} 的对象标签：{count}",
+      "indexed": "全部 {count}",
+      "indexed_label": "{name} 的全部对象标签：{count}",
       "search": "显示包含 {label} 的照片"
+    },
+    "album_tags": {
+      "summary": "相册标签 · {count}",
+      "label": "相册标签：{count}",
+      "hint": "相册标签用于筛选归档照片，不描述照片内容。"
     },
     "rating": "星级",
     "generate_caption": "生成",
@@ -3487,7 +3490,6 @@
     "remove_action": "移除",
     "remove_tag": "移除标签 {tag}",
     "manual": "手动标签",
-    "addon_group": "来自 {name} 的标签：{count}",
     "error": "无法更新标签，请检查后重试。",
     "already_present": "照片已有此标签。"
   },

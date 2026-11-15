@@ -3281,22 +3281,25 @@
     "gps_clear": "Supprimer la position",
     "caption": "Légende",
     "no_caption": "Aucune légende disponible",
-    "persons": "Personnes",
+    "people_tags": "Tags de personnes",
     "quality": "Qualité",
     "composition": "Composition",
     "saliency": "Saillance du sujet",
     "technical": "Technique",
     "exif": "Données EXIF",
     "tags": "Mots-clés",
-    "tag_groups": {
-      "ai": "IA",
-      "yours": "Les vôtres"
-    },
-    "detections": {
-      "summary": "{name} · {count} détections",
-      "summary_one": "{name} · {count} détection",
-      "label": "Détections de {name} : {count}",
+    "object_tags": {
+      "summary": "{name} · {count} tags d'objets",
+      "summary_one": "{name} · {count} tag d'objet",
+      "label": "Tags d'objets de {name} : {count}",
+      "indexed": "tous ({count})",
+      "indexed_label": "Tous les tags d'objets de {name} : {count}",
       "search": "Afficher les photos avec {label}"
+    },
+    "album_tags": {
+      "summary": "Tags d'album · {count}",
+      "label": "Tags d'album : {count}",
+      "hint": "Les tags d'album classent la photo pour le filtrage ; ils ne la décrivent pas."
     },
     "rating": "Note",
     "generate_caption": "Générer",
@@ -3487,7 +3490,6 @@
     "remove_action": "Retirer",
     "remove_tag": "Retirer le mot-clé {tag}",
     "manual": "Mot-clé manuel",
-    "addon_group": "Mots-clés de {name} : {count}",
     "error": "Impossible de modifier le mot-clé. Vérifiez-le et réessayez.",
     "already_present": "Ce tag est déjà sur la photo."
   },

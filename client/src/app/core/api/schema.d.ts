@@ -9760,6 +9760,11 @@ export interface components {
             aggregate?: number | null;
             /** Ai Edit Of */
             ai_edit_of?: string | null;
+            /**
+             * Album Tags
+             * @default []
+             */
+            album_tags?: string[];
             assessment_states?: components["schemas"]["PhotoAssessmentStates"] | null;
             /** Bg Separation */
             bg_separation?: number | null;
@@ -11284,6 +11289,11 @@ export interface components {
             aggregate?: number | null;
             /** Ai Edit Of */
             ai_edit_of?: string | null;
+            /**
+             * Album Tags
+             * @default []
+             */
+            album_tags?: string[];
             /** Asset Id */
             asset_id: string;
             /** Bg Separation */

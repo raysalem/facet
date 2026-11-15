@@ -3277,22 +3277,25 @@
     "downloading": "Descargando…",
     "caption": "Descripción",
     "no_caption": "Sin descripción disponible",
-    "persons": "Personas",
+    "people_tags": "Etiquetas de personas",
     "quality": "Calidad",
     "composition": "Composición",
     "saliency": "Saliencia del sujeto",
     "technical": "Técnico",
     "exif": "Datos EXIF",
     "tags": "Etiquetas",
-    "tag_groups": {
-      "ai": "IA",
-      "yours": "Tuyas"
-    },
-    "detections": {
-      "summary": "{name} · {count} detecciones",
-      "summary_one": "{name} · {count} detección",
-      "label": "Detecciones de {name}: {count}",
+    "object_tags": {
+      "summary": "{name} · {count} etiquetas de objetos",
+      "summary_one": "{name} · {count} etiqueta de objeto",
+      "label": "Etiquetas de objetos de {name}: {count}",
+      "indexed": "todas ({count})",
+      "indexed_label": "Todas las etiquetas de objetos de {name}: {count}",
       "search": "Mostrar fotos con {label}"
+    },
+    "album_tags": {
+      "summary": "Etiquetas de álbum · {count}",
+      "label": "Etiquetas de álbum: {count}",
+      "hint": "Las etiquetas de álbum clasifican la foto para filtrar; no la describen."
     },
     "rating": "Valoración",
     "generate_caption": "Generar",
@@ -3487,7 +3490,6 @@
     "remove_action": "Quitar",
     "remove_tag": "Quitar la etiqueta {tag}",
     "manual": "Etiqueta manual",
-    "addon_group": "Etiquetas de {name}: {count}",
     "error": "No se pudo modificar la etiqueta. Compruébala e inténtalo de nuevo.",
     "already_present": "Esta etiqueta ya está en la foto."
   },

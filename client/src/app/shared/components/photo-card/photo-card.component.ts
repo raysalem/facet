@@ -23,6 +23,7 @@ import { closeOverlayDirectives } from '../../utils/overlays';
 import { MetricDistribution, topPercentOf } from '../../utils/metric-distribution';
 import { KeyboardMappingService } from '../../../core/services/keyboard-mapping.service';
 import { FaceFocusOverlayComponent } from './face-focus-overlay.component';
+import { tagKinds } from '../../utils/tag-kinds';
 
 interface AppConfig {
   quality_thresholds?: { excellent: number; great: number; good: number };
@@ -890,9 +891,11 @@ export class PhotoCardComponent {
   readonly tooltipHide = output<void>();
   readonly tagClicked = output<TagNavigation>();
   readonly tagCollectionAvailable = input(true);
-  protected readonly navigationTags = computed(() => [...new Set([
-    ...(this.photo().tags_list ?? []), ...(this.photo().manual_tags ?? []),
-  ])]);
+  /** Tags only (AI + the user's own): an add-on's object tags and album tags are not the photo's description. */
+  protected readonly navigationTags = computed(() => {
+    const kinds = tagKinds(this.photo(), this.photo().manual_tag_sources ?? {});
+    return [...new Set([...kinds.ai, ...kinds.own])];
+  });
   readonly personFilterClicked = output<number>();
   readonly personRemoveClicked = output<{ photo: Photo; personId: number }>();
   readonly openSimilarClicked = output<{ photo: Photo; mode: 'visual' | 'color' | 'person' }>();

@@ -1023,7 +1023,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
                                      [histogramDefaultMode]="tooltipHistogramDefaultMode()"
                                      [indicatorPercent]="clippingIndicatorPercent()"
                                      [explainable]="railCritiqueVisible()" (explain)="openRailCritique()"
-                                     [personLinks]="!pinned()" [tagCollectionAvailable]="!store.filters().similar_to" (tagSelected)="navigateTag($event)"
+                                     [addonNames]="addonNames()" [personLinks]="!pinned()" [tagCollectionAvailable]="!store.filters().similar_to" (tagSelected)="navigateTag($event)"
                                      (personSelected)="store.updateFilter('person_id', $event)" />
                 } @else {
                   <div class="p-4 text-sm text-[var(--mat-sys-on-surface-variant)] text-center">
@@ -1100,7 +1100,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
         [pinned]="tooltipMode() === 'click'"
         [histogramDefaultMode]="tooltipHistogramDefaultMode()"
         [indicatorPercent]="clippingIndicatorPercent()"
-        [personLinks]="!pinned()" [tagCollectionAvailable]="!store.filters().similar_to" (tagSelected)="navigateTag($event)"
+        [addonNames]="addonNames()" [personLinks]="!pinned()" [tagCollectionAvailable]="!store.filters().similar_to" (tagSelected)="navigateTag($event)"
         (personSelected)="store.updateFilter('person_id', $event)"
       />
     }
@@ -1241,6 +1241,8 @@ export class GalleryComponent implements OnInit, OnDestroy {
   protected readonly rail: AddonRail<GalleryTab> = new AddonRail<GalleryTab>({
     storageKey: 'facet_gallery_rail_tab', tabs: ['filter', ...PHOTO_TABS], defaultTab: null,
   });
+  /** Add-on id -> name, for the object-tag rows of the hover card and the Content panel. */
+  protected readonly addonNames = computed<ReadonlyMap<string, string>>(() => new Map(this.rail.registry().map(addon => [addon.id, addon.name])));
   protected readonly PHOTO_TABS = PHOTO_TABS;
   /** Showing (tab id `filter`): the collection on screen and the filters that define it. */
   private readonly filterRailTab: RailTab = { id: 'filter', icon: 'photo_library', label: this.I18N.gallery.rail.showing };

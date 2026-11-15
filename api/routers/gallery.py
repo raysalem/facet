@@ -904,22 +904,39 @@ async def gallery_scope_sql_async(conn, filters, user_id, exclude=None, prepared
                                       hierarchy_available=hierarchy_available, collection_source=collection_source)
 
 
-async def _addon_tag_sources_async(conn, path: str) -> dict[str, str]:
-    """``{tag: add-on id}`` for the photo's manual tags an installed add-on wrote.
+_ADDON_TAG_SOURCES_CHUNK = 500
+
+
+async def _addon_tag_sources_map_async(conn, paths: list[str]) -> dict[str, dict[str, str]]:
+    """``{path: {tag: add-on id}}`` for the manual tags an installed add-on wrote (object tags).
 
     An add-on's tag is stored as ``source='user'`` with ``created_by`` = its id
     (``api.addons.auth``), so the add-on registry is what tells it apart from a
-    user's ``created_by``. Typed and XMP-imported tags are absent.
+    user's ``created_by``. Typed and XMP-imported tags are absent. Every path is a
+    key (``{}`` when none), so a reader can tell "none" from "not read".
     """
     from api.addons import manifest
     from api.db_helpers import is_manual_tags_available
-    if not manifest.registry().addons or not is_manual_tags_available(conn):
-        return {}
-    cur = await conn.execute(
-        "SELECT tag, created_by FROM photo_manual_tags WHERE photo_path = ? AND created_by IS NOT NULL", [path])
-    rows = await cur.fetchall()
-    await cur.close()
-    return {row['tag']: row['created_by'] for row in rows if manifest.get(row['created_by'])}
+    result: dict[str, dict[str, str]] = {path: {} for path in paths}
+    if not paths or not manifest.registry().addons or not is_manual_tags_available(conn):
+        return result
+    unique = list(dict.fromkeys(paths))
+    for start in range(0, len(unique), _ADDON_TAG_SOURCES_CHUNK):
+        chunk = unique[start:start + _ADDON_TAG_SOURCES_CHUNK]
+        cur = await conn.execute(
+            "SELECT photo_path, tag, created_by FROM photo_manual_tags "
+            f"WHERE photo_path IN ({','.join('?' * len(chunk))}) AND created_by IS NOT NULL", chunk)
+        rows = await cur.fetchall()
+        await cur.close()
+        for row in rows:
+            if manifest.get(row['created_by']):
+                result[row['photo_path']][row['tag']] = row['created_by']
+    return result
+
+
+async def _addon_tag_sources_async(conn, path: str) -> dict[str, str]:
+    """``{tag: add-on id}`` for one photo's object tags (see ``_addon_tag_sources_map_async``)."""
+    return (await _addon_tag_sources_map_async(conn, [path]))[path]
 
 
 @router.get("/api/photo", response_model=Photo, response_model_exclude_unset=True)
@@ -1504,8 +1521,11 @@ async def _assemble_gallery_rows(rows, conn, user_id) -> list[dict]:
     Shared by the listing and ``/api/photos/by_paths`` so the two cannot drift.
     """
     photos = split_photo_tags(rows, VIEWER_CONFIG['display']['tags_per_photo'])
+    sources = await _addon_tag_sources_map_async(conn, [photo['path'] for photo in photos])
     for photo in photos:
         photo['date_formatted'] = format_date(photo.get('date_taken'))
+        # Which manual tags an add-on wrote (object tags), so a card never lists them as the photo's own tags.
+        photo['manual_tag_sources'] = sources[photo['path']]
     await attach_person_data_async(photos, conn)
     from api.logical_reviews import attach_async as attach_logical_reviews
     await attach_logical_reviews(conn, photos, user_id)

@@ -3281,22 +3281,25 @@
     "gps_clear": "Limpar localização",
     "caption": "Legenda",
     "no_caption": "Nenhuma legenda disponível",
-    "persons": "Pessoas",
+    "people_tags": "Tags de pessoas",
     "quality": "Qualidade",
     "composition": "Composição",
     "saliency": "Saliência do sujeito",
     "technical": "Técnico",
     "exif": "Dados EXIF",
     "tags": "Tags",
-    "tag_groups": {
-      "ai": "IA",
-      "yours": "Suas"
-    },
-    "detections": {
-      "summary": "{name} · {count} deteções",
-      "summary_one": "{name} · {count} deteção",
-      "label": "Deteções de {name}: {count}",
+    "object_tags": {
+      "summary": "{name} · {count} tags de objetos",
+      "summary_one": "{name} · {count} tag de objeto",
+      "label": "Tags de objetos de {name}: {count}",
+      "indexed": "todas ({count})",
+      "indexed_label": "Todas as tags de objetos de {name}: {count}",
       "search": "Mostrar fotos com {label}"
+    },
+    "album_tags": {
+      "summary": "Tags de álbum · {count}",
+      "label": "Tags de álbum: {count}",
+      "hint": "As tags de álbum classificam a foto para filtrar; não a descrevem."
     },
     "rating": "Avaliação",
     "generate_caption": "Gerar",
@@ -3487,7 +3490,6 @@
     "remove_action": "Remover",
     "remove_tag": "Remover a etiqueta {tag}",
     "manual": "Etiqueta manual",
-    "addon_group": "Etiquetas de {name}: {count}",
     "error": "Não foi possível alterar a etiqueta. Verifique-a e tente novamente.",
     "already_present": "Esta etiqueta já está na foto."
   },
