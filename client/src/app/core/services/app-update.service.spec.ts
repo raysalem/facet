@@ -141,6 +141,75 @@ describe('AppUpdateService', () => {
       expect(reload).toHaveBeenCalledTimes(1);
     });
 
+    it('defers while a field holds typed text, even after it lost focus; reloads once it is emptied', async () => {
+      setup();
+      const input = document.createElement('input');
+      input.type = 'text';
+      document.body.appendChild(input);
+      input.focus();
+      input.value = 'draft';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.blur();
+      versionUpdates.next(ready('hash-dirty'));
+      await flush();
+      expect(reload).not.toHaveBeenCalled();
+      input.value = '';
+      await vi.advanceTimersByTimeAsync(IDLE_RECHECK_INTERVAL_MS);
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores a field with a value the user never typed, and one removed from the page', async () => {
+      setup();
+      const preset = document.createElement('input');
+      preset.value = 'loaded from the server';
+      const typed = document.createElement('textarea');
+      document.body.append(preset, typed);
+      typed.value = 'x';
+      typed.dispatchEvent(new Event('input', { bubbles: true }));
+      typed.remove();
+      versionUpdates.next(ready('hash-preset'));
+      await flush();
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('a form submit clears typed text', async () => {
+      setup();
+      const form = document.createElement('form');
+      const input = document.createElement('input');
+      form.appendChild(input);
+      document.body.appendChild(form);
+      input.value = 'query';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      form.dispatchEvent(new Event('submit', { bubbles: true }));
+      versionUpdates.next(ready('hash-submit'));
+      await flush();
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('defers while the page is fullscreen, then reloads when it is not', async () => {
+      setup();
+      let fs: Element | null = document.body;
+      Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => fs });
+      versionUpdates.next(ready('hash-fs'));
+      await flush();
+      expect(reload).not.toHaveBeenCalled();
+      fs = null;
+      await vi.advanceTimersByTimeAsync(IDLE_RECHECK_INTERVAL_MS);
+      delete (document as unknown as Record<string, unknown>)['fullscreenElement'];
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('defers while a slideshow is playing', async () => {
+      setup();
+      document.body.innerHTML = '<app-slideshow></app-slideshow>';
+      versionUpdates.next(ready('hash-show'));
+      await flush();
+      expect(reload).not.toHaveBeenCalled();
+      document.body.innerHTML = '';
+      await vi.advanceTimersByTimeAsync(IDLE_RECHECK_INTERVAL_MS);
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
     it('does not treat a focused button as busy', async () => {
       setup();
       const button = document.createElement('button');
