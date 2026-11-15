@@ -39,6 +39,8 @@ describe('GallerySelectionActions', () => {
       pinnedPaths: () => null,
       currentAlbum: () => null,
       refreshPaths: vi.fn(async () => undefined),
+      tagsRevision: signal(0),
+      loadFilterOptions: vi.fn(async () => undefined),
     };
     TestBed.configureTestingModule({
       providers: [

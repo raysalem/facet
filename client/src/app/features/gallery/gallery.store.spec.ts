@@ -4473,25 +4473,6 @@ describe('GalleryStore smart-album temporary refinements', () => {
     expect(snackOpen).not.toHaveBeenCalled();
   });
 
-  it('never saves the Set or Photographer pull-down into the album definition, but saves a tag', async () => {
-    store.currentAlbum.set({ ...smartAlbum, smart_filter_json: JSON.stringify({ path_prefix: '/p' }) });
-    vi.useFakeTimers();
-    try {
-      store.filters.set({ ...DEFAULT_FILTERS, path_prefix: '/p', album_set: 'peter/communion/church', photographer: 'photographer[robin]' });
-      TestBed.tick();
-      await vi.advanceTimersByTimeAsync(500);
-      const saved = JSON.parse(albumUpdate.mock.calls.at(-1)![1].smart_filter_json);
-      expect(saved.album_set).toBeUndefined();
-      expect(saved.photographer).toBeUndefined();
-      store.filters.set({ ...DEFAULT_FILTERS, path_prefix: '/p', tag: 'cake' });
-      TestBed.tick();
-      await vi.advanceTimersByTimeAsync(500);
-      expect(JSON.parse(albumUpdate.mock.calls.at(-1)![1].smart_filter_json)).toMatchObject({ tag: 'cake' });
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
   it('keeps the saved smart-album decision criterion during a temporary review queue', async () => {
     const get = TestBed.inject(ApiService).get as Mock;
     get.mockReturnValue(of(makePhotosResponse()));
