@@ -3,6 +3,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { SwUpdate } from '@angular/service-worker';
 import { Subject } from 'rxjs';
+import { signal } from '@angular/core';
+import { AddonPanelService } from '../addons/addon-panel.service';
 import { I18N } from '../i18n/keys';
 import {
   AppUpdateService, IDLE_RECHECK_INTERVAL_MS, PAGE_RELOAD, UNRECOVERABLE_RELOAD_WINDOW_MS, UPDATE_CHECK_INTERVAL_MS,
@@ -24,6 +26,7 @@ describe('AppUpdateService', () => {
   let onAction: Subject<void>;
   let dismiss: ReturnType<typeof vi.fn>;
   let dialogs: unknown[];
+  let addonPanel: ReturnType<typeof signal<unknown>>;
 
   function setup(isEnabled = true) {
     versionUpdates = new Subject();
@@ -38,12 +41,14 @@ describe('AppUpdateService', () => {
     dismiss = vi.fn();
     open = vi.fn(() => ({ onAction: () => onAction, dismiss }));
     dialogs = [];
+    addonPanel = signal<unknown>(null);
     TestBed.configureTestingModule({
       providers: [
         { provide: SwUpdate, useValue: sw },
         { provide: PAGE_RELOAD, useValue: reload },
         { provide: MatSnackBar, useValue: { open } },
         { provide: MatDialog, useValue: { get openDialogs() { return dialogs; } } },
+        { provide: AddonPanelService, useValue: { panel: addonPanel } },
         { provide: I18nService, useValue: { t: (k: string) => k } },
       ],
     });
@@ -137,6 +142,99 @@ describe('AppUpdateService', () => {
       await flush();
       expect(reload).not.toHaveBeenCalled();
       input.blur();
+      await vi.advanceTimersByTimeAsync(IDLE_RECHECK_INTERVAL_MS);
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('defers while an add-on panel is open, shows the banner, then reloads after it is closed', async () => {
+      setup();
+      addonPanel.set({ addon: { id: 'astro', name: 'Astro', icon: 'x' }, nonce: 'n', src: '/s', scope: {} });
+      versionUpdates.next(ready('hash-addon'));
+      await flush();
+      expect(reload).not.toHaveBeenCalled();
+      expect(open).toHaveBeenCalledWith(I18N.pwa.update_when_idle, I18N.pwa.reload, { duration: 0 });
+      await vi.advanceTimersByTimeAsync(IDLE_RECHECK_INTERVAL_MS * 3);
+      expect(reload).not.toHaveBeenCalled();
+      addonPanel.set(null);
+      await vi.advanceTimersByTimeAsync(IDLE_RECHECK_INTERVAL_MS);
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('the banner Reload works at once even with an add-on panel open', async () => {
+      setup();
+      addonPanel.set({ addon: { id: 'astro', name: 'Astro', icon: 'x' }, nonce: 'n', src: '/s', scope: {} });
+      versionUpdates.next(ready('hash-addon2'));
+      await flush();
+      onAction.next();
+      await flush();
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('defers while a field holds typed text, even after it lost focus; reloads once it is emptied', async () => {
+      setup();
+      const input = document.createElement('input');
+      input.type = 'text';
+      document.body.appendChild(input);
+      input.focus();
+      input.value = 'draft';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.blur();
+      versionUpdates.next(ready('hash-dirty'));
+      await flush();
+      expect(reload).not.toHaveBeenCalled();
+      input.value = '';
+      await vi.advanceTimersByTimeAsync(IDLE_RECHECK_INTERVAL_MS);
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores a field with a value the user never typed, and one removed from the page', async () => {
+      setup();
+      const preset = document.createElement('input');
+      preset.value = 'loaded from the server';
+      const typed = document.createElement('textarea');
+      document.body.append(preset, typed);
+      typed.value = 'x';
+      typed.dispatchEvent(new Event('input', { bubbles: true }));
+      typed.remove();
+      versionUpdates.next(ready('hash-preset'));
+      await flush();
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('a form submit clears typed text', async () => {
+      setup();
+      const form = document.createElement('form');
+      const input = document.createElement('input');
+      form.appendChild(input);
+      document.body.appendChild(form);
+      input.value = 'query';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      form.dispatchEvent(new Event('submit', { bubbles: true }));
+      versionUpdates.next(ready('hash-submit'));
+      await flush();
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('defers while the page is fullscreen, then reloads when it is not', async () => {
+      setup();
+      let fs: Element | null = document.body;
+      Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => fs });
+      versionUpdates.next(ready('hash-fs'));
+      await flush();
+      expect(reload).not.toHaveBeenCalled();
+      fs = null;
+      await vi.advanceTimersByTimeAsync(IDLE_RECHECK_INTERVAL_MS);
+      delete (document as unknown as Record<string, unknown>)['fullscreenElement'];
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('defers while a slideshow is playing', async () => {
+      setup();
+      document.body.innerHTML = '<app-slideshow></app-slideshow>';
+      versionUpdates.next(ready('hash-show'));
+      await flush();
+      expect(reload).not.toHaveBeenCalled();
+      document.body.innerHTML = '';
       await vi.advanceTimersByTimeAsync(IDLE_RECHECK_INTERVAL_MS);
       expect(reload).toHaveBeenCalledTimes(1);
     });

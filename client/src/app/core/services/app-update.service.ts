@@ -1,8 +1,10 @@
 import { DestroyRef, inject, Injectable, InjectionToken } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarRef, TextOnlySnackBar } from '@angular/material/snack-bar';
+import { NavigationStart, Router } from '@angular/router';
 import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
 import { filter } from 'rxjs';
+import { AddonPanelService } from '../addons/addon-panel.service';
 import { I18N } from '../i18n/keys';
 import { I18nService } from './i18n.service';
 
@@ -31,7 +33,7 @@ const UNRECOVERABLE_MARKER = 'unrecoverable';
  * translation keys show as raw text. This service finds the update early (at startup, when
  * the tab becomes visible, and on a timer), then activates it and reloads on its own, but
  * only when that cannot lose the user's work: it waits while a dialog or an overlay is open
- * or an editable field has focus (the snackbar stays as the manual path), and a
+ * an editable field has focus or holds typed text, or the page is fullscreen (the snackbar stays as the manual path), and a
  * `sessionStorage` marker stops it from ever reloading twice for the same build.
  *
  * The new version is activated only at reload time, not when it is detected. Activating
@@ -45,8 +47,12 @@ export class AppUpdateService {
   private readonly dialog = inject(MatDialog);
   private readonly i18n = inject(I18nService);
   private readonly reloadPage = inject(PAGE_RELOAD);
+  private readonly addonPanel = inject(AddonPanelService);
+  private readonly router = inject(Router, { optional: true });
   private readonly destroyRef = inject(DestroyRef);
 
+  /** Text fields the user has typed into since the last submit or navigation. */
+  private readonly edited = new Set<HTMLElement>();
   private started = false;
   /** Hash of the build waiting for the page to go idle, if any. */
   private pendingHash: string | null = null;
@@ -73,8 +79,21 @@ export class AppUpdateService {
     document.addEventListener('visibilitychange', onVisibility);
     const checkTimer = setInterval(() => this.checkNow(), UPDATE_CHECK_INTERVAL_MS);
 
+    // Typed text counts as work even after the field loses focus. Capture phase sees every
+    // field; a submit or a route change means the text was used or left behind.
+    const onInput = (e: Event) => {
+      if (e.target instanceof HTMLElement && AppUpdateService.isTextLike(e.target)) this.edited.add(e.target);
+    };
+    const clearEdited = () => this.edited.clear();
+    document.addEventListener('input', onInput, true);
+    document.addEventListener('submit', clearEdited, true);
+    const navSub = this.router?.events.pipe(filter(e => e instanceof NavigationStart)).subscribe(clearEdited);
+
     this.destroyRef.onDestroy(() => {
       subs.forEach(s => s.unsubscribe());
+      navSub?.unsubscribe();
+      document.removeEventListener('input', onInput, true);
+      document.removeEventListener('submit', clearEdited, true);
       document.removeEventListener('visibilitychange', onVisibility);
       clearInterval(checkTimer);
       this.clearIdleTimer();
@@ -90,21 +109,45 @@ export class AppUpdateService {
 
   /**
    * Whether reloading now could discard something the user is doing: a dialog or an overlay
-   * with a backdrop (open menu, select panel) is up, or an editable field has focus.
+   * with a backdrop (open menu, select panel) is up, an add-on panel is open, an editable field has focus, a field
+   * holds text typed since the last submit or navigation (even unfocused), or the page is
+   * fullscreen or playing a slideshow.
+   *
+   * The idle recheck notices the panel closing within IDLE_RECHECK_INTERVAL_MS and reloads then.
+   *
+   * Not covered, on purpose: scans and exports run as server jobs that a reload does not
+   * stop, and the client has no upload flow, so there is no in-page work to lose there.
    */
   isBusy(): boolean {
     if (this.dialog.openDialogs?.length) return true;
     if (document.querySelector('.cdk-overlay-container .cdk-overlay-backdrop')) return true;
+    if (document.fullscreenElement || document.querySelector('app-slideshow')) return true;
+    // An add-on session (a finished plate solve not yet saved) lives in a sandboxed iframe a reload destroys.
+    if (this.addonPanel.panel()) return true;
+    if (this.hasUnsavedText()) return true;
     const el = document.activeElement as HTMLElement | null;
     if (!el || el === document.body) return false;
     if (el.isContentEditable) return true;
     const tag = el.tagName;
     if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
-    if (tag === 'INPUT') {
-      const type = (el as HTMLInputElement).type;
-      return !['button', 'checkbox', 'radio', 'range', 'submit', 'reset', 'image', 'file', 'color'].includes(type);
+    return tag === 'INPUT' && AppUpdateService.isTextLike(el);
+  }
+
+  /** A field the user edited still holds text. Cost is the number of fields typed into, not the DOM size. */
+  private hasUnsavedText(): boolean {
+    for (const el of this.edited) {
+      if (!el.isConnected) { this.edited.delete(el); continue; }
+      const value = el.isContentEditable ? el.textContent : (el as HTMLInputElement | HTMLTextAreaElement).value;
+      if (value) return true;
     }
     return false;
+  }
+
+  /** Text, search, number, ... inputs, textareas and contenteditable hosts; not buttons, checkboxes and the like. */
+  private static isTextLike(el: HTMLElement): boolean {
+    if (el.isContentEditable || el.tagName === 'TEXTAREA') return true;
+    return el.tagName === 'INPUT'
+      && !['button', 'checkbox', 'radio', 'range', 'submit', 'reset', 'image', 'file', 'color'].includes((el as HTMLInputElement).type);
   }
 
   private onVersionReady(hash: string): void {
