@@ -214,6 +214,7 @@
     "color_harmony": "Harmonia de cores",
     "caption": "Legenda",
     "filter_by_person": "Filtrar por {name}",
+    "more_count": "+{count} mais",
     "histogram": "Histograma"
   },
   "photoCard": {

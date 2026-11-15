@@ -77,7 +77,7 @@ describe('PhotoTooltipComponent', () => {
     fixture.detectChanges();
     expect(capture().classList).not.toContain('w-0');
   });
-  it('the tags and people rows wrap inside the floating card instead of widening it; docked keeps its own width', () => {
+  it('the tags and people rows cannot widen the floating card (one non-wrapping line); docked keeps its own width and wraps', () => {
     fixture.componentInstance.photo.set(makePhoto({ filename: 'a.jpg', tags_list: ['sky', 'moon', 'nebula'], persons: [{ id: 1, name: 'Alice' }] }));
     const root = fixture.nativeElement as HTMLElement;
     const rows = () => ['[data-tags-row]', '[data-people-row]'].map(sel => root.querySelector<HTMLElement>(sel)!);
@@ -85,6 +85,8 @@ describe('PhotoTooltipComponent', () => {
     for (const row of rows()) {
       expect(row.classList).toContain('w-0');
       expect(row.classList).toContain('min-w-full');
+      expect(row.classList).toContain('overflow-hidden');
+      expect(row.classList).not.toContain('flex-wrap');
     }
     fixture.componentInstance.docked.set(true);
     fixture.componentInstance.section.set('content');
@@ -93,7 +95,34 @@ describe('PhotoTooltipComponent', () => {
       expect(row).not.toBeNull();
       expect(row.classList).not.toContain('w-0');
       expect(row.classList).not.toContain('min-w-full');
+      expect(row.classList).toContain('flex-wrap');
     }
+  });
+  it('the floating card folds 20 tags and 7 people into one line each with a +N; docked lists them all', () => {
+    const tags = Array.from({ length: 20 }, (_, i) => `tag${i}`);
+    const persons = Array.from({ length: 7 }, (_, i) => ({ id: i + 1, name: `P${i}` }));
+    fixture.componentInstance.photo.set(makePhoto({ filename: 'a.jpg', tags_list: tags, persons }));
+    const root = fixture.nativeElement as HTMLElement;
+    fixture.detectChanges();
+    expect(root.querySelectorAll('[data-tags-row] span:not([data-tags-more])').length).toBe(4);
+    expect(root.querySelector('[data-tags-more]')!.textContent!.trim()).toBe('+16');
+    expect(root.querySelectorAll('[data-people-row] img').length).toBe(4);
+    expect(root.querySelector('[data-people-more]')!.textContent!.trim()).toBe('+3');
+    fixture.componentInstance.docked.set(true);
+    fixture.componentInstance.section.set('content');
+    fixture.detectChanges();
+    expect(root.querySelectorAll('[data-testid="tooltip-tag"], [data-tags-row] span').length).toBe(20);
+    expect(root.querySelector('[data-tags-more]')).toBeNull();
+    expect(root.querySelectorAll('[data-people-row] img').length).toBe(7);
+  });
+  it('the floating card shows one object-tag line even with several add-ons', () => {
+    fixture.componentInstance.addonNames.set(new Map([['astro-id', 'Astro'], ['other', 'Other']]));
+    fixture.componentInstance.photo.set(makePhoto({
+      manual_tags: ['a', 'b', 'c', 'd'], manual_tag_sources: { a: 'astro-id', b: 'astro-id', c: 'astro-id', d: 'other' },
+    }));
+    fixture.detectChanges();
+    const lines = [...(fixture.nativeElement as HTMLElement).querySelectorAll('[data-object-tag-count]')];
+    expect(lines.map(n => n.textContent!.trim())).toEqual(['Astro 3 · Other 1']);
   });
   describe('four tag kinds', () => {
     const astro = () => makePhoto({

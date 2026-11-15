@@ -239,6 +239,7 @@
     "color_harmony": "Color Harmony",
     "caption": "Caption",
     "filter_by_person": "Filter by {name}",
+    "more_count": "+{count} more",
     "histogram": "Histogram"
   },
   "photoCard": {
