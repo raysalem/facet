@@ -423,7 +423,7 @@ function inDetectedSet(photo: Photo): boolean {
           (pointercancel)="inspectorWidth.finish($event, true)" (lostpointercapture)="inspectorWidth.finish($event, true)" (keydown)="inspectorWidth.key($event)"></div>
 
         <!-- Info panel -->
-        <aside data-photo-inspector [attr.aria-label]="I18N.photo_detail.details | translate" [style.--facet-inspector-width]="inspectorWidth.width() + 'px'" [class.lg:!hidden]="rail.addonActive()" [class.!hidden]="!rail.shownPage()" (keydown)="closePanels($event)" class="[overflow-wrap:anywhere] lg:w-[var(--facet-inspector-width)] lg:shrink-0 lg:overflow-y-auto lg:border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-4 space-y-4 text-sm text-[var(--mat-sys-on-surface)]">
+        <aside data-photo-inspector [attr.aria-label]="I18N.photo_detail.details | translate" [style.--facet-inspector-width]="inspectorWidth.width() + 'px'" [class.lg:!hidden]="rail.addonActive()" [class.!hidden]="!rail.shownPage()" [class.lg:flex]="rail.shownPage() === 'filter'" (keydown)="closePanels($event)" class="relative [overflow-wrap:anywhere] lg:flex-col lg:w-[var(--facet-inspector-width)] lg:shrink-0 lg:overflow-y-auto lg:border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-4 space-y-4 text-sm text-[var(--mat-sys-on-surface)]">
           <ng-template #categoryExplanation>
               <mat-form-field class="w-full" subscriptSizing="dynamic">
                 <mat-label>{{ I18N.photo.category_override.target_category_label | translate }}</mat-label>
@@ -840,7 +840,7 @@ function inDetectedSet(photo: Photo): boolean {
               <app-photo-related-files [photo]="p" (logicalApplied)="onLogicalAssetApplied($event)" />
             </mat-accordion>
           </section>
-          <section id="photo-panel-filter" data-photo-panel="filter" role="tabpanel" aria-labelledby="photo-rail-filter" [hidden]="rail.shownPage() !== 'filter'" class="flex min-h-0 flex-col gap-3 lg:h-full">
+          <section id="photo-panel-filter" data-photo-panel="filter" role="tabpanel" aria-labelledby="photo-rail-filter" [hidden]="rail.shownPage() !== 'filter'" class="flex min-h-0 flex-col gap-3 lg:flex-1">
             <!-- Showing: the content this photo is one of. Its name and how many filters define it, where you are
                  in it, then its photos; the filters themselves fold behind their count. -->
             @if (collectionSidebarAvailable()) {
