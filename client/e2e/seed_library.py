@@ -26,6 +26,8 @@ DB_PATH = os.path.join(WORK, 'facet_e2e.db')
 CONFIG_PATH = os.path.join(WORK, 'scoring_config.json')
 # send2trash honours XDG_DATA_HOME: a deleted test photo lands here, not in the user's own Trash.
 XDG_DATA_HOME = os.path.join(WORK, 'xdg-data')
+# The add-on's own page is served here (by serve()), one port above the default viewer port.
+ADDON_UI_PORT = int(os.environ.get('FACET_E2E_ADDON_PORT', '5100'))
 
 sys.path.insert(0, REPO)
 
@@ -45,7 +47,23 @@ PHOTOS = {
              ('IMG_0200_agy_1.jpg', '#f08c00', 7.0, 1, 'IMG_0200.jpg')],
 }
 DATE = {'burst': '2026:01:10 10:00:', 'reuse': '2026:01:11 10:00:', 'lead': '2026:01:12 10:00:',
-        'layout': '2026:01:15 10:00:'}
+        'album_a': '2026:01:13 10:00:', 'album_b': '2026:01:14 10:00:', 'layout': '2026:01:15 10:00:',
+        'tagged': '2026:01:16 10:00:'}
+# folder -> (album name, colour, file prefix). Read-only: two manual albums with disjoint photos,
+# each photo its own one-frame burst so Hide bursts folds nothing. (album-switch flow)
+ALBUMS = {'album_a': ('E2E Album A', '#c92a2a', 'ALB_A'),
+          'album_b': ('E2E Album B', '#1864ab', 'ALB_B')}
+ALBUM_SIZE = 6
+# Tag-kinds + Showing flows (read-only): one album of six photos filed in two sets by album tags, whose
+# first photo carries all four tag kinds (AI tags, a named person, an add-on's object tag, album tags).
+TAGGED_ALBUM = 'E2E Tagged'
+TAGGED_SETS = ('e2e/church', 'e2e/lunch')   # album tags; the picker labels them by their last segment
+TAGGED_AI_TAGS = ('sunset', 'beach')
+TAGGED_OWN_TAG = 'family'
+TAGGED_OBJECT_TAG = 'cup'
+TAGGED_PERSON = 'Alex Example'
+ADDON_ID = 'e2e-addon'
+
 # Layout geometry flow (read-only): one manual album with enough photos to overflow the grid, each
 # its own one-frame burst; the best-scored one carries LAYOUT_TAG_COUNT tags for the hover card.
 LAYOUT_ALBUM, LAYOUT_SIZE, LAYOUT_TAG_COUNT = 'E2E Layout', 80, 20
@@ -112,18 +130,80 @@ def _seed_layout(conn):
                      [(first, t) for t in tags[4:]])
 
 
+def _seed_album(conn, folder):
+    name, colour, prefix = ALBUMS[folder]
+    os.makedirs(os.path.join(LIBRARY, folder))
+    album_id = conn.execute('INSERT INTO albums (user_id, name) VALUES (NULL, ?)', (name,)).lastrowid
+    base = 100 * (list(ALBUMS).index(folder) + 1)
+    for i in range(ALBUM_SIZE):
+        path = _insert_photo(conn, folder, f'{prefix}_{i + 1:02d}.jpg', colour, 5.0, 1, base + i, i)
+        conn.execute('INSERT INTO album_photos (album_id, photo_path, position) VALUES (?, ?, ?)',
+                     (album_id, path, i))
+
+
+def _seed_tagged(conn):
+    os.makedirs(os.path.join(LIBRARY, 'tagged'))
+    album_id = conn.execute('INSERT INTO albums (user_id, name) VALUES (NULL, ?)', (TAGGED_ALBUM,)).lastrowid
+    colours = ['#e67700', '#2b8a3e', '#1c7ed6', '#9c36b5', '#c2255c', '#0c8599']
+    paths = []
+    for i in range(6):
+        path = _insert_photo(conn, 'tagged', f'TAG_{i + 1:02d}.jpg', colours[i], 5.0 - i * 0.1, 1, 300 + i, i)
+        conn.execute('INSERT INTO album_photos (album_id, photo_path, position) VALUES (?, ?, ?)',
+                     (album_id, path, i))
+        paths.append(path)
+    # Album tags are manual tags the registry marks as filing: three photos per set.
+    for tag in TAGGED_SETS:
+        conn.execute('INSERT INTO album_tags (tag) VALUES (?)', (tag,))
+    for i, path in enumerate(paths):
+        conn.execute("INSERT INTO photo_manual_tags (photo_path, tag, source) VALUES (?, ?, 'user')",
+                     (path, TAGGED_SETS[i // 3]))
+    first = paths[0]
+    # Tags: the AI's (photos.tags, which the API cuts to display.tags_per_photo) and one the user typed.
+    conn.execute('UPDATE photos SET tags = ? WHERE path = ?', (', '.join(TAGGED_AI_TAGS), first))
+    conn.executemany('INSERT INTO photo_tags (photo_path, tag) VALUES (?, ?)', [(first, t) for t in TAGGED_AI_TAGS])
+    conn.execute("INSERT INTO photo_manual_tags (photo_path, tag, source) VALUES (?, ?, 'user')",
+                 (first, TAGGED_OWN_TAG))
+    # Object tags: a manual tag written by an installed add-on (created_by = its id, see api/routers/gallery.py).
+    conn.execute("INSERT INTO photo_manual_tags (photo_path, tag, source, created_by) VALUES (?, ?, 'user', ?)",
+                 (first, TAGGED_OBJECT_TAG, ADDON_ID))
+    # People tags: a face assigned to a named person (the avatar needs the person's thumbnail).
+    conn.execute('INSERT INTO persons (name, face_count, auto_clustered, face_thumbnail) VALUES (?, 1, 0, ?)',
+                 (TAGGED_PERSON, _jpeg('#868e96', (96, 96))))
+    person_id = conn.execute('SELECT id FROM persons WHERE name = ?', (TAGGED_PERSON,)).fetchone()[0]
+    conn.execute('INSERT INTO faces (photo_path, face_index, embedding, bbox_x1, bbox_y1, bbox_x2, bbox_y2, '
+                 'confidence, person_id, face_thumbnail) VALUES (?, 0, ?, 400, 200, 700, 500, 0.99, ?, ?)',
+                 (first, b'\0' * 2048, person_id, _jpeg('#868e96', (96, 96))))
+
+
+def _write_addon():
+    """An installed external add-on (its UI is the tiny page serve() hosts one port up), so the
+    gallery knows whose object tag 'cup' is and the add-on panel can be opened."""
+    folder = os.path.join(WORK, 'addons', ADDON_ID)
+    os.makedirs(folder)
+    with open(os.path.join(folder, 'addon.json'), 'w', encoding='utf-8') as fh:
+        json.dump({'id': ADDON_ID, 'name': 'E2E Add-on', 'version': '1.0', 'icon': 'extension', 'facet_api': 1,
+                   'slots': ['sidebar'], 'permissions': ['photos.read'],
+                   'ui': {'url': f'http://127.0.0.1:{ADDON_UI_PORT}/'}}, fh, indent=2)
+
+
 def seed(edition_password):
     from db.schema import init_database
     shutil.rmtree(WORK, ignore_errors=True)
     os.makedirs(LIBRARY)
     with open(CONFIG_PATH, 'w', encoding='utf-8') as fh:
         json.dump({'viewer': {'edition_password': edition_password, 'scan_directories': [LIBRARY],
-                              'cull': {'allow_trash': True}}}, fh, indent=2)
+                              'cull': {'allow_trash': True},
+                              'features': {'show_scan_button': True}},
+                   'addons': {'enabled': True}}, fh, indent=2)
     init_database(DB_PATH)
     conn = sqlite3.connect(DB_PATH)
     for folder in PHOTOS:
         _seed_folder(conn, folder)
+    for folder in ALBUMS:
+        _seed_album(conn, folder)
+    _seed_tagged(conn)
     _seed_layout(conn)
+    _write_addon()
     conn.commit()
     conn.close()
 
@@ -162,8 +242,31 @@ def reimport(edit_path, colour):
     conn.close()
 
 
+def _serve_addon_page():
+    """The add-on's UI: one page with a text field, so a flow can put focus inside the add-on frame."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    page = (b'<!doctype html><meta charset="utf-8"><title>E2E add-on</title>'
+            b'<h1>E2E add-on</h1><label>Note <input aria-label="add-on note"></label>')
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.send_header('Content-Length', str(len(page)))
+            self.end_headers()
+            self.wfile.write(page)
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(('127.0.0.1', ADDON_UI_PORT), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+
+
 def serve(port, edition_password):
     seed(edition_password)
+    _serve_addon_page()
     env = {**os.environ, 'FACET_CONFIG': CONFIG_PATH, 'DB_PATH': DB_PATH, 'PYTHONIOENCODING': 'utf-8',
            'FACET_BUILD': 'e2e', 'XDG_DATA_HOME': XDG_DATA_HOME}
     sys.exit(subprocess.call([sys.executable, 'viewer.py', '--production', '--port', str(port),
