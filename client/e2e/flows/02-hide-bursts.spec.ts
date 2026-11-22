@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures';
+import { expectCleanUI } from '../helpers/ui-probe.helpers';
 
 // Hide bursts (on by default) folds each burst behind its lead; Show all brings every frame back.
 test('Hide bursts folds a burst behind its lead and Show all brings the frames back', async ({ page }) => {
@@ -8,10 +9,12 @@ test('Hide bursts folds a burst behind its lead and Show all brings the frames b
   await test.step('1. By default the burst shows as one card, its lead', async () => {
     await page.goto('/');
     await expect(cards).toHaveCount(1);
+    await expectCleanUI(page, { label: '02 bursts folded' });
   });
 
   await test.step('2. Show all lists all three of its frames', async () => {
     await page.getByRole('button', { name: 'Show all' }).click();
     await expect(cards).toHaveCount(3);
+    await expectCleanUI(page, { label: '02 show all' });
   });
 });
