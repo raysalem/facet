@@ -483,6 +483,22 @@ describe('GalleryComponent', () => {
       fixture.destroy();
     });
 
+    // B47: below lg the Filters drawer is a mat-sidenav whose inner container scrolls. The sidebar's
+    // sr-only spans are position: absolute with the drawer as containing block, so one low in the
+    // list stretched the drawer into a second scroller beside the list's own (903 px in 796).
+    it('below lg the Filters drawer body clips what it holds, so only the list inside it scrolls', async () => {
+      const { fixture, root } = render(false);
+      mockStore.filterDrawerOpen.set(true); fixture.detectChanges(); TestBed.flushEffects();
+      await fixture.whenStable(); fixture.detectChanges();
+      const list = root.querySelector<HTMLElement>('mat-sidenav [data-scroll]')!;
+      expect(list.classList).toContain('overflow-y-auto');
+      const body = list.parentElement!.closest('div.h-full') as HTMLElement;
+      expect(body.classList).toContain('relative');
+      expect(body.classList).toContain('overflow-hidden');
+      expect(body.classList).not.toContain('overflow-y-auto');
+      fixture.destroy();
+    });
+
     it('from lg the Filters button (the drawer flag) opens and closes the Filter panel, and the drawer stays shut', () => {
       const { fixture, root } = render(true);
       const drawer = fixture.debugElement.query(By.directive(MatSidenav)).componentInstance as MatSidenav;

@@ -269,7 +269,7 @@ type RatingOption = 'any' | '1' | '2' | '3' | '4' | '5' | 'zero';
   ],
   changeDetection: ChangeDetectionStrategy.Eager,
   template: `
-<ng-template #bodyContent><div class="flex flex-col h-full bg-[var(--mat-sys-surface-container-lowest)] [&_.mat-expansion-panel]:!shadow-none [&_.mat-expansion-panel]:!rounded-none [&_.mat-expansion-panel]:!bg-transparent [&_.mat-expansion-panel]:!mx-0 [&_.mat-expansion-panel]:!my-0 [&_.mat-expansion-panel]:border-b [&_.mat-expansion-panel]:border-[var(--mat-sys-outline-variant)]">
+<ng-template #bodyContent><div class="relative flex flex-col h-full overflow-hidden bg-[var(--mat-sys-surface-container-lowest)] [&_.mat-expansion-panel]:!shadow-none [&_.mat-expansion-panel]:!rounded-none [&_.mat-expansion-panel]:!bg-transparent [&_.mat-expansion-panel]:!mx-0 [&_.mat-expansion-panel]:!my-0 [&_.mat-expansion-panel]:border-b [&_.mat-expansion-panel]:border-[var(--mat-sys-outline-variant)]">
 <div class="shrink-0 px-4 border-b border-[var(--mat-sys-outline-variant)]">
 
       <div class="relative py-2 flex items-center gap-2">
