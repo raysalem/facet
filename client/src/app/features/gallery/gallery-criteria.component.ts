@@ -160,7 +160,7 @@ const SORT_ARROWS:Record<string,string>={ASC:' ↑',DESC:' ↓'};
             <span class="font-medium w-8 text-right shrink-0">{{ similaritySliderValue() }}%</span>
           }
           <button
-            class="inline-flex items-center justify-center min-w-8 min-h-8 max-sm:min-w-11 max-sm:min-h-11 rounded-full hover:bg-black/20 transition-colors"
+            class="inline-flex shrink-0 items-center justify-center min-w-8 min-h-8 max-sm:min-w-11 max-sm:min-h-11 rounded-full hover:bg-black/20 transition-colors"
             (click)="clearSimilarFilter()"
             [attr.aria-label]="I18N.gallery.criteria.remove | translate:{ label: (I18N.gallery.criteria.ranked | translate) }"
           >
@@ -178,13 +178,13 @@ const SORT_ARROWS:Record<string,string>={ASC:' ↑',DESC:' ↓'};
             <span class="px-2 py-1 text-xs">{{ chip.labelKey | translate }}: {{ chip.value }}</span>
           }
         } @else {
-          <div class="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-md bg-[var(--mat-sys-secondary-container)] text-[var(--mat-sys-on-secondary-container)] text-xs font-medium">
-            <span class="font-normal">{{ chip.labelKey | translate }}</span>
+          <div class="inline-flex max-w-full items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-md bg-[var(--mat-sys-secondary-container)] text-[var(--mat-sys-on-secondary-container)] text-xs font-medium">
+            <span class="shrink-0 font-normal">{{ chip.labelKey | translate }}</span>
             @if (chip.value) {
-              <span class="mx-0.5 max-w-64 truncate" [title]="displayValue">{{ displayValue }}</span>
+              <span class="mx-0.5 min-w-0 max-w-64 truncate" [title]="displayValue">{{ displayValue }}</span>
             }
             <button
-              class="inline-flex items-center justify-center min-w-8 min-h-8 max-sm:min-w-11 max-sm:min-h-11 rounded-full hover:bg-black/20 transition-colors"
+              class="inline-flex shrink-0 items-center justify-center min-w-8 min-h-8 max-sm:min-w-11 max-sm:min-h-11 rounded-full hover:bg-black/20 transition-colors"
               (click)="clearFilterChip(chip)"
               [attr.aria-label]="I18N.gallery.criteria.remove | translate:{ label: (chip.labelKey | translate) }"
             >

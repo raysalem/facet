@@ -60,6 +60,23 @@ describe('album rules placement',()=>{
   expect(order()).toEqual(['chips','rules']);
  });
 });
+describe('filter chip width (B48)',()=>{
+ // A Folders chip holds a UNC path. Its value is capped at max-w-64, but the chip (label + value +
+ // remove) was wider than the 288 px the Showing panel offers and ended 7 px past the panel edge:
+ // the chip must be allowed to shrink, with the value as the part that gives way.
+ it('lets a long value truncate inside the chip instead of widening it past its container',()=>{
+  const {fixture,filtersSignal}=createCriteria();
+  const path='//192.168.1.90/Photos and Videos/peter/first communion';
+  filtersSignal.update(filters=>({...filters,path_prefix:path}));fixture.detectChanges();
+  const chip=(fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('[data-active-criteria] > div')!;
+  const value=chip.querySelector<HTMLElement>('[title]')!;
+  expect(value.getAttribute('title')).toContain('first communion');
+  expect(chip.classList).toContain('max-w-full');
+  expect(value.classList).toContain('min-w-0');
+  expect(value.classList).toContain('truncate');
+  expect(chip.querySelector('button')!.classList).toContain('shrink-0');
+ });
+});
 describe('recent collection visits',()=>{ it('lets Escape leave a closed inner disclosure so the enclosing mobile menu can close',()=>{
   const {fixture}=createCriteria();fixture.detectChanges();
   const root=fixture.nativeElement as HTMLElement;
