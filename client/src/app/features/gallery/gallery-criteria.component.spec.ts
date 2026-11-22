@@ -66,7 +66,7 @@ describe('filter chip width (B48)',()=>{
  // the chip must be allowed to shrink, with the value as the part that gives way.
  it('lets a long value truncate inside the chip instead of widening it past its container',()=>{
   const {fixture,filtersSignal}=createCriteria();
-  const path='//192.168.1.90/Photos and Videos/peter/first communion';
+  const path='//nas.example/photos/event/first communion';
   filtersSignal.update(filters=>({...filters,path_prefix:path}));fixture.detectChanges();
   const chip=(fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('[data-active-criteria] > div')!;
   const value=chip.querySelector<HTMLElement>('[title]')!;
