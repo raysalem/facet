@@ -52,7 +52,7 @@ test('Showing names the album, the Set chip narrows it, and a new album starts c
   });
 
   await test.step('4. A long folder chip truncates inside the panel (B48)', async () => {
-    const folder = '//192.168.1.90/Photos and Videos/peter/' + 'first communion with a very long folder name '.repeat(3).trim();
+    const folder = '//nas.example/photos/event/' + 'first communion with a very long folder name '.repeat(3).trim();
     await page.goto(page.url().split('?')[0] + '?path_prefix=' + encodeURIComponent(folder));
     await expect(page.getByRole('heading', { name: 'E2E Album A', level: 1 })).toBeVisible();
     if ((await showingTab(page).getAttribute('aria-selected')) !== 'true') await openShowing(page);
