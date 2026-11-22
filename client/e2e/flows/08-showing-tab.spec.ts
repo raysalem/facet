@@ -50,4 +50,17 @@ test('Showing names the album, the Set chip narrows it, and a new album starts c
     await expect(showingPanel(page).getByText(/ · \d+ filters?$/), 'no filter is carried over').toHaveCount(0);
     await expectCleanUI(page, { label: '08 new album', panes: [PANEL] });
   });
+
+  await test.step('4. A long folder chip truncates inside the panel (B48)', async () => {
+    const folder = '//192.168.1.90/Photos and Videos/peter/' + 'first communion with a very long folder name '.repeat(3).trim();
+    await page.goto(page.url().split('?')[0] + '?path_prefix=' + encodeURIComponent(folder));
+    await expect(page.getByRole('heading', { name: 'E2E Album A', level: 1 })).toBeVisible();
+    if ((await showingTab(page).getAttribute('aria-selected')) !== 'true') await openShowing(page);
+    const chip = showingPanel(page).getByRole('group', { name: 'Active criteria' }).locator('> div', { hasText: 'first communion' });
+    await expect(chip, 'the folder chip is listed').toContainText('first communion');
+    const box = (await chip.boundingBox())!;
+    const panel = (await showingPanel(page).boundingBox())!;
+    expect(box.x + box.width, 'the chip ends inside the Showing panel').toBeLessThanOrEqual(panel.x + panel.width);
+    await expectCleanUI(page, { label: '08 long folder chip', panes: [PANEL] });
+  });
 });
