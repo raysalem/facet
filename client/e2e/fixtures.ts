@@ -17,11 +17,16 @@ export function seedTool(...args: string[]): void {
   execFileSync(PYTHON, [path.join(__dirname, 'seed_library.py'), ...args], { stdio: 'pipe' });
 }
 
+/** The edition token, asked for once per run: the login route answers 429 after a few logins in a minute. */
+let cachedToken: string | null = null;
+
 /** Log in to edition mode the way the client does, and return the bearer token. */
 export async function editionToken(page: Page): Promise<string> {
+  if (cachedToken) return cachedToken;
   const res = await page.request.post('/api/auth/edition/login', { data: { password: EDITION_PASSWORD } });
   expect(res.ok(), `edition login: ${res.status()}`).toBeTruthy();
-  return (await res.json()).access_token as string;
+  cachedToken = (await res.json()).access_token as string;
+  return cachedToken;
 }
 
 /** The RGB of the middle pixel of a rendered <img>, read through a canvas. */

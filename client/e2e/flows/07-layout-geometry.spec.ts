@@ -28,12 +28,10 @@ function scrollers(page: Page): Promise<{ kind: 'grid' | 'panel' | 'other'; what
 }
 
 async function openLayoutAlbum(page: Page): Promise<void> {
-  // The Albums link joins the nav once the app's startup config is in; entering a gallery before
-  // that can leave an empty grid (a separate startup race, not this flow's subject).
-  await page.goto('/albums');
-  await page.getByRole('navigation', { name: 'Navigation' }).getByRole('link', { name: /Albums$/ }).click();
-  await page.getByRole('link', { name: /E2E Layout/ }).click();
-  await expect(page.getByRole('heading', { name: 'E2E Layout', level: 1 })).toBeVisible();
+  // Enter from the Albums page. (Clicking the nav's Albums link first, as this once did, can wait forever: on a
+  // start where the app's config read is slow the nav stays at Gallery / Persons / Statistics, a startup race that is
+  // not this flow's subject; the album cards on the Albums page are there regardless.)
+  await openAlbum(page, 'E2E Layout');
   await expect(page.getByRole('button', { name: 'LAY_001.jpg' })).toBeVisible();
 }
 
@@ -175,8 +173,7 @@ for (const { name, size, theme } of LAYOUTS) {
     const lg = size.width >= 1024;
 
     await test.step('1. The 80-photo album, with the Showing panel open where there is a rail', async () => {
-      await openAlbum(page, 'E2E Layout');   // the nav link is a drawer at phone width: enter from the Albums page
-      await expect(page.getByRole('button', { name: 'LAY_001.jpg' })).toBeVisible();
+      await openLayoutAlbum(page);
       // The theme really is the one asked for (light adds a class to <html>).
       if (theme === 'dark') await expect(page.locator('html')).not.toHaveClass(/light-mode/);
       else await expect(page.locator('html')).toHaveClass(/light-mode/);
