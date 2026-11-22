@@ -536,6 +536,14 @@ export class GalleryStore {
     this.total.set(response.total);
     this.matchingPhotoTotal.set(response.photo_total ?? null);
   }
+  /** Forget the listing a different view left behind: rows, both totals and the hidden-photos
+   *  summary go together, so no half of the old view (a count, a notice) outlives its rows. */
+  clearListing(): void {
+    this.photos.set([]);
+    this.total.set(0);
+    this.matchingPhotoTotal.set(null);
+    this.hiddenSummary.set({ total: 0, blinks: 0, bursts: 0, duplicates: 0, brackets: 0, panoramas: 0 });
+  }
   readonly loading = signal(false);
   /** Invalidates timeline snapshots for changes that can affect unloaded rows. */
   readonly timelineMembershipRevision = signal(0);

@@ -152,6 +152,7 @@ describe('GalleryComponent', () => {
         { id: 'macro', label: 'Macro', count: 50 },
       ]),
       photos: signal([]),
+      clearListing: vi.fn(() => { mockStore.photos.set([]); mockStore.total.set(0); mockStore.hiddenSummary.set({ total: 0, blinks: 0, bursts: 0, duplicates: 0, brackets: 0, panoramas: 0 }); }),
       focusedPath: signal<string | null>(null),
       total: signal(0),
       photoTotal: () => mockStore.total(),
@@ -397,6 +398,8 @@ describe('GalleryComponent', () => {
     const desktop = signal(true);
     Object.defineProperty(fixture.componentInstance, 'isDesktop', { value: desktop });
     fixture.detectChanges();
+    mockStore.initializing.set(false);
+    fixture.detectChanges();
     const header = fixture.nativeElement.querySelector('[data-collection-header]') as HTMLElement;
     expect(header.textContent).toContain('4 matching, 2 displayed');
     const status = header.querySelector('[role="status"]');
@@ -530,6 +533,7 @@ describe('GalleryComponent', () => {
 
     it('heads the panel Showing, with the statement of what the grid holds: the album named, not counted as a filter', () => {
       const { fixture, root } = render(true);
+      mockStore.initializing.set(false); fixture.detectChanges();
       const tab = root.querySelector<HTMLButtonElement>('app-panel-rail [data-rail-tab="filter"]')!;
       expect(tab.getAttribute('aria-label')).toBe('gallery.rail.showing');
       expect(tab.querySelector('mat-icon')!.textContent!.trim()).toBe('photo_library');
@@ -2076,6 +2080,59 @@ describe('GalleryComponent', () => {
       releaseConfig();
       await init;
       expect(mockStore.loadPhotos).toHaveBeenCalledOnce();
+    });
+
+    // B46: between the click and the first page of the new album (config + album reads, then the
+    // listing) the grid said "No photos found", the header said "All Photos" and the count and the
+    // hidden-photos notice were the other album's.
+    describe('while the first page of another album is in flight (B46)', () => {
+      function renderInitializing() {
+        mockStore.initializing.set(true);
+        mockStore.loading.set(false);
+        const fixture = TestBed.createComponent(GalleryComponent);
+        fixture.detectChanges(); TestBed.tick(); fixture.detectChanges();
+        return { fixture, root: fixture.nativeElement as HTMLElement };
+      }
+
+      it('shows the loading skeleton, not the empty state', () => {
+        const { fixture, root } = renderInitializing();
+        expect(root.textContent).not.toContain(I18N.gallery.no_photos);
+        expect(root.querySelector('[aria-busy="true"] app-photo-skeleton')).not.toBeNull();
+        fixture.destroy();
+      });
+
+      it('names no album it is not showing and carries no count', () => {
+        const { fixture, root } = renderInitializing();
+        const header = root.querySelector('[data-collection-header]') as HTMLElement;
+        expect(header.querySelector('h1')?.textContent).toContain(I18N.gallery.loading_photos);
+        expect(header.querySelector('h1')?.textContent).not.toContain(I18N.gallery.all_photos);
+        expect(header.querySelector('[role="status"]')?.textContent?.trim()).toBe('');
+        fixture.destroy();
+      });
+
+      it('shows the empty state again once the load settles with nothing', () => {
+        const { fixture, root } = renderInitializing();
+        mockStore.initializing.set(false);
+        fixture.detectChanges(); TestBed.tick(); fixture.detectChanges();
+        expect(root.textContent).toContain(I18N.gallery.no_photos);
+        fixture.destroy();
+      });
+
+      it('clears the previous view\'s listing, hidden-photos summary included, when the visit starts', async () => {
+        routeMock.snapshot.paramMap.get = vi.fn((k: string) => (k === 'albumId' ? '7' : null));
+        routeMock.snapshot.queryParams = {};
+        mockStore.currentAlbum.set({ id: 3 });
+        mockStore.photos.set([{ path: '/other-album/a.jpg' }]);
+        mockStore.hiddenSummary.set({ total: 21, blinks: 0, bursts: 21, duplicates: 0, brackets: 0, panoramas: 0 });
+        let releaseConfig!: () => void;
+        mockStore.loadConfig.mockImplementation(() => new Promise<boolean>(resolve => { releaseConfig = () => resolve(true); }));
+
+        const init = component.ngOnInit();
+
+        expect(mockStore.clearListing).toHaveBeenCalledOnce();
+        releaseConfig();
+        await init;
+      });
     });
 
     it('keeps the rows of a view it restores', async () => {
@@ -4760,6 +4817,7 @@ describe('GalleryComponent', () => {
         mockLayout(1000, 640);
         const f = render();
         f.detectChanges();
+        mockStore.initializing.set(false); f.detectChanges();
         const spacer = f.nativeElement.querySelector('mat-sidenav-content div[aria-hidden="true"][style*="height"]') as HTMLElement;
         expect(spacer.style.height).toBe('160px');
       });
@@ -5590,6 +5648,8 @@ describe('GalleryComponent', () => {
       scan.canLaunch.set(canLaunch);
       scan.openLauncher.mockResolvedValue(launched);
       fixture = TestBed.createComponent(GalleryComponent);
+      fixture.detectChanges();
+      mockStore.initializing.set(false);
       fixture.detectChanges();
       return { f: fixture, scan };
     }

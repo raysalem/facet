@@ -121,6 +121,25 @@ describe('GalleryStore', () => {
     store = TestBed.inject(GalleryStore);
   });
 
+  describe('clearListing (B46)', () => {
+    it('drops rows, both totals and the hidden-photos summary together', async () => {
+      apiGet.mockImplementation((path: string) => of(path === '/config' ? makeConfig() : makePhotosResponse({
+        total: 1, photo_total: 48, hidden_summary: { total: 21, blinks: 0, bursts: 21, duplicates: 0, brackets: 0, panoramas: 0 },
+      })));
+      await store.loadPhotos();
+      expect(store.photoTotal()).toBe(48);
+      expect(store.hiddenSummary().total).toBe(21);
+
+      store.clearListing();
+
+      expect(store.photos()).toEqual([]);
+      expect(store.total()).toBe(0);
+      // A stale matching count beside zero rows read "48 matching, 0 displayed".
+      expect(store.photoTotal()).toBe(0);
+      expect(store.hiddenSummary().total).toBe(0);
+    });
+  });
+
   describe('filter drawer restore', () => {
     const restoreWith = (wide: boolean): boolean => {
       localStorage.setItem('facet_filter_drawer_open', 'true');

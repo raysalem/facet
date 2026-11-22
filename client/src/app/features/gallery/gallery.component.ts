@@ -271,11 +271,12 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
         <header #collectionHeader data-collection-header class="sticky top-0 z-40 @container border-b border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] px-2 md:px-4">
           <div data-collection-bar class="-mx-2 flex flex-wrap items-center gap-x-2 gap-y-1 bg-[var(--mat-sys-surface-container)] px-2 py-2 md:-mx-4 md:px-4 @min-[480px]:@max-[639px]:grid @min-[480px]:@max-[639px]:grid-cols-[minmax(0,1fr)_auto]">
           <div class="min-w-40 flex-1 @min-[960px]:max-w-52 @min-[960px]:min-w-32 @min-[960px]:basis-0 @min-[1280px]:max-w-64 @min-[480px]:@max-[639px]:col-start-1 @min-[480px]:@max-[639px]:col-span-2 @min-[480px]:@max-[639px]:row-start-1 @min-[480px]:@max-[639px]:pr-48">
-          <h1 class="m-0 min-w-0 text-lg font-medium leading-6 text-[var(--mat-sys-on-surface)] truncate" [title]="store.currentAlbum()?.name || (I18N.gallery.all_photos | translate)">
-            {{ store.currentAlbum()?.name || (I18N.gallery.all_photos | translate) }}
+          <h1 class="m-0 min-w-0 text-lg font-medium leading-6 text-[var(--mat-sys-on-surface)] truncate" [title]="collectionTitle()">
+            {{ collectionTitle() }}
           </h1>
           <p role="status" class="m-0 text-xs leading-5 tabular-nums text-[var(--mat-sys-on-surface-variant)]">
-            @if (!pinned() && store.photoTotal() !== store.total()) {
+            @if (store.initializing() && !store.photos().length) {
+            } @else if (!pinned() && store.photoTotal() !== store.total()) {
               {{ I18N.gallery.collection_totals_compact | translate:{ photos: store.photoTotal(), items: store.total() } }}
             } @else {
               {{ (pinned() ? store.total() : store.photoTotal()) | pluralKey:I18N.gallery.photo_count_one:I18N.gallery.photo_count | translate:{ count: pinned() ? store.total() : store.photoTotal() } }}
@@ -613,7 +614,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
         }
 
         <!-- Loading skeletons -->
-        @if (store.loading()) {
+        @if (store.loading() || (store.initializing() && !store.photos().length)) {
           <div role="status" [attr.aria-label]="I18N.gallery.loading_photos | translate" aria-busy="true">
             @if (!store.photos().length) {
               <div
@@ -651,7 +652,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
         }
 
         <!-- Empty state -->
-        @if (!store.loading() && !store.loadError() && store.photos().length === 0 && store.total() === 0) {
+        @if (!store.loading() && !store.initializing() && !store.loadError() && store.photos().length === 0 && store.total() === 0) {
           <div class="flex flex-col items-center justify-center gap-4 p-16 opacity-60">
             <mat-icon class="!text-6xl !w-16 !h-16">photo_library</mat-icon>
             <p class="text-lg">{{ I18N.gallery.no_photos | translate }}</p>
@@ -979,8 +980,8 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
         <div data-panel-header class="flex shrink-0 items-center gap-2 px-4 pt-2">
           <div class="min-w-0 flex-1 py-1">
             <h2 class="m-0 truncate text-sm font-medium">{{ I18N.gallery.rail.showing | translate }}</h2>
-            <p data-showing-statement class="m-0 truncate text-xs text-[var(--mat-sys-on-surface-variant)]" [title]="store.currentAlbum()?.name || (I18N.gallery.all_photos | translate)">
-              {{ store.currentAlbum()?.name || (I18N.gallery.all_photos | translate) }}@if (activeFilterCount()) { · {{ activeFilterCount() | pluralKey:I18N.gallery.rail.filters_one:I18N.gallery.rail.filters | translate:{ count: activeFilterCount() } }}}
+            <p data-showing-statement class="m-0 truncate text-xs text-[var(--mat-sys-on-surface-variant)]" [title]="collectionTitle()">
+              {{ collectionTitle() }}@if (activeFilterCount()) { · {{ activeFilterCount() | pluralKey:I18N.gallery.rail.filters_one:I18N.gallery.rail.filters | translate:{ count: activeFilterCount() } }}}
             </p>
           </div>
           <button mat-icon-button data-close-panels class="!h-8 !w-8 !p-0 shrink-0" [matTooltip]="I18N.ui.buttons.close_panels | translate"
@@ -1793,6 +1794,10 @@ export class GalleryComponent implements OnInit, OnDestroy {
     this.store.setReviewProgressVisible(true);
   }
   protected readonly reviewBookmarkShown = computed(() => !!this.store.reviewBookmark() && !this.noticeClosed('review_bookmark'));
+  /** The album name; while a visit is still reading its album, a neutral title rather than the plain gallery's. */
+  protected readonly collectionTitle = computed(() => this.store.currentAlbum()?.name
+    || this.i18n.t(this.store.initializing() ? I18N.gallery.loading_photos : I18N.gallery.all_photos));
+
   protected readonly hiddenNoticeShown = computed(() => this.showHiddenBanner() && !this.noticeClosed('hidden'));
   protected readonly restoreNoticeShown = computed(() => this.canRestoreHidden() && !this.noticeClosed('restore_hidden'));
 
@@ -2300,8 +2305,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
     // reloads anyway (loadPhotos clears without retainRows), but only after the config and album
     // reads: until then a different album's grid would show, and open, the other album's photos.
     if (String(this.store.currentAlbum()?.id ?? '') !== (routeAlbumId ?? '')) {
-      this.store.photos.set([]);
-      this.store.total.set(0);
+      this.store.clearListing();
     }
     // Reset album state to avoid stale singleton data; loadConfig() resets filters from scratch
     this.store.currentAlbum.set(null);
