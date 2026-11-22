@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import * as path from 'node:path';
 import { test as base, expect, type Page } from '@playwright/test';
 import { EDITION_PASSWORD, PYTHON } from './env';
+import { attachNetworkGate } from './helpers/ui-probe.helpers';
 
 export const WORK = path.resolve(__dirname, '.work');
 
@@ -37,28 +38,21 @@ export async function centrePixel(page: Page, selector: string): Promise<[number
   });
 }
 
-/** Every flow fails on a page error, a console error or a 5xx answer, even if the screen looks fine. */
+/** Every flow fails on a page error, a console error, a 5xx or a 4xx answer, even if the screen looks fine.
+ *  The network half is the kit's attachNetworkGate (I6): a 4xx counts whether or not the browser logged it. */
 export const test = base.extend<{ gate: void }>({
   gate: [
     async ({ page }, use) => {
       const problems: string[] = [];
       page.on('pageerror', (err) => problems.push(`pageerror: ${err.message}`));
-      let failedLoad = false;
       page.on('console', (msg) => {
-        if (msg.type() !== 'error') return;
-        problems.push(`console.error: ${msg.text()}`);
-        if (msg.text().startsWith('Failed to load resource')) failedLoad = true;
+        // A failed load logs only "Failed to load resource"; the gate below names the URL.
+        if (msg.type() === 'error' && !msg.text().startsWith('Failed to load resource')) problems.push(`console.error: ${msg.text()}`);
       });
-      // A failed load logs only "Failed to load resource"; keep the URLs so the report names them.
-      const failed: string[] = [];
-      page.on('response', (res) => {
-        const line = `${res.status()} ${res.request().method()} ${decodeURIComponent(res.url())}`;
-        if (res.status() >= 500) problems.push(line);
-        else if (res.status() >= 400) failed.push(line);
-      });
+      const network = attachNetworkGate(page);
       await use();
-      if (failedLoad && failed.length) problems.push(`4xx responses: ${failed.join(' ; ')}`);
       expect(problems, 'errors seen during the flow').toEqual([]);
+      network.assertClean();
     },
     { auto: true },
   ],
