@@ -66,7 +66,10 @@ ADDON_ID = 'e2e-addon'
 
 # Layout geometry flow (read-only): one manual album with enough photos to overflow the grid, each
 # its own one-frame burst; the best-scored one carries LAYOUT_TAG_COUNT tags for the hover card.
-LAYOUT_ALBUM, LAYOUT_SIZE, LAYOUT_TAG_COUNT = 'E2E Layout', 80, 20
+LAYOUT_ALBUM, LAYOUT_SIZE, LAYOUT_TAG_COUNT, LAYOUT_PEOPLE = 'E2E Layout', 80, 20, 7
+LAYOUT_CAMERA = 'E2E Camera Company Professional Mirrorless Full Frame Body Model Number One Hundred Twenty Three'
+LAYOUT_CAPTION = ('A long caption that keeps going well past the width of the picture it describes, so that a caption '
+                  'line which could widen the floating card would do so: ' + 'words ' * 30).strip()
 
 
 def _jpeg(colour, size):
@@ -128,6 +131,12 @@ def _seed_layout(conn):
     conn.executemany('INSERT INTO photo_tags (photo_path, tag) VALUES (?, ?)', [(first, t) for t in tags[:4]])
     conn.executemany("INSERT INTO photo_manual_tags (photo_path, tag, source) VALUES (?, ?, 'user')",
                      [(first, t) for t in tags[4:]])
+    # The rest of what the floating card shows, long enough to stretch it if a row could: a capture line
+    # (camera, lens settings), a caption, and 7 named people.
+    conn.execute('UPDATE photos SET camera_model = ?, focal_length = 35, f_stop = 1.8, iso = 400, caption = ? '
+                 'WHERE path = ?', (LAYOUT_CAMERA, LAYOUT_CAPTION, first))
+    for n in range(LAYOUT_PEOPLE):
+        _add_person(conn, first, f'Person {n + 1}', n)
 
 
 def _seed_album(conn, folder):
@@ -139,6 +148,17 @@ def _seed_album(conn, folder):
         path = _insert_photo(conn, folder, f'{prefix}_{i + 1:02d}.jpg', colour, 5.0, 1, base + i, i)
         conn.execute('INSERT INTO album_photos (album_id, photo_path, position) VALUES (?, ?, ?)',
                      (album_id, path, i))
+
+
+def _add_person(conn, photo_path, name, face_index):
+    """A named person with one face on the photo (the avatar needs the person's thumbnail)."""
+    thumbnail = _jpeg('#868e96', (96, 96))
+    conn.execute('INSERT INTO persons (name, face_count, auto_clustered, face_thumbnail) VALUES (?, 1, 0, ?)',
+                 (name, thumbnail))
+    person_id = conn.execute('SELECT max(id) FROM persons').fetchone()[0]
+    conn.execute('INSERT INTO faces (photo_path, face_index, embedding, bbox_x1, bbox_y1, bbox_x2, bbox_y2, '
+                 'confidence, person_id, face_thumbnail) VALUES (?, ?, ?, 400, 200, 700, 500, 0.99, ?, ?)',
+                 (photo_path, face_index, b'\0' * 2048, person_id, thumbnail))
 
 
 def _seed_tagged(conn):
@@ -166,13 +186,8 @@ def _seed_tagged(conn):
     # Object tags: a manual tag written by an installed add-on (created_by = its id, see api/routers/gallery.py).
     conn.execute("INSERT INTO photo_manual_tags (photo_path, tag, source, created_by) VALUES (?, ?, 'user', ?)",
                  (first, TAGGED_OBJECT_TAG, ADDON_ID))
-    # People tags: a face assigned to a named person (the avatar needs the person's thumbnail).
-    conn.execute('INSERT INTO persons (name, face_count, auto_clustered, face_thumbnail) VALUES (?, 1, 0, ?)',
-                 (TAGGED_PERSON, _jpeg('#868e96', (96, 96))))
-    person_id = conn.execute('SELECT id FROM persons WHERE name = ?', (TAGGED_PERSON,)).fetchone()[0]
-    conn.execute('INSERT INTO faces (photo_path, face_index, embedding, bbox_x1, bbox_y1, bbox_x2, bbox_y2, '
-                 'confidence, person_id, face_thumbnail) VALUES (?, 0, ?, 400, 200, 700, 500, 0.99, ?, ?)',
-                 (first, b'\0' * 2048, person_id, _jpeg('#868e96', (96, 96))))
+    # People tags: a face assigned to a named person.
+    _add_person(conn, first, TAGGED_PERSON, 0)
 
 
 def _write_addon():

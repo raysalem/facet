@@ -35,6 +35,8 @@ export function showingTab(page: Page): Locator {
   return page.getByRole('tablist', { name: 'Gallery panels' }).getByRole('tab', { name: 'Showing' });
 }
 export const showingPanel = (page: Page) => page.getByRole('tabpanel', { name: 'Showing' });
+/** The line under the panel's title: what the grid holds (the album, then the filter count). */
+export const showingStatement = (page: Page) => showingPanel(page).getByRole('paragraph').first();
 
 export async function openShowing(page: Page): Promise<void> {
   await showingTab(page).click();
@@ -64,4 +66,40 @@ export async function recordContentWidth(page: Page, label: string): Promise<voi
 export async function expectNoPageScroll(page: Page, label: string): Promise<void> {
   const over = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - window.innerWidth);
   expect(over, `${label}: horizontal page scroll (px)`).toBeLessThanOrEqual(1);
+}
+
+/** The four tag kinds on a photo Content panel, in the order the UI standard fixes (U4): Tags, People tags,
+ *  Object tags (folded), Album tags (folded, last). Their labels, top to bottom; fails if one is missing. */
+export async function tagKindPositions(page: Page): Promise<{ kind: string; top: number }[]> {
+  const panel = page.getByRole('tabpanel', { name: 'Content' });
+  const marks: [string, Locator][] = [
+    ['Tags', panel.getByText('Tags', { exact: true })],
+    ['People tags', panel.getByRole('heading', { name: 'People tags' })],
+    ['Object tags', panel.getByRole('button', { name: /^Object tags from / })],
+    ['Album tags', panel.getByRole('button', { name: /^Album tags: / })],
+  ];
+  const found: { kind: string; top: number }[] = [];
+  for (const [kind, locator] of marks) {
+    await expect(locator, `the ${kind} group is on the Content panel`).toBeVisible();
+    found.push({ kind, top: (await locator.boundingBox())!.y });
+  }
+  return found;
+}
+
+export async function expectTagKindOrder(page: Page, label: string): Promise<void> {
+  const found = await tagKindPositions(page);
+  const tops = found.map((f) => f.top);
+  expect(tops, `${label}: ${found.map((f) => `${f.kind} @${Math.round(f.top)}`).join(', ')}`).toEqual([...tops].sort((a, b) => a - b));
+  expect(new Set(tops).size, `${label}: each kind on its own row`).toBe(4);
+}
+
+/** The photo page tabs: a rail (icons stacked) from lg, a bar (icons in a row) below it, told by where the tabs sit. */
+export async function photoTabsLayout(page: Page): Promise<'column' | 'row'> {
+  const tabs = page.getByRole('tablist', { name: 'Photo panels' }).getByRole('tab');
+  const boxes = await Promise.all((await tabs.all()).map((t) => t.boundingBox()));
+  const xs = new Set(boxes.map((b) => Math.round(b!.x)));
+  const ys = new Set(boxes.map((b) => Math.round(b!.y)));
+  if (xs.size === 1 && ys.size === boxes.length) return 'column';
+  if (ys.size === 1 && xs.size === boxes.length) return 'row';
+  throw new Error(`photo panel tabs are neither a column nor a row: ${JSON.stringify(boxes)}`);
 }

@@ -22,4 +22,18 @@ export const KNOWN_FINDINGS: KnownFinding[] = [
     selector: 'svg',
     note: 'The photo page lays an absolutely placed <svg> (face boxes) over the image, as wide as the image; it is not a floating card.',
   },
+  {
+    id: 'FP-photo-collection-overlay',
+    kind: 'false-positive',
+    rule: 'I4',
+    selector: 'div.pointer-events-none.absolute',
+    note: 'On a photo opened from a collection, the previous/next arrows sit in a pointer-events-none absolute inset-0 overlay (photo-detail.component.ts, the collection group) as wide as the image; it is not a floating card.',
+  },
+  {
+    id: 'F-filters-drawer-double-scroll',
+    kind: 'finding',
+    rule: 'I2',
+    selector: 'mat-sidenav.mat-drawer.mat-sidenav',
+    note: 'At 1023x768 the album Filters drawer itself scrolls (734 of 720 px) while its inner list also scrolls (560 of 530 px): two vertical scrollers in one pane.',
+  },
 ];
