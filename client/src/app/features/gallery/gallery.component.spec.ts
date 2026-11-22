@@ -475,8 +475,7 @@ describe('GalleryComponent', () => {
       const panel = root.querySelector<HTMLElement>('[data-gallery-panel="filter"]')!;
       // An sr-only label is position: absolute; with no positioned ancestor it took the shell's <main> as containing
       // block, escaped the panel's scroller and stretched <main> into a third scrollbar (919 px in a 583 px window).
-      expect(panel.classList).toContain('relative');
-      expect(panel.classList).toContain('overflow-hidden');
+      // Positioned and clipping (`relative overflow-hidden`): geometry in e2e flow 07-layout-geometry (one scroller per pane).
       // The panel itself never scrolls: its criteria and its filter controls own their scrollers.
       expect(panel.classList).not.toContain('overflow-y-auto');
       expect(panel.querySelector('app-gallery-criteria')!.classList).toContain('overflow-y-auto');

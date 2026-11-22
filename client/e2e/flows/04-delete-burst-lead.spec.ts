@@ -1,4 +1,5 @@
 import { test, expect, libraryPath, editionToken, seedTool } from '../fixtures';
+import { expectCleanUI } from '../helpers/ui-probe.helpers';
 
 // Deleting the AI edit that leads its burst must hand the lead to the best remaining frame, or Hide
 // bursts hides the whole burst. Found while reproducing B22, as B23.
@@ -8,6 +9,7 @@ test('deleting the AI edit that leads its burst keeps the burst in the gallery',
   await test.step('1. The burst shows as its leading AI edit', async () => {
     await page.goto('/');
     await expect(page.getByRole('button', { name: 'IMG_0200_agy_1.jpg', exact: true })).toBeVisible();
+    await expectCleanUI(page, { label: '04 before delete' });
   });
 
   await test.step('2. Delete the leading edit (edition mode)', async () => {
@@ -25,5 +27,6 @@ test('deleting the AI edit that leads its burst keeps the burst in the gallery',
     await expect(page.getByRole('button', { name: 'IMG_0200_agy_1.jpg', exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'IMG_0200.jpg', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'IMG_0201.jpg', exact: true })).toHaveCount(0);
+    await expectCleanUI(page, { label: '04 after delete' });
   });
 });

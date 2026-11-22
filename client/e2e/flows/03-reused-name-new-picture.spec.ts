@@ -1,4 +1,5 @@
 import { test, expect, libraryPath, seedTool, centrePixel } from '../fixtures';
+import { expectCleanUI } from '../helpers/ui-probe.helpers';
 
 // Deleting an AI edit frees its number, so the next import reuses the path. The browser (service
 // worker + HTTP cache) must still show the NEW picture. Found by hand as B22: the card kept the
@@ -14,6 +15,7 @@ test('an edit imported under a deleted edit’s name shows the new picture', asy
     await expect(page.locator(card)).toBeVisible();
     const [r, g, b] = await centrePixel(page, card);
     expect(r > 180 && g < 90 && b < 90, `expected red, got ${r},${g},${b}`).toBeTruthy();
+    await expectCleanUI(page, { label: '03 red edit' });
   });
 
   await test.step('2. Delete it and import a blue edit under the same name, then scan', async () => {
@@ -25,5 +27,6 @@ test('an edit imported under a deleted edit’s name shows the new picture', asy
     await expect(page.locator(card)).toBeVisible();
     const [r, g, b] = await centrePixel(page, card);
     expect(b > 150 && r < 90, `expected blue, got ${r},${g},${b}`).toBeTruthy();
+    await expectCleanUI(page, { label: '03 blue edit' });
   });
 });

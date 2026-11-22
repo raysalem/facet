@@ -510,24 +510,8 @@ describe('PhotoDetailComponent', () => {
       view.destroy();
     });
 
-    it('lays the Showing panel out as a column from lg so its photo list is the one scroller, not the panel as well', async () => {
-      const { view, root, panel, tab } = await render();
-      const aside = root.querySelector<HTMLElement>('[data-photo-inspector]')!;
-      // The panel scrolls the long pages itself and contains its absolutely placed (sr-only) content.
-      expect(aside.classList).toContain('relative');
-      expect(aside.classList).toContain('lg:overflow-y-auto');
-      expect(aside.classList).not.toContain('lg:flex');
-      tab('filter').click(); view.detectChanges(); TestBed.flushEffects(); view.detectChanges();
-      // Showing fills what the header leaves (flex-1, not h-full, which overflowed the panel by the header's height
-      // and gave it a second bar beside the photo list's).
-      expect(aside.classList).toContain('lg:flex');
-      expect(aside.classList).toContain('lg:flex-col');
-      expect(panel('filter').classList).toContain('lg:flex-1');
-      expect(panel('filter').classList).not.toContain('lg:h-full');
-      tab('grade').click(); view.detectChanges(); TestBed.flushEffects(); view.detectChanges();
-      expect(aside.classList).not.toContain('lg:flex');
-      view.destroy();
-    });
+    // The Showing panel as a column from lg, its photo list the one scroller and the panel not scrolling as well:
+    // geometry in e2e flow 07-layout-geometry ("photo page with Showing open").
 
     it('folds every panel and the add-on to the side with the X or Escape, and an icon brings one back', async () => {
       const { view, root, panel, tab } = await render();

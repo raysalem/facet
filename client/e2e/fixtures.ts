@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import * as path from 'node:path';
 import { test as base, expect, type Page } from '@playwright/test';
 import { EDITION_PASSWORD, PYTHON } from './env';
+import { attachNetworkGate } from './helpers/ui-probe.helpers';
 
 export const WORK = path.resolve(__dirname, '.work');
 
@@ -16,11 +17,16 @@ export function seedTool(...args: string[]): void {
   execFileSync(PYTHON, [path.join(__dirname, 'seed_library.py'), ...args], { stdio: 'pipe' });
 }
 
+/** The edition token, asked for once per run: the login route answers 429 after a few logins in a minute. */
+let cachedToken: string | null = null;
+
 /** Log in to edition mode the way the client does, and return the bearer token. */
 export async function editionToken(page: Page): Promise<string> {
+  if (cachedToken) return cachedToken;
   const res = await page.request.post('/api/auth/edition/login', { data: { password: EDITION_PASSWORD } });
   expect(res.ok(), `edition login: ${res.status()}`).toBeTruthy();
-  return (await res.json()).access_token as string;
+  cachedToken = (await res.json()).access_token as string;
+  return cachedToken;
 }
 
 /** The RGB of the middle pixel of a rendered <img>, read through a canvas. */
@@ -37,28 +43,21 @@ export async function centrePixel(page: Page, selector: string): Promise<[number
   });
 }
 
-/** Every flow fails on a page error, a console error or a 5xx answer, even if the screen looks fine. */
+/** Every flow fails on a page error, a console error, a 5xx or a 4xx answer, even if the screen looks fine.
+ *  The network half is the kit's attachNetworkGate (I6): a 4xx counts whether or not the browser logged it. */
 export const test = base.extend<{ gate: void }>({
   gate: [
     async ({ page }, use) => {
       const problems: string[] = [];
       page.on('pageerror', (err) => problems.push(`pageerror: ${err.message}`));
-      let failedLoad = false;
       page.on('console', (msg) => {
-        if (msg.type() !== 'error') return;
-        problems.push(`console.error: ${msg.text()}`);
-        if (msg.text().startsWith('Failed to load resource')) failedLoad = true;
+        // A failed load logs only "Failed to load resource"; the gate below names the URL.
+        if (msg.type() === 'error' && !msg.text().startsWith('Failed to load resource')) problems.push(`console.error: ${msg.text()}`);
       });
-      // A failed load logs only "Failed to load resource"; keep the URLs so the report names them.
-      const failed: string[] = [];
-      page.on('response', (res) => {
-        const line = `${res.status()} ${res.request().method()} ${decodeURIComponent(res.url())}`;
-        if (res.status() >= 500) problems.push(line);
-        else if (res.status() >= 400) failed.push(line);
-      });
+      const network = attachNetworkGate(page);
       await use();
-      if (failedLoad && failed.length) problems.push(`4xx responses: ${failed.join(' ; ')}`);
       expect(problems, 'errors seen during the flow').toEqual([]);
+      network.assertClean();
     },
     { auto: true },
   ],

@@ -15,7 +15,12 @@ export default defineConfig({
   retries: 0,
   timeout: 60_000,
   expect: { timeout: 10_000 },
-  reporter: [['list'], ['html', { open: 'never', outputFolder: '../playwright-report' }]],
+  reporter: [
+    ['list'],
+    ['html', { open: 'never', outputFolder: '../playwright-report' }],
+    // Writes test-results/human-review.html: the (at most 3) screens a person must judge.
+    ['./helpers/human-review-reporter.ts', { maxCards: 3, build: process.env['BUILD_HASH'] }],
+  ],
   outputDir: '../test-results',
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
@@ -27,7 +32,7 @@ export default defineConfig({
     // Off: recording needs Playwright's ffmpeg download, which the installed Chrome does not bring.
     video: 'off',
     screenshot: 'only-on-failure',
-    viewport: { width: 1440, height: 900 },
+    viewport: { width: 1480, height: 1100 },   // half of Ray's display; the layout flows set their own
   },
   webServer: {
     command: `${PYTHON} e2e/seed_library.py serve --port ${PORT} --edition-password ${EDITION_PASSWORD}`,
