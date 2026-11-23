@@ -62,6 +62,8 @@ export class AddonRail<T extends string> {
     const isPageTab = (value: string | null): value is T => value !== null && (options.tabs as readonly string[]).includes(value);
     this.tab.set(stored === '' ? null : isPageTab(stored) || stored?.startsWith(ADDON_PREFIX) ? stored : options.defaultTab);
     this.pageTab.set(isPageTab(stored) ? stored : options.defaultTab);
+    // The add-on tab this page was on before a reload (F5): its panel opens again once the add-on is readable.
+    const reopen = stored?.startsWith(ADDON_PREFIX) && !this.panels.panel() ? stored.slice(ADDON_PREFIX.length) : null;
     this.adoptPanel();
 
     effect(() => {
@@ -75,6 +77,14 @@ export class AddonRail<T extends string> {
       addons.available();
       untracked(() => addons.sync());
     });
+    if (reopen) {
+      const restore = effect(() => {
+        const addon = this.service()?.available() ? this.addons().find(entry => entry.id === reopen) : undefined;
+        if (!addon) return;
+        restore.destroy();
+        if (this.panels.restorable()?.addonId === reopen) untracked(() => void this.panels.restore(addon));
+      });
+    }
     effect(() => {
       const open = this.panels.panel();
       const key = open ? `${open.addon.id}|${open.nonce}` : null;

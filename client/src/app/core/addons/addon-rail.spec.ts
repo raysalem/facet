@@ -167,4 +167,27 @@ describe('AddonRail', () => {
     expect(rail.addons()).toEqual([]);
     expect(sync).toHaveBeenCalledTimes(3);
   });
+
+  it('opens again, after a reload, the add-on panel this page had open (#390)', async () => {
+    const available = signal(true);
+    const item = { ...astro, slots: ['sidebar'], mode: 'supervised' } as unknown as AddonList['addons'][number];
+    const list = signal<AddonList | null>({ addons: [item], refused: [], addons_dir: '' } as AddonList);
+    const restore = vi.fn(async () => { panel.set({ addon: astro, nonce: 'n9', src: '/addons/astro/', scope: { kind: 'view' } }); return true; });
+    const restorable = () => ({ addonId: 'astro', scope: { kind: 'view' } });
+    TestBed.overrideProvider(AuthService, { useValue: { hasFeature: (key: string) => key === 'addons' } });
+    TestBed.overrideProvider(AddonsService, { useValue: { available, list, sync: vi.fn() } });
+    TestBed.overrideProvider(AddonPanelService, { useValue: { panel, dockHidden, addonShown, openForCurrentView, restore, restorable } });
+    localStorage.setItem(KEY, 'addon:astro');
+    const rail = create('view');
+    TestBed.tick();
+    expect(restore).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: 'astro', mode: 'supervised' }));
+    await Promise.resolve(); TestBed.tick();
+    expect(rail.tab()).toBe('addon:astro');
+    expect(dockHidden()).toBe(false);
+    // A page remembered on its own panel reopens nothing.
+    restore.mockClear(); panel.set(null);
+    localStorage.setItem(KEY, 'view');
+    create('view'); TestBed.tick();
+    expect(restore).not.toHaveBeenCalled();
+  });
 });
