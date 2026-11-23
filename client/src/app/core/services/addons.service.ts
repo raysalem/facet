@@ -25,6 +25,21 @@ export class AddonsService {
   readonly list = signal<AddonList | null>(null);
   readonly loadError = signal(false);
   readonly available = computed(() => this.auth.hasFeature('addons') && this.scan.canLaunch());
+  private loading: Promise<AddonList | null> | null = null;
+
+  /**
+   * Keep `list` in step with the right to read it: read once this session may (an edition unlock, a sign-in),
+   * dropped when it may no longer (a lock). A page rail calls it whenever `available` changes.
+   */
+  sync(): void {
+    if (!this.available()) {
+      if (this.list() !== null) this.list.set(null);
+      return;
+    }
+    if (this.list() === null && !this.loading) {
+      this.loading = this.load().finally(() => { this.loading = null; });
+    }
+  }
 
   async load(): Promise<AddonList | null> {
     if (!this.available()) {

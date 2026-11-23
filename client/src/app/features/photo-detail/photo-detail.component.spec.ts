@@ -3576,7 +3576,12 @@ describe('PhotoDetailComponent', () => {
 
     describe('add-on tags', () => {
       const astro = { ...untagged, tags_list: ['sky'], manual_tags: ['m42', 'orion', 'trip'], manual_tag_sources: { m42: 'astro-id', orion: 'astro-id' } };
-      const addonsMock = (load = vi.fn()) => ({ provide: AddonsService, useValue: { list: signal(null), available: () => true, load } });
+      // The service's own sync rule: read the list once the session may.
+      const addonsFake = (available: boolean, load = vi.fn()) => {
+        const list = signal<unknown>(null);
+        return { list, available: () => available, load, sync: () => { if (available && list() === null) void Promise.resolve(load()).then((read: unknown) => { if (read) list.set(read); }); } };
+      };
+      const addonsMock = (load = vi.fn()) => ({ provide: AddonsService, useValue: addonsFake(true, load) });
       const chipTexts = (el: HTMLElement) => [...el.querySelectorAll('[data-testid="manual-tag-chip"]')].map(chip => chip.querySelector('button span:last-child')!.textContent!.trim());
       const groupNames = () => (tagsView.componentInstance as any).tagGroups().addons.map((group: { name: string }) => group.name);
 
@@ -3603,7 +3608,7 @@ describe('PhotoDetailComponent', () => {
       });
 
       it('names the group by the add-on id while the registry is unavailable, and folds again on the next photo', async () => {
-        const el = await render(astro, false, [{ provide: AddonsService, useValue: { list: signal(null), available: () => false, load: vi.fn() } }]);
+        const el = await render(astro, false, [{ provide: AddonsService, useValue: addonsFake(false) }]);
         const group = el.querySelector<HTMLButtonElement>('[data-addon-tag-group]')!;
         expect(groupNames()).toEqual(['astro-id']);
         group.click(); await settle();

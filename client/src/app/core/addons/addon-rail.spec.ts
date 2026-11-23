@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { AddonRail } from './addon-rail';
 import { AddonPanelService, type OpenPanel } from './addon-panel.service';
 import { AuthService } from '../services/auth.service';
+import { AddonsService, type AddonList } from '../services/addons.service';
 
 describe('AddonRail', () => {
   const KEY = 'addon_rail_spec';
@@ -148,5 +149,22 @@ describe('AddonRail', () => {
     expect(dockHidden()).toBe(false);
     rail.resume();
     expect(dockHidden()).toBe(true);
+  });
+
+  it('shows the add-on tab as soon as an edition unlock lets the session read add-ons, and drops it on lock (#389)', () => {
+    const available = signal(false);
+    const list = signal<AddonList | null>(null);
+    const item = { ...astro, slots: ['sidebar'], mode: 'supervised' } as unknown as AddonList['addons'][number];
+    const sync = vi.fn(() => list.set(available() ? { addons: [item], refused: [], addons_dir: '' } as AddonList : null));
+    TestBed.overrideProvider(AuthService, { useValue: { hasFeature: (key: string) => key === 'addons' } });
+    TestBed.overrideProvider(AddonsService, { useValue: { available, list, sync } });
+    const rail = create('view');
+    TestBed.tick();
+    expect(rail.addons()).toEqual([]);
+    available.set(true); TestBed.tick();
+    expect(rail.addons().map(addon => addon.id)).toEqual(['astro']);
+    available.set(false); TestBed.tick();
+    expect(rail.addons()).toEqual([]);
+    expect(sync).toHaveBeenCalledTimes(3);
   });
 });

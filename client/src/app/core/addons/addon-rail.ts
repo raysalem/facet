@@ -37,8 +37,10 @@ export class AddonRail<T extends string> {
   readonly pageTab = signal<T | null>(null);
   /** The page panel on screen: none while everything is closed. */
   readonly shownPage = computed(() => this.tab() === null ? null : this.pageTab());
-  /** The installed add-ons, read once when this account has add-ons (or `needsRegistry` asks). */
-  readonly registry = signal<readonly Addon[]>([]);
+  /** The add-on service, resolved only once this page needs it (a page with no add-on never starts it). */
+  private readonly service = signal<AddonsService | null>(null);
+  /** The installed add-ons this session may read; follows an edition unlock or lock without a reload. */
+  readonly registry = computed<readonly Addon[]>(() => this.service()?.list()?.addons ?? []);
   /** Add-ons with a sidebar panel, plus the open panel's add-on when the registry has not been read. */
   readonly addons = computed<RailAddon[]>(() => {
     const listed: RailAddon[] = this.registry().filter(addon => addon.slots.includes('sidebar'));
@@ -53,7 +55,6 @@ export class AddonRail<T extends string> {
   /** False while the host page is parked (detached by route reuse): another page owns the dock then. */
   private active = true;
   private lastPanel: string | null | undefined = undefined;
-  private registryRequested = false;
 
   constructor(options: AddonRailOptions<T>) {
     this.options = options;
@@ -64,14 +65,15 @@ export class AddonRail<T extends string> {
     this.adoptPanel();
 
     effect(() => {
-      if (this.registryRequested || (!this.auth.hasFeature('addons') && !options.needsRegistry?.())) return;
-      this.registryRequested = true;
-      // Resolved only now: a page that needs no add-on never starts the add-on service.
-      const addons = this.injector.get(AddonsService);
-      untracked(async () => {
-        const list = addons.list() ?? (addons.available() ? await addons.load() : null);
-        if (list) this.registry.set(list.addons);
-      });
+      if (this.service() || (!this.auth.hasFeature('addons') && !options.needsRegistry?.())) return;
+      untracked(() => this.service.set(this.injector.get(AddonsService)));
+    });
+    // Read again whenever the right to read changes: the unlocked rail gets its add-on tab at once.
+    effect(() => {
+      const addons = this.service();
+      if (!addons) return;
+      addons.available();
+      untracked(() => addons.sync());
     });
     effect(() => {
       const open = this.panels.panel();
