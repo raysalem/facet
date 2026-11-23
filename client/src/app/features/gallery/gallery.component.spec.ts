@@ -225,6 +225,7 @@ describe('GalleryComponent', () => {
       continueReview: vi.fn(() => Promise.resolve(null)),
       viewSnapshot: signal(null),
       pinnedPaths: signal<string[] | null>(null),
+      pinnedBy: signal<string | null>(null),
       clearPinned: vi.fn(() => Promise.resolve()),
       filterKey: vi.fn((f?: GalleryFilters) => JSON.stringify(buildApiParams(f ?? mockStore.filters(), false, undefined))),
       reviewProgressKey: vi.fn(() => {
@@ -388,6 +389,23 @@ describe('GalleryComponent', () => {
     expect(mockStore.restoreRatingSnapshot).toHaveBeenCalledWith(snapshot, 3);
     expect([...mockStore.restoreSelection.mock.calls[0][0]]).toEqual(paths);
     expect(mockStore.restoreSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('names the add-on that chose a pinned list, not "your assistant" (#392)', () => {
+    vi.spyOn(TestBed.inject(I18nService), 't').mockImplementation((key, params) =>
+      params?.['name'] ? `${key} ${params['name']} ${params['count']}` : key);
+    mockStore.total.set(2);
+    mockStore.pinnedPaths.set(['/a.jpg', '/b.jpg']);
+    mockStore.pinnedBy.set('Astro');
+    const fixture = TestBed.createComponent(GalleryComponent);
+    fixture.detectChanges();
+    mockStore.initializing.set(false);
+    fixture.detectChanges();
+    const chip = () => (fixture.nativeElement.querySelector('[data-pinned-summary]') as HTMLElement).textContent!;
+    expect(chip()).toContain(`${I18N.gallery.pinned.chip_by_plural} Astro 2`);
+    mockStore.pinnedBy.set(null); fixture.detectChanges();
+    expect(chip()).toContain(I18N.gallery.pinned.chip_plural);
+    fixture.destroy();
   });
 
   it('owns matching/group counts and shows exact item totals for an assistant-pinned list', () => {

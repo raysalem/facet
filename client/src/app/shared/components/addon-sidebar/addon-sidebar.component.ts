@@ -133,10 +133,10 @@ export class AddonSidebarComponent {
       return;
     }
     if (this.handshake() === 0) return;
-    void this.handle(request, open.addon.id);
+    void this.handle(request, open.addon.id, open.addon.name);
   }
 
-  private async handle(request: PanelRequest, addonId: string): Promise<void> {
+  private async handle(request: PanelRequest, addonId: string, addonName: string): Promise<void> {
     switch (request.type) {
       case 'ready':
         return;
@@ -144,10 +144,12 @@ export class AddonSidebarComponent {
         this.service.close();
         return;
       case 'refresh':
-        this.changes.report({ tool: `addon:${addonId}`, paths: request.paths, count: request.paths.length });
+        this.changes.report({ tool: `addon:${addonId}`, paths: request.paths, count: request.paths.length, actor: addonName });
         return;
       case 'show_photos':
         await this.tools.load();
+        // The grid's chip names the add-on, not "your assistant".
+        this.gallery.pinNextBy(addonName);
         await this.tools.execute('ui_show_photos', { paths: request.paths });
         return;
       case 'open_photo':

@@ -148,7 +148,9 @@
       "inpage_toggle": "允许此浏览器中的智能体使用 Facet 工具",
       "inpage_hint": "开启后，在此浏览器中运行的助手可以搜索，并在您的会话允许时通过页面修改您的图库。默认关闭，仅对此浏览器生效。",
       "inpage_changed": "助手更改了 {count} 张照片",
-      "inpage_changed_plural": "助手更改了 {count} 张照片"
+      "inpage_changed_plural": "助手更改了 {count} 张照片",
+      "addon_changed": "{name} 更改了 {count} 张照片",
+      "addon_changed_plural": "{name} 更改了 {count} 张照片"
     },
     "ok": "好的"
   },
@@ -1187,6 +1189,8 @@
     "pinned": {
       "chip": "助手挑选了 {count} 张照片",
       "chip_plural": "助手挑选了 {count} 张照片",
+      "chip_by": "{name} 挑选了 {count} 张照片",
+      "chip_by_plural": "{name} 挑选了 {count} 张照片",
       "clear": "返回常规视图"
     },
     "all_photos": "全部照片",

@@ -8,6 +8,8 @@ export interface AssistantChangeBatch {
   paths: string[] | null;
   /** The number the "Assistant changed N photos" notice shows: max(unique paths, reported count). */
   count?: number;
+  /** The add-on that made every change of the batch ("Astro"); absent for the assistant or a mixed burst. */
+  actor?: string;
 }
 
 export interface AssistantChangeReport {
@@ -20,6 +22,8 @@ export interface AssistantChangeReport {
   showPaths?: string[] | null;
   paths: string[] | null;
   count: number | null;
+  /** An add-on's display name when an add-on panel made the change, so the notice names it. */
+  actor?: string;
 }
 
 /** One line of the activity log: an assistant write, or a tool call that drove this tab. */
@@ -69,6 +73,8 @@ export class AssistantChangesService {
   private paths = new Set<string>();
   private sticky = false;
   private extra = 0;
+  /** undefined: no report yet; null: the assistant, or more than one actor. */
+  private actor: string | null | undefined = undefined;
   private pending = false;
   private startedAt = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -142,6 +148,8 @@ export class AssistantChangesService {
       this.pending = true;
       this.startedAt = now;
     }
+    const actor = report.actor ?? null;
+    this.actor = this.actor === undefined || this.actor === actor ? actor : null;
     if (report.paths === null) this.sticky = true;
     else for (const path of report.paths) this.paths.add(path);
     // A null-path report counts whole; a path report only adds what its paths do not already say.
@@ -154,10 +162,12 @@ export class AssistantChangesService {
   private flush(): void {
     this.timer = null;
     const notice = Math.max(this.paths.size, this.sticky ? this.extra : this.paths.size + this.extra);
-    const batch: AssistantChangeBatch = { paths: this.sticky ? null : [...this.paths], count: notice };
+    const actor = this.actor ?? undefined;
+    const batch: AssistantChangeBatch = { paths: this.sticky ? null : [...this.paths], count: notice, ...(actor ? { actor } : {}) };
     this.reset();
     // The notifier first: a subscriber that opens its own actionable snackbar then wins the single snackbar slot.
-    this.notifier.notify(notice);
+    if (actor) this.notifier.notify(notice, actor);
+    else this.notifier.notify(notice);
     this.subject.next(batch);
   }
 
@@ -175,6 +185,7 @@ export class AssistantChangesService {
     this.paths = new Set<string>();
     this.sticky = false;
     this.extra = 0;
+    this.actor = undefined;
     this.pending = false;
   }
 }

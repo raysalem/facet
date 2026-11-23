@@ -148,7 +148,9 @@
       "inpage_toggle": "Permitir que agentes neste navegador usem as ferramentas do Facet",
       "inpage_hint": "Quando ativado, um assistente executado neste navegador pode pesquisar e, se a sua sessão permitir, alterar a sua biblioteca através da página. Desativado por predefinição; aplica-se apenas a este navegador.",
       "inpage_changed": "O assistente alterou {count} foto",
-      "inpage_changed_plural": "O assistente alterou {count} fotos"
+      "inpage_changed_plural": "O assistente alterou {count} fotos",
+      "addon_changed": "{name} alterou {count} foto",
+      "addon_changed_plural": "{name} alterou {count} fotos"
     },
     "ok": "OK"
   },
@@ -1187,6 +1189,8 @@
     "pinned": {
       "chip": "{count} foto escolhida pelo seu assistente",
       "chip_plural": "{count} fotos escolhidas pelo seu assistente",
+      "chip_by": "{count} foto escolhida por {name}",
+      "chip_by_plural": "{count} fotos escolhidas por {name}",
       "clear": "Voltar à vista habitual"
     },
     "all_photos": "Todas as fotos",

@@ -19,6 +19,7 @@ describe('add-on sidebar host', () => {
   const close = vi.fn();
   const execute = vi.fn(async () => ({ ok: true }));
   const report = vi.fn();
+  const pinNextBy = vi.fn();
   const events = new Subject<unknown>();
 
   beforeEach(() => {
@@ -28,7 +29,7 @@ describe('add-on sidebar host', () => {
     selectedPaths.set(new Set(['/p/a.jpg']));
     TestBed.configureTestingModule({ imports: [AddonSidebarComponent], providers: [
       { provide: AddonPanelService, useValue: { panel, width: signal(380), dockHidden, close, setWidth: vi.fn() } },
-      { provide: GalleryStore, useValue: { selectionScope: signal('paths'), selectedPaths } },
+      { provide: GalleryStore, useValue: { selectionScope: signal('paths'), selectedPaths, pinNextBy } },
       { provide: WebMcpToolRegistry, useValue: { load: vi.fn(async () => undefined), execute } },
       { provide: AssistantChangesService, useValue: { report } },
       { provide: Router, useValue: { url: '/album/7', events } },
@@ -119,7 +120,9 @@ describe('add-on sidebar host', () => {
     await vi.waitFor(() => expect(execute).toHaveBeenCalledTimes(2));
     expect(execute).toHaveBeenCalledWith('ui_show_photos', { paths: ['/p/a.jpg'] });
     expect(execute).toHaveBeenCalledWith('ui_open_photo', { path: '/p/a.jpg' });
-    expect(report).toHaveBeenCalledWith({ tool: 'addon:astro', paths: ['/p/a.jpg'], count: 1 });
+    // The grid chip and the change notice name the add-on (#392).
+    expect(pinNextBy).toHaveBeenCalledWith('Astro');
+    expect(report).toHaveBeenCalledWith({ tool: 'addon:astro', paths: ['/p/a.jpg'], count: 1, actor: 'Astro' });
     send({ type: 'close', v: 1, nonce: 'nonce-1' });
     expect(close).toHaveBeenCalled();
   });
