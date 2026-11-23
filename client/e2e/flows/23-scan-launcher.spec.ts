@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import { test, expect, unlockEdition, WORK } from '../fixtures';
 
 // The scan launcher (edition only, behind features.show_scan_button) lists the configured library
@@ -13,7 +14,8 @@ test('the scan launcher offers the library folder without starting a scan', asyn
   });
 
   await test.step('2. The configured library folder is offered, already chosen, and Start is ready', async () => {
-    await expect(dialog.getByText(`${WORK}/library`)).toBeVisible();
+    // The server lists the folder with the platform's separator (backslashes on Windows).
+    await expect(dialog.getByText(path.join(WORK, 'library'), { exact: true })).toBeVisible();
     await expect(dialog.getByRole('radio')).toBeChecked();
     await expect(dialog.getByRole('button', { name: /^Start/ })).toBeEnabled();
   });

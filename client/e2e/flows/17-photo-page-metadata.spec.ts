@@ -9,6 +9,9 @@ test('a caption, a tag and a corrected capture date survive a reload', async ({ 
   const details = page.getByRole('complementary', { name: 'Photo details' });
 
   await test.step('1. The photo starts on 16 Apr 2026 10:00 with no caption', async () => {
+    // Our photo page keeps the date, caption and tags on its Content panel; Grade opens first.
+    await page.getByRole('tab', { name: 'Content', exact: true }).click();
+    await expect(details.getByRole('tabpanel', { name: 'Content' })).toBeVisible();
     await expect(details).toContainText('16 Apr 2026 10:00');
     await expect(details.getByRole('button', { name: 'Add caption' })).toBeVisible();
   });
@@ -38,6 +41,7 @@ test('a caption, a tag and a corrected capture date survive a reload', async ({ 
 
   await test.step('5. A reload shows all three', async () => {
     await page.reload();
+    await expect(details.getByRole('tabpanel', { name: 'Content' })).toBeVisible();
     await expect(details).toContainText('a grey wall in the rain');
     await expect(details).toContainText('e2e-wall');
     await expect(details).toContainText('16 Apr 2026 11:00');
