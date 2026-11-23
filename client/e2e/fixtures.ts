@@ -109,3 +109,4 @@ export const test = base.extend<{ gate: void }>({
 });
 
 export { expect };
+export type { Page };
