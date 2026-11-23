@@ -168,6 +168,22 @@ describe('Add-ons page', () => {
     expect(stop).toHaveBeenCalledWith('local');
   });
 
+  it('asks for no log when Facet refused the add-on on Start (its log route answers 404, M1)', async () => {
+    await settle();
+    start.mockImplementationOnce(async () => {
+      // The re-read addon.json is broken: the add-on moves to the refused list, and the start answers 409.
+      const refused = listing();
+      refused.addons = refused.addons.filter(addon => addon.id !== 'local');
+      refused.refused = [...refused.refused, { directory: 'local', reason: 'addon.json is not valid JSON' }];
+      list.set(refused);
+      throw new Error('409');
+    });
+    (root.querySelector('[data-addon="local"] [data-addon-start]') as HTMLButtonElement).click();
+    await vi.waitFor(() => expect(start).toHaveBeenCalledWith('local'));
+    await settle();
+    expect(log).not.toHaveBeenCalled();
+  });
+
   it('shows why a supervised add-on failed and its exit code', async () => {
     await settle();
     const failed = listing();

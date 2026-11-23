@@ -61,7 +61,7 @@ FACET_E2E_PYTHON=../venv/bin/python npm run e2e
 | `03-reused-name-new-picture` | An edit imported under a deleted edit's name shows the new picture, not the cached thumbnail (fails without `apply_ai_edit_captions`' fresh `preview_revision`) |
 | `04-delete-burst-lead` | Deleting the AI edit that leads its burst keeps the burst in the gallery (fails without `_reassign_dead_burst_leads`) |
 | `05-album-switch` | Opening an album on a slow network (its config and album reads held 1.5 s each) never shows a card of the view shown before it, the plain gallery or another album (fails without the clear at the start of `GalleryComponent`'s fresh visit) |
-| `05-route-smoke` | Each top-level page (`/albums`, `/capsules`, `/compare`, `/culling`, `/folders`, `/junk`, `/map`, `/persons`, `/scenes`, `/stats`, `/timeline`) loads on its own URL with no page error, console error or 5xx |
+| `05-route-smoke` | Each top-level page (`/albums`, `/capsules`, `/compare`, `/culling`, `/folders`, `/junk`, `/map`, `/persons`, `/scenes`, `/stats`, `/timeline`) loads on its own URL with no page error, console error or 5xx; a direct load of `/addons`, `/stats`, `/persons`, `/albums` and `/timeline` shows the same top tabs as the gallery, locked and unlocked (fails without the config load after the auth status in `App.ngOnInit`, B51) |
 | `06-app-update` | A new app build is applied by itself; it waits behind the banner while a field has focus or holds unused text, and while an add-on panel is open (focus inside its frame), and lands once they are left. Build 2..5 are the served shell re-marked, with its hash updated in `ngsw.json` |
 | `06-photo-page` | A double click on a gallery card opens that photo's page; the Quality panel carries the seeded score, the Histogram tab swaps the panel, and Back returns to the gallery |
 | `07-album-lifecycle` | An album made through the API lists on `/albums`, opens to its photo, and leaves `/albums` once deleted while its photo stays in the library |
@@ -75,7 +75,7 @@ FACET_E2E_PYTHON=../venv/bin/python npm run e2e
 | `11-gallery-select-and-rate` | Review > Favorite and Review > Rate 4 in the selection bar apply to both selected photos; the favourites filter and the photo page read them back |
 | `12-culling-confirm` | `/culling` proposes a keeper per burst; flipping a frame to kept and confirming rejects only the frame left out, and the gallery hides it |
 | `13-login-ui` | The Edition dialog refuses a wrong password in place and unlocks with the right one; unlocked state survives a reload |
-| `14-photo-page-review` | Rating, Favorite and Keep set on the photo page are read back after a reload |
+| `14-photo-page-review` | Rating, Favorite and Keep set on the photo page are read back after a reload; unlocked on the Grade panel at 1180, 1480 and 2950 px, the header's Previous, Next and Close take their own clicks (centre and lower edge), the review strip starts below the header, and Next steps to the next photo (fails with the strip pulled up over the header, B52) |
 | `15-photo-compare` | Two selected photos open the compare workspace (Reference / Candidate), the candidate can be promoted, and the page redirects without a selection |
 | `16-timeline-and-folders` | The timeline month counts the day's photos and links to them; the Folders page filters the gallery to the clicked folder |
 | `17-photo-page-metadata` | A caption, a manual tag and a one-hour capture-date shift made on the photo page are still shown after a reload |

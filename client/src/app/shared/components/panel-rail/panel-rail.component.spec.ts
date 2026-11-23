@@ -76,7 +76,9 @@ describe('PanelRailComponent', () => {
     const { addon } = render(true);
     expect(addon).not.toBeNull();
     expect(addon.getAttribute('aria-disabled')).toBe('true');
-    expect(addon.getAttribute('aria-label')).toBe('addons.panel.locked');
+    // Named for the add-on, the reason as its description (M3): a screen reader announced only the reason.
+    expect(addon.getAttribute('aria-label')).toBe(astro.name);
+    expect(addon.getAttribute('aria-description')).toBe('addons.panel.locked');
     addon.click();
     expect(openForCurrentView).not.toHaveBeenCalled();
   });

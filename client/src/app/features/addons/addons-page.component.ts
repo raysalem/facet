@@ -201,7 +201,9 @@ export class AddonsPageComponent implements OnInit {
       // The refreshed list carries the reason (status, error, exit code).
     } finally {
       this.busy.set(null);
-      await this.reloadLog(id);
+      // A start that Facet refused (a broken addon.json) moves the add-on to the refused list, where it has
+      // no log: asking would answer 404 and log a console error (M1).
+      if (this.addons.list()?.addons.some(addon => addon.id === id)) await this.reloadLog(id);
     }
   }
 

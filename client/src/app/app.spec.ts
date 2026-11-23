@@ -1012,3 +1012,37 @@ describe('App', () => {
     });
   });
 });
+
+describe('App startup config load (B51)', () => {
+  // The rest of ngOnInit waits on reads that never answer here (ApiService.get is NEVER), so the
+  // tests let the microtasks run instead of awaiting it.
+  const flush = async () => { for (let i = 0; i < 5; i++) await Promise.resolve(); };
+
+  function withPendingStatus(fail = false) {
+    let settle!: () => void;
+    const status = new Promise<void>((resolve, reject) => { settle = () => (fail ? reject(new Error('offline')) : resolve()); });
+    const { app, mockStore } = createApp('/stats', [
+      { provide: AuthService, useValue: { identity: () => '0|', session: () => '0|', status: signal(null), isAuthenticated: vi.fn(() => true), isEdition: vi.fn(() => false), checkStatus: vi.fn(() => status) } },
+    ]);
+    (mockStore as unknown as { galleryMounts: () => number }).galleryMounts = () => 0;
+    return { app, mockStore, settle };
+  }
+
+  it('asks for the config only after the auth status has landed', async () => {
+    const { app, mockStore, settle } = withPendingStatus();
+    void app.ngOnInit();
+    await flush();
+    expect(mockStore.loadConfig).not.toHaveBeenCalled();
+    settle();
+    await flush();
+    expect(mockStore.loadConfig).toHaveBeenCalledTimes(1);
+  });
+
+  it('still asks for the config when the auth status fails', async () => {
+    const { app, mockStore, settle } = withPendingStatus(true);
+    void app.ngOnInit();
+    settle();
+    await flush();
+    expect(mockStore.loadConfig).toHaveBeenCalledTimes(1);
+  });
+});
