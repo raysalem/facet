@@ -46,13 +46,14 @@ const TAB = 'inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-ce
       @for (addon of rail().addons(); track addon.id) {
         @let picked = rail().tab() === 'addon:' + addon.id;
         @let usable = rail().usable(addon.id);
+        <!-- The tab is named for its add-on; a viewer who may not open it hears why as its description (and sees it as the tooltip). -->
         @let tip = usable ? addon.name : ((rail().lockedReason() === 'locked' ? I18N.addons.panel.locked : I18N.addons.panel.admin_only) | translate: { name: addon.name });
         <button type="button" [attr.role]="isWide() ? 'tab' : null" [attr.data-rail-addon]="addon.id"
           [attr.aria-disabled]="usable ? null : 'true'" [attr.data-rail-addon-locked]="usable ? null : ''"
           [attr.aria-selected]="isWide() ? picked : null" [attr.aria-pressed]="isWide() ? null : picked"
           [attr.aria-controls]="isWide() && picked && rail().addonActive() ? ADDON_DOCK_ID : null"
           [attr.tabindex]="isWide() ? (tabStop() === 'addon:' + addon.id ? 0 : -1) : null"
-          [matTooltip]="tip" matTooltipPosition="left" [attr.aria-label]="tip" (click)="rail().selectAddon(addon)"
+          [matTooltip]="tip" matTooltipPosition="left" [attr.aria-label]="addon.name" [attr.aria-description]="usable ? null : tip" (click)="rail().selectAddon(addon)"
           [class]="TAB" [class.opacity-40]="!usable" [class.!cursor-not-allowed]="!usable" [class.!bg-[var(--mat-sys-secondary-container)]]="picked" [class.!text-[var(--mat-sys-on-secondary-container)]]="picked">
           <mat-icon aria-hidden="true">{{ addon.icon }}</mat-icon>
         </button>
