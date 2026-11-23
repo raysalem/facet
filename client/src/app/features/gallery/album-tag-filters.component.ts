@@ -69,17 +69,33 @@ export class AlbumTagFiltersComponent {
 
   /** The request in flight; replaced by a newer query and cancelled when the sidebar goes away. */
   private request?: Subscription;
+  /** The query the options were last asked for; `undefined` once they no longer match the view. */
+  private loaded?: string | null;
 
   constructor() {
+    // Asked only while the controls are on screen: their body is built on idle with the panel shut, and a
+    // read for a view nobody looks at races whatever changes it meanwhile (an album deleted while the
+    // request waits answered 404). A view changed while shut drops its options and asks again on opening.
     effect(() => {
       const query = this.query();
-      untracked(() => this.load(query));
+      const shown = this.store.filterControlsShown();
+      untracked(() => {
+        if (query === this.loaded) return;
+        if (shown) {
+          this.load(query);
+        } else {
+          this.request?.unsubscribe();
+          this.facets.set([]);
+          this.loaded = undefined;
+        }
+      });
     });
     inject(DestroyRef).onDestroy(() => this.request?.unsubscribe());
   }
 
   private load(query: string | null): void {
     this.request?.unsubscribe();
+    this.loaded = query;
     if (!query) {
       this.facets.set([]);
       return;

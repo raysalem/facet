@@ -387,6 +387,10 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
 
         <!-- Album-scoped actions (album detail view). The scenes browse is open to
              all authenticated users; culling stays edition-only. -->
+        @if (albumBarPending()) {
+          <!-- The bar's height (border, py-2, a 36 px button row) while the album is read; a smart album has none. -->
+          <div data-album-bar-placeholder aria-hidden="true" class="invisible mx-2 md:mx-4 mt-2 md:mt-4 px-3 py-2 rounded-md border"><div class="h-9"></div></div>
+        }
         @if (store.currentAlbum(); as album) {
           @if (!album.is_smart) {
             <div class="mx-2 md:mx-4 mt-2 md:mt-4 px-3 py-2 rounded-md bg-[var(--mat-sys-surface-container-high)] border border-[var(--mat-sys-outline-variant)] flex items-center gap-3 text-sm">
@@ -993,8 +997,9 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
           <button mat-icon-button data-close-panels class="!h-8 !w-8 !p-0 shrink-0" [matTooltip]="I18N.ui.buttons.close_panels | translate"
             [attr.aria-label]="I18N.ui.buttons.close_panels | translate" (click)="rail.closeAll()"><mat-icon class="!text-xl">close</mat-icon></button>
         </div>
+        <!-- While the album is read, the room its chip and rules take (92 px), so the filters below stay put (B49). -->
         <app-gallery-criteria data-collection-header [portShortcuts]="true" [consolidatedSettings]="true" [searchPresented]="true" [rulesLast]="true"
-          class="block min-w-0 max-h-[45%] shrink-0 overflow-y-auto px-4" />
+          class="block min-w-0 max-h-[45%] shrink-0 overflow-y-auto px-4" [class.min-h-23]="albumBarPending()" />
         @if (!pinned()) {
           <div data-filter-controls class="min-h-0 flex-1 border-t border-[var(--mat-sys-outline-variant)]">
             @defer (on idle; when filterPanelOpen()) {
@@ -1287,6 +1292,14 @@ export class GalleryComponent implements OnInit, OnDestroy {
       else if (!open && this.rail.tab() === 'filter') this.rail.closePage();
     });
   });
+  /** Tells the filter controls when they are on screen: the Showing panel from lg, the drawer below. */
+  private readonly filterControlsShownFollows = (() => {
+    effect(() => {
+      const shown = this.lgDesktop.isDesktop() ? this.filterPanelOpen() && !this.pinned() : this.store.filterDrawerOpen();
+      untracked(() => this.store.filterControlsShown.set(shown));
+    });
+    inject(DestroyRef).onDestroy(() => this.store.filterControlsShown.set(false));
+  })();
   private readonly flagFollowsRail = (() => {
     let previous: string | null | undefined;
     return effect(() => {
@@ -2022,6 +2035,11 @@ export class GalleryComponent implements OnInit, OnDestroy {
     this.setShowAll = { stash: this.store.hiddenFiltersStash() };
   }
 
+  /** This visit opens an album by its route: its bar above the grid is coming. */
+  private readonly albumRouteLoading = signal(false);
+  /** Hold the album bar's room while the album is read, so the bar does not push the loading grid down (B49). */
+  protected readonly albumBarPending = computed(() => this.albumRouteLoading() && this.store.initializing() && !this.store.currentAlbum());
+
   /** Container width for mosaic layout (updated via ResizeObserver) */
   protected readonly containerWidth = signal(0);
   protected readonly compactCollectionControls = computed(() => this.containerWidth() - (this.isDesktop() ? 32 : 16) < 960);
@@ -2131,6 +2149,12 @@ export class GalleryComponent implements OnInit, OnDestroy {
   });
 
   constructor() {
+    // The breakpoints before the first render (B49): read after it, the first frame was laid out without the
+    // rail's open panel, the header measured the full width, showed its wide one-row controls and then folded
+    // them to the compact ones once the panel took its 320 px, moving the grid under it.
+    this.desktop.setup();
+    this.railWide.setup();
+    this.lgDesktop.setup();
     let previousMode: string | null = null;
     effect(() => {
       const mode = this.effectiveGalleryMode();
@@ -2140,9 +2164,6 @@ export class GalleryComponent implements OnInit, OnDestroy {
     afterNextRender(() => {
       this.isTouchDevice.set(window.matchMedia('(hover: none)').matches);
       this.touchOnly.set(window.matchMedia('(hover: none) and (pointer: coarse)').matches);
-      this.desktop.setup();
-      this.railWide.setup();
-      this.lgDesktop.setup();
       this.setupResizeObserver();
       this.setupScrollTracking();
     });
@@ -2316,6 +2337,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
     }
     // Reset album state to avoid stale singleton data; loadConfig() resets filters from scratch
     this.store.currentAlbum.set(null);
+    this.albumRouteLoading.set(!!routeAlbumId);
     this.store.initializing.set(true);
     this.awaitingInitialScope = true;
     try {

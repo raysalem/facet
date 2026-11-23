@@ -71,6 +71,7 @@ describe('GalleryFilterSidebarComponent', () => {
       tags: signal([]),
       albumTags: signal([]),
       tagsRevision: signal(0),
+      filterControlsShown: signal(false),
       persons: signal([]),
       compositionPatterns: signal([]),
       metricRanges: signal({}),

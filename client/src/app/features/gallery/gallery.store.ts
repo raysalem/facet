@@ -938,6 +938,12 @@ export class GalleryStore {
   readonly albumTags = signal<FilterOption[]>([]);
   /** Bumped after a tag write, so views built from tags (album chips, tag picker) refetch. */
   readonly tagsRevision = signal(0);
+  /**
+   * Whether the filter controls are on screen (the Showing panel from lg, the Filters drawer below).
+   * Their body is built on idle while closed, so its own reads (the album's Set / Photographer counts)
+   * wait for this rather than ask for a view nobody is looking at. Set by the gallery.
+   */
+  readonly filterControlsShown = signal(false);
   readonly persons = signal<PersonOption[]>([]);
   readonly patterns = signal<FilterOption[]>([]);
   readonly colorTemps = signal<FilterOption[]>([]);

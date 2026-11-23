@@ -16,10 +16,13 @@ test('a gallery card opens its photo page and Back returns to the gallery', asyn
     await expect(page.getByRole('img', { name: 'IMG_0300.jpg' })).toBeVisible();
   });
 
+  // Our photo page splits the panel: Grade holds Quality, and the histogram sits on the Camera page.
   await test.step('3. The Quality panel carries the seeded score, and the Histogram tab swaps the panel', async () => {
     await expect(page.getByRole('tabpanel', { name: 'Quality' })).toContainText(/Aesthetic\s*6\.0/);
-    await page.getByRole('tab', { name: 'Histogram' }).click();
-    await expect(page.getByRole('tab', { name: 'Histogram' })).toHaveAttribute('aria-selected', 'true');
+    await page.getByRole('tab', { name: 'Camera', exact: true }).click();
+    const camera = page.getByRole('tabpanel', { name: 'Camera', exact: true });
+    await camera.getByRole('tab', { name: 'Histogram' }).click();
+    await expect(camera.getByRole('tab', { name: 'Histogram' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByRole('tabpanel', { name: 'Quality' })).toHaveCount(0);
   });
 

@@ -35,8 +35,11 @@ test('the gallery sorts by score and narrows by score range and camera', async (
     await page.getByRole('button', { name: 'Quality', exact: true }).click();
     const min = page.getByRole('slider', { name: 'Score Range min' });
     await min.focus();
+    // The slider's lower bound follows the library's lowest score, and our seed adds folders below
+    // upstream's (it starts at 1, not 2): step from wherever it starts.
+    const start = Number(await min.inputValue());
     // One key at a time: each step re-queries the gallery, and a burst of keys is partly dropped.
-    for (let value = 2.5; value <= 6; value += 0.5) {
+    for (let value = start + 0.5; value <= 6; value += 0.5) {
       await min.press('ArrowRight');
       await expect(min).toHaveValue(String(value));
     }

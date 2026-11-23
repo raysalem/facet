@@ -14,8 +14,9 @@ test('a person can be renamed and opens its photos', async ({ page }) => {
   await test.step('2. Rename it', async () => {
     await page.getByRole('button', { name: 'More' }).first().click();
     await page.getByRole('menuitem', { name: 'Rename' }).click();
-    // The card edits the name in place, in an input of its own.
-    await page.locator('app-person-card input').fill('Grace E2E');
+    // The card edits the name in place, in its Rename field (an autocomplete, so a combobox). Selected by
+    // role: `app-person-card input` also matches the selection checkboxes of the cards on the other tabs.
+    await page.getByRole('combobox', { name: 'Rename' }).fill('Grace E2E');
     await page.keyboard.press('Enter');
     await expect(page.getByRole('button', { name: 'Grace E2E', exact: true })).toBeVisible();
   });

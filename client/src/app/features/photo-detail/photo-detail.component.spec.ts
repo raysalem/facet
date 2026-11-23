@@ -2808,6 +2808,48 @@ describe('PhotoDetailComponent', () => {
       expect(view.nativeElement.querySelector('[data-photo-next]')).not.toBeNull();
     });
 
+    // #386: the Content panel (and Grade, Camera) carries previous / next in its header, as Showing does beside its list.
+    it.each(['content', 'grade', 'camera'])('offers previous and next in the %s panel header', async tabId => {
+      localStorage.setItem('facet_photo_rail_tab', tabId);
+      mockApi.get.mockImplementation((url: string, params?: { path?: string }) => of(url === '/photo'
+        ? (params?.path === onNextPage.path ? onNextPage : last) : {}));
+      const view = renderDetail();
+      const detail = view.componentInstance as any;
+      detail.store.photos.set([last, onNextPage]);
+      detail.store.hasMore.set(false);
+      detail.photo.set(last);
+      mockRoute.snapshot.queryParamMap.get.mockReturnValue(last.path);
+      view.detectChanges();
+      await view.whenStable();
+
+      const header = view.nativeElement.querySelector('[data-panel-header]') as HTMLElement;
+      expect(view.nativeElement.querySelector(`[data-photo-panel="${tabId}"]`).hidden).toBe(false);
+      expect(header.querySelector('[data-panel-previous]')!.getAttribute('aria-label')).toBe('photo_detail.collection.previous');
+      expect((header.querySelector('[data-panel-previous]') as HTMLButtonElement).disabled).toBe(true);
+      (header.querySelector('[data-panel-next]') as HTMLButtonElement).click();
+      await Promise.resolve();
+      view.detectChanges();
+
+      expect(detail.photo().path).toBe(onNextPage.path);
+      expect((header.querySelector('[data-panel-next]') as HTMLButtonElement).disabled).toBe(true);
+      expect((header.querySelector('[data-panel-previous]') as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it('leaves the header without previous / next on Showing, which has its own', async () => {
+      localStorage.setItem('facet_photo_rail_tab', 'filter');
+      mockApi.get.mockImplementation(() => of(last));
+      const view = renderDetail();
+      const detail = view.componentInstance as any;
+      detail.store.photos.set([last, onNextPage]);
+      detail.photo.set(last);
+      mockRoute.snapshot.queryParamMap.get.mockReturnValue(last.path);
+      view.detectChanges();
+      await view.whenStable();
+
+      expect(view.nativeElement.querySelector('[data-view-next]')).not.toBeNull();
+      expect(view.nativeElement.querySelector('[data-panel-collection-nav]')).toBeNull();
+    });
+
     it('steps from where the photo sits in a list reloaded while the page loaded', async () => {
       atEndOfLoadedPage(() => component.store.photos.set([samplePhoto, onNextPage, last, { ...samplePhoto, path: '/photos/c.jpg' }]));
 

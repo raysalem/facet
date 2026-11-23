@@ -465,8 +465,7 @@ export class App implements OnInit {
 
   async ngOnInit(): Promise<void> {
     this.setupUpdateNotifications();
-    await this.i18n.loadLanguages();
-    await this.i18n.load();
+    // The strings are loaded before the first render, by the app initializer in app.config.ts.
     this.store.loadTypeCounts();
     void this.store.loadConfig(() => this.store.galleryMounts() === 0);
     try {

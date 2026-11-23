@@ -453,6 +453,16 @@ function inDetectedSet(photo: Photo): boolean {
           <!-- The open panel's name and the X that folds every panel (and an add-on's) to the side. -->
           <div data-panel-header class="-mb-2 flex items-center gap-2">
             <h2 class="m-0 min-w-0 flex-1 truncate text-sm font-medium">{{ shownPanelLabel() | translate }}</h2>
+            <!-- Previous / next in the collection on every panel (#386); Showing carries its own beside the list. -->
+            @if (collectionNavigation().visible && rail.shownPage() !== 'filter') {
+              <div data-panel-collection-nav role="group" [attr.aria-label]="I18N.photo_detail.collection.title | translate" class="flex shrink-0 items-center">
+                <button mat-icon-button data-panel-previous class="!h-8 !w-8 !p-0 max-sm:!h-11 max-sm:!w-11 pointer-coarse:!h-11 pointer-coarse:!w-11" [disabled]="!collectionNavigation().previous || store.loading()"
+                  [attr.aria-label]="I18N.photo_detail.collection.previous | translate" (click)="stepCollectionPhoto(-1)"><mat-icon>chevron_left</mat-icon></button>
+                <span data-panel-position class="text-xs tabular-nums">{{ I18N.photo_detail.collection.position | translate:{ position: collectionNavigation().position, total: store.total() } }}</span>
+                <button mat-icon-button data-panel-next class="!h-8 !w-8 !p-0 max-sm:!h-11 max-sm:!w-11 pointer-coarse:!h-11 pointer-coarse:!w-11" [disabled]="!collectionNavigation().next || store.loading()"
+                  [attr.aria-label]="I18N.photo_detail.collection.next | translate" (click)="stepCollectionPhoto(1)"><mat-icon>chevron_right</mat-icon></button>
+              </div>
+            }
             <button mat-icon-button data-close-panels class="!h-8 !w-8 !p-0 max-sm:!h-11 max-sm:!w-11 pointer-coarse:!h-11 pointer-coarse:!w-11 shrink-0"
               [matTooltip]="I18N.ui.buttons.close_panels | translate" [attr.aria-label]="I18N.ui.buttons.close_panels | translate" (click)="rail.closeAll()">
               <mat-icon class="!text-xl">close</mat-icon>
