@@ -50,6 +50,13 @@ describe('add-on sidebar host', () => {
     expect(root.classList).not.toContain('lg:!hidden');
     expect(frame()).toBe(first);
   });
+  it('is a drawer over the page below sm, not a column that squeezes it (#391)', () => {
+    for (const cls of ['max-sm:absolute', 'max-sm:inset-y-0', 'max-sm:right-0', 'max-sm:!w-[calc(100vw-3rem)]', 'max-sm:!max-w-none']) {
+      expect(root.classList).toContain(cls);
+    }
+    // The column's own resize handle has no use in a drawer.
+    expect(root.querySelector('[data-addon-resize]')!.classList).toContain('max-sm:hidden');
+  });
   function send(data: unknown, source: unknown = frame().contentWindow): void {
     window.dispatchEvent(new MessageEvent('message', { data, source: source as Window }));
   }
