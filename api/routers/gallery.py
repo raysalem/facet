@@ -7,9 +7,11 @@ import json
 import asyncio
 import logging
 import math
+import re
 import sqlite3
 import unicodedata
 from typing import NoReturn, Optional, Any
+from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import ValidationError
 
@@ -17,7 +19,7 @@ from api.auth import CurrentUser, get_optional_user, require_authenticated
 from api import database as _database
 from api import stack_gallery
 from api.change_token import db_change_token
-from api.config import VIEWER_CONFIG, _FULL_CONFIG, cull_allow_trash
+from api.config import VIEWER_CONFIG, _FULL_CONFIG, cull_allow_trash, config_number
 from api.database import get_async_db, get_db
 from api.model_cache import AcceleratorBusy
 from api.models.gallery import (
@@ -53,7 +55,7 @@ from db.ai_edits import attach_ai_edit_sources_async
 from db.preview_versions import attach_preview_versions_async
 from db.metadata_provenance import photo_provenance
 from api.related_files import related_files
-from utils.histogram import unpack_histogram
+from utils.histogram import LEGACY_HISTOGRAM_BLOB_SIZE, unpack_histogram
 from utils.sequence import BRACKET as BRACKET_KIND
 
 try:
@@ -199,7 +201,21 @@ def _add_album_tags_filter(where_clauses, sql_params, album_tags: str, conn, inc
         sql_params.append(_manual_tag_match_key(tag))
 
 
-def _apply_search_filter(where_clauses, sql_params, term: str, conn, include_manual=True):
+def _membership(outer: str, key: str, source: str, condition: str, correlated: bool) -> str:
+    """``outer`` is among ``source``'s ``key`` values that meet ``condition``.
+
+    The uncorrelated form, ``outer IN (SELECT key ...)``, resolves the subquery
+    once and suits a library-wide scan. The correlated form, ``EXISTS (... key =
+    outer ...)``, probes ``source`` by its index for each outer row, which is the
+    fast one when the outer query is pinned to a single photo: the ``IN`` form
+    would build the whole match list to test one row.
+    """
+    if correlated:
+        return f"EXISTS (SELECT 1 FROM {source} WHERE {key} = {outer} AND {condition})"
+    return f"{outer} IN (SELECT {key} FROM {source} WHERE {condition})"
+
+
+def _apply_search_filter(where_clauses, sql_params, term: str, conn, include_manual=True, *, correlated=False):
     """Apply the gallery free-text search filter.
 
     Prefers a single ``photos_fts MATCH`` query over the covering FTS5
@@ -212,33 +228,35 @@ def _apply_search_filter(where_clauses, sql_params, term: str, conn, include_man
     the labels of user-marked objects (``photo_objects``), neither of which is in
     the FTS index, via companion ``IN`` subqueries; ``include_manual=False``
     (share-link requests) leaves both out.
+
+    ``correlated=True`` writes the same predicates as correlated ``EXISTS``
+    probes, for a query already restricted to one photo (smart-album membership
+    of a single path); see ``_membership``.
     """
     from db.fts import has_fts_table
     from api.db_helpers import is_manual_tags_available, is_photo_objects_available
 
     use_manual = include_manual and is_manual_tags_available(conn)
-    manual_clause = (
-        "photos.path IN (SELECT photo_path FROM photo_manual_tags WHERE tag LIKE ? ESCAPE '\\')"
-    )
+    manual_clause = _membership("photos.path", "photo_manual_tags.photo_path", "photo_manual_tags",
+                                "photo_manual_tags.tag LIKE ? ESCAPE '\\'", correlated)
     use_objects = include_manual and is_photo_objects_available(conn)
-    object_clause = (
-        "photos.path IN (SELECT photo_path FROM photo_objects WHERE label LIKE ? ESCAPE '\\')"
-    )
+    object_clause = _membership("photos.path", "photo_objects.photo_path", "photo_objects",
+                                "photo_objects.label LIKE ? ESCAPE '\\'", correlated)
 
     fts_query = _fts5_query_from(term)
 
     if fts_query and has_fts_table(conn):
         person_like = "%" + term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-        # IN-subquery rather than EXISTS per row: the persons.name LIKE
-        # scan runs once on the small persons table (a few thousand rows)
-        # instead of N times against the photos table. On a no-match query
-        # this collapses the worst-case from ~580 ms to ~2 ms.
+        # IN-subquery rather than EXISTS per row for a library-wide scan: the
+        # persons.name LIKE scan runs once on the small persons table (a few
+        # thousand rows) instead of N times against the photos table. On a
+        # no-match query this collapses the worst-case from ~580 ms to ~2 ms.
         where_clauses.append(
             "("
-            "photos.rowid IN (SELECT rowid FROM photos_fts WHERE photos_fts MATCH ?)"
-            " OR photos.path IN ("
-            "SELECT f.photo_path FROM faces f JOIN persons p ON f.person_id = p.id"
-            " WHERE p.name LIKE ? ESCAPE '\\')"
+            + _membership("photos.rowid", "photos_fts.rowid", "photos_fts", "photos_fts MATCH ?", correlated)
+            + " OR "
+            + _membership("photos.path", "f.photo_path", "faces f JOIN persons p ON f.person_id = p.id",
+                          "p.name LIKE ? ESCAPE '\\'", correlated)
             + (f" OR {manual_clause}" if use_manual else "")
             + (f" OR {object_clause}" if use_objects else "")
             + ")"
@@ -314,7 +332,7 @@ def _add_range_filter(where_clauses, sql_params, params, column, min_key, max_ke
             pass
 
 
-def _apply_text_filters(where_clauses, sql_params, params, conn, include_manual=True, *, hierarchy_available=None):
+def _apply_text_filters(where_clauses, sql_params, params, conn, include_manual=True, *, hierarchy_available=None, correlated_search=False):
     """Apply camera, lens, search, tag, composition, person, category filters."""
     if params.get('camera'):
         where_clauses.append("camera_model = ?")
@@ -325,7 +343,8 @@ def _apply_text_filters(where_clauses, sql_params, params, conn, include_manual=
         sql_params.append(f"{clean_search}%")
 
     if params.get('search'):
-        _apply_search_filter(where_clauses, sql_params, params['search'], conn, include_manual=include_manual)
+        _apply_search_filter(where_clauses, sql_params, params['search'], conn, include_manual=include_manual,
+                             correlated=correlated_search)
 
     if params.get('album_tags'):
         _add_album_tags_filter(where_clauses, sql_params, params['album_tags'], conn, include_manual)
@@ -504,9 +523,12 @@ def _quality_tier_bounds(tier):
     if tier not in _QUALITY_TIER_KEYS:
         return None
     thresholds = VIEWER_CONFIG.get('quality_thresholds', {}) or {}
-    good = float(thresholds.get('good', 6))
-    great = float(thresholds.get('great', 7))
-    excellent = float(thresholds.get('excellent', 8))
+    # A bad threshold value must not shift the good/great/excellent tier
+    # boundaries (a raw float() here 500'd the gallery, and a hand-rolled
+    # except would silently re-tier the whole library).
+    good = config_number(thresholds, 'good', default=6, name='quality_thresholds.good')
+    great = config_number(thresholds, 'great', default=7, name='quality_thresholds.great')
+    excellent = config_number(thresholds, 'excellent', default=8, name='quality_thresholds.excellent')
     if tier == 'excellent':
         return (excellent, None)
     if tier == 'good':
@@ -751,11 +773,14 @@ def _apply_date_album_geo_filters(where_clauses, sql_params, params, *, logical=
         sql_params.append(escaped + '%')
 
 
-def _build_gallery_where(params, conn=None, user_id=None, include_manual=True, *, stack_owner=None, include_stacks=True, hierarchy_available=None, logical=False):
+def _build_gallery_where(params, conn=None, user_id=None, include_manual=True, *, stack_owner=None, include_stacks=True, hierarchy_available=None, logical=False, single_photo=False):
     """Build WHERE clauses for gallery queries.
 
     ``include_manual=False`` makes the tag filter and the text search AI-only:
     a share-link request must not be able to probe the owner's manual tags.
+    ``single_photo=True`` is for a caller that pins the query to one path: the
+    text search then probes its side tables per row instead of resolving every
+    match in the library first (see ``_apply_search_filter``).
     """
     # Stack ownership is trusted execution context, never a filter value. Smart
     # album JSON is user-controlled even when its keys begin with an underscore.
@@ -766,7 +791,8 @@ def _build_gallery_where(params, conn=None, user_id=None, include_manual=True, *
     where_clauses = []
     sql_params = []
     _apply_visibility_and_hide_filters(where_clauses, sql_params, params, user_id, stack_owner, logical=logical)
-    _apply_text_filters(where_clauses, sql_params, params, conn, include_manual=include_manual, hierarchy_available=hierarchy_available)
+    _apply_text_filters(where_clauses, sql_params, params, conn, include_manual=include_manual, hierarchy_available=hierarchy_available,
+                        correlated_search=single_photo)
     preference_columns = {field: f'photos.{field}' for field in ('star_rating', 'is_favorite', 'is_kept', 'is_rejected')} if logical else None
     _apply_preference_filters(where_clauses, sql_params, params, user_id, preference_columns)
     _apply_score_range_filters(where_clauses, sql_params, params, user_id, preference_columns)
@@ -1863,15 +1889,14 @@ def _find_similar_color(conn, source, photo_path, min_similarity, vis_sql, vis_p
     src_sat = source.get('mean_saturation', 0) or 0
     src_lum = source.get('mean_luminance', 0) or 0
 
-    # Luminance only, even for a photo whose blob carries the R/G/B channels: a
-    # library mid-rescan holds both formats, so a per-channel term would score
-    # rescanned candidates on a different scale than legacy ones and shuffle the
-    # ranking by scan order rather than by colour. The chroma signal stays in the
-    # saturation and monochrome terms below, which every row has.
-    src_hist = src_decoded['luma']
-    src_norm = src_hist.sum()
-    if src_norm > 0:
-        src_hist = src_hist / src_norm
+    def _norm_hist(arr):
+        if arr is None:
+            return None
+        total = arr.sum()
+        return arr / total if total > 0 else arr
+
+    src_hist = _norm_hist(src_decoded['luma'])
+    src_rgb = tuple(_norm_hist(c) for c in src_decoded['rgb']) if src_decoded.get('rgb') is not None else None
 
     # Pre-filter: match monochrome flag, limit saturation distance
     rows = conn.execute(f"""
@@ -1884,19 +1909,32 @@ def _find_similar_color(conn, source, photo_path, min_similarity, vis_sql, vis_p
               AND {vis_sql}
     """, [photo_path, src_mono, src_sat] + vis_params).fetchall()
 
+    # Blend R/G/B with luminance only when the source AND every candidate carry the
+    # 4-channel format. A library mid-rescan holds both formats; scoring some
+    # pairs on four channels and the rest on luma alone would put rescanned and
+    # legacy candidates on different scales and order the list by scan date, not
+    # by colour. One legacy candidate therefore puts the whole request on luma.
+    use_rgb = src_rgb is not None and all(
+        len(r['histogram_data']) != LEGACY_HISTOGRAM_BLOB_SIZE for r in rows)
+
     results = []
     for r in rows:
         r = dict(r)
         cand_decoded = unpack_histogram(r['histogram_data'])
         if cand_decoded is None:
             continue
-        cand_hist = cand_decoded['luma']
-        cand_norm = cand_hist.sum()
-        if cand_norm > 0:
-            cand_hist = cand_hist / cand_norm
+        cand_hist = _norm_hist(cand_decoded['luma'])
 
-        # Histogram intersection (0..1)
-        hist_sim = float(np.minimum(src_hist, cand_hist).sum())
+        # Histogram intersection (0..1): 4-channel RGB+luma when use_rgb, else luma-only
+        luma_sim = float(np.minimum(src_hist, cand_hist).sum())
+        if use_rgb and cand_decoded.get('rgb') is not None:
+            cand_rgb = tuple(_norm_hist(c) for c in cand_decoded['rgb'])
+            r_sim = float(np.minimum(src_rgb[0], cand_rgb[0]).sum())
+            g_sim = float(np.minimum(src_rgb[1], cand_rgb[1]).sum())
+            b_sim = float(np.minimum(src_rgb[2], cand_rgb[2]).sum())
+            hist_sim = 0.4 * luma_sim + 0.2 * r_sim + 0.2 * g_sim + 0.2 * b_sim
+        else:
+            hist_sim = luma_sim
 
         # Saturation distance (0..1, inverted)
         cand_sat = r.get('mean_saturation', 0) or 0
@@ -2021,7 +2059,7 @@ async def api_similar_photos(
 
     Modes:
       - visual: scored on the features both photos carry -- pHash similarity
-        (70%) + CLIP/SigLIP cosine (30%) when both are shared, the one shared
+        (30%) + CLIP/SigLIP cosine (70%) when both are shared, the one shared
         feature at full weight otherwise; a photo sharing neither is never
         listed. ``total`` counts the complete thresholded set.
       - color: histogram intersection + saturation/luminance distance
@@ -2164,6 +2202,59 @@ def api_config(user: Optional[CurrentUser] = Depends(get_optional_user)):
     from utils.version import build_label, current_version
     from api.types import QUALITY_LEVELS, TYPE_LABELS, available_sort_options, populated_gated_cols, unavailable_columns
 
+    def _map_tile_url() -> str:
+        """The operator's ``viewer.map_tile_url``, or '' for the OSM default.
+
+        The CSP permits tile images from 'self' and https: only, so an
+        http:// absolute URL would silently render a grey map in the browser
+        — refuse it here where the misconfiguration is visible, and keep
+        same-origin paths (a tile server behind the same reverse proxy) and
+        https:// URLs. Leaflet interpolates only {s}/{z}/{x}/{y}; a URL
+        without the three coordinate placeholders throws synchronously in
+        every browser instead of failing per tile, so it is refused too.
+        """
+        url = str(VIEWER_CONFIG.get('map_tile_url', '') or '').strip()
+        if not url:
+            return ''
+        placeholders = set(re.findall(r'\{ *([\w_ -]+) *\}', url))
+        # Leaflet interpolates only its own template variables, throws
+        # synchronously on an unknown one, and cannot render without the three
+        # coordinate placeholders — both shapes kill the whole map surface.
+        known = {'s', 'z', 'x', 'y', 'r'}
+        if not placeholders <= known or not {'z', 'x', 'y'} <= placeholders:
+            logger.warning("viewer.map_tile_url must interpolate exactly Leaflet's variables "
+                           "{s}/{r}/{z}/{x}/{y}, always including {z}/{x}/{y}; got %r", url)
+            return ''
+        if url.startswith('/') and not url.startswith('//'):
+            return url
+        if urlparse(url).scheme == 'https' and urlparse(url).netloc and '@' not in urlparse(url).netloc:
+            return url
+        logger.warning("viewer.map_tile_url must be a same-origin path starting with a single '/' "
+                       "or an https:// URL (the CSP blocks other image sources); got %r", url)
+        return ''
+
+    def _map_tile_attribution() -> str:
+        """``viewer.map_tile_attribution``, guarded like its siblings: the
+        JSON-schema string constraint is advisory, and a non-string value
+        would fail the /api/config response model on every request."""
+        raw = VIEWER_CONFIG.get('map_tile_attribution', '')
+        if isinstance(raw, str):
+            return raw
+        logger.warning("viewer.map_tile_attribution must be a string; got %r", raw)
+        return ''
+
+    def _map_tile_max_zoom() -> int:
+        """``viewer.map_tile_max_zoom``, guarded like the URL: the JSON-schema
+        integer constraint is advisory, and an unparseable value would 500 the
+        SPA's startup endpoint on every request. Clamped to Leaflet's sane range;
+        JSON booleans are ints to Python (``int(True) == 1``) and rejected."""
+        raw = VIEWER_CONFIG.get('map_tile_max_zoom', 19)
+        # json.load accepts NaN/Infinity, and int() of those raises.
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)) or not math.isfinite(raw):
+            logger.warning("viewer.map_tile_max_zoom must be an integer; got %r", raw)
+            return 19
+        return max(0, min(int(raw), 30))
+
     features = dict(VIEWER_CONFIG.get('features', {}))
     with get_db() as conn:
         populated_scores = populated_gated_cols(conn)
@@ -2215,6 +2306,9 @@ def api_config(user: Optional[CurrentUser] = Depends(get_optional_user)):
         'notification_duration_ms': VIEWER_CONFIG.get('notification_duration_ms', 2000),
         'search_threshold_default': search_threshold_default(),
         'place_search_enabled': bool(place_search_endpoint()),
+        'map_tile_url': _map_tile_url(),
+        'map_tile_attribution': _map_tile_attribution(),
+        'map_tile_max_zoom': _map_tile_max_zoom(),
         'translation_target_language': _FULL_CONFIG.get('translation', {}).get('target_language', ''),
         'is_multi_user': is_multi_user_enabled(),
         'edition_enabled': is_edition_enabled(),

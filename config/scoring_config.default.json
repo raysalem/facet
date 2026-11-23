@@ -1,7 +1,8 @@
 {
   "scanning": {
     "skip_hidden_directories": true,
-    "skip_directories": ["@eaDir", "#recycle", "#snapshot", "@Recycle"]
+    "skip_directories": ["@eaDir", "#recycle", "#snapshot", "@Recycle"],
+    "skip_raw": false
   },
   "categories": [
     {
@@ -3446,6 +3447,9 @@
   },
   "viewer": {
     "place_search_url": "https://photon.komoot.io/api",
+    "map_tile_url": "",
+    "map_tile_attribution": "",
+    "map_tile_max_zoom": 19,
     "password": "",
     "default_category": "",
     "edition_password": "",
@@ -3481,6 +3485,10 @@
         {
           "column": "date_taken",
           "label": "Date Taken"
+        },
+        {
+          "column": "date_added",
+          "label": "Date Added"
         },
         {
           "column": "star_rating",

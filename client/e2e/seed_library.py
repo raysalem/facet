@@ -28,10 +28,12 @@ CONFIG_PATH = os.path.join(WORK, 'scoring_config.json')
 XDG_DATA_HOME = os.path.join(WORK, 'xdg-data')
 # The add-on's own page is served here (by serve()), one port above the default viewer port.
 ADDON_UI_PORT = int(os.environ.get('FACET_E2E_ADDON_PORT', '5100'))
+# The one place the exports (portfolio site) may write; viewer.export.allowed_target_dirs names it.
+EXPORTS = os.path.join(WORK, 'exports')
 
 sys.path.insert(0, REPO)
 
-# folder -> [(file name, colour, aggregate, burst lead, AI edit of)]. One burst per folder.
+# folder -> [(file name, colour, aggregate, burst lead, AI edit of)]. One burst per folder, except 'review'.
 PHOTOS = {
     # 01 strip + 02 hide bursts (read-only): the edit outscores both frames and leads.
     'burst': [('IMG_0001.jpg', '#3c6e47', 5.0, 0, None),
@@ -45,10 +47,42 @@ PHOTOS = {
     'lead': [('IMG_0200.jpg', '#1971c2', 5.0, 0, None),
              ('IMG_0201.jpg', '#5f3dc4', 3.0, 0, None),
              ('IMG_0200_agy_1.jpg', '#f08c00', 7.0, 1, 'IMG_0200.jpg')],
+    # 06-08 photo page, albums, edition gate: two plain photos, no burst, no AI edit.
+    # Each is a one-photo group so none is folded away by Hide bursts.
+    'review': [('IMG_0300.jpg', '#0c8599', 6.0, 1, None),
+               ('IMG_0301.jpg', '#c2255c', 4.0, 1, None)],
+    # 09-11 gallery sort, filters, search and batch rating: five plain photos with distinct scores,
+    # cameras and captions (EXTRA), so one filter narrows the folder to a known subset.
+    'filter': [('IMG_0400.jpg', '#364fc7', 8.0, 1, None),
+               ('IMG_0401.jpg', '#37b24d', 6.5, 1, None),
+               ('IMG_0402.jpg', '#f59f00', 5.0, 1, None),
+               ('IMG_0403.jpg', '#ae3ec9', 3.5, 1, None),
+               ('IMG_0404.jpg', '#e8590c', 2.0, 1, None)],
+    # 12 culling: one plain three-frame burst (no AI edit); IMG_0500 leads.
+    'cull': [('IMG_0500.jpg', '#1098ad', 7.0, 1, None),
+             ('IMG_0501.jpg', '#74b816', 5.0, 0, None),
+             ('IMG_0502.jpg', '#d6336c', 3.0, 0, None)],
+    # 19 delete from the selection bar: two plain photos, one of which the flow deletes.
+    'trash': [('IMG_0700.jpg', '#862e9c', 4.5, 1, None),
+              ('IMG_0701.jpg', '#2b8a3e', 3.5, 1, None)],
+    # 20 persons: four photos with faces seeded by _seed_people (see PEOPLE).
+    'people': [('IMG_0800.jpg', '#5c940d', 6.0, 1, None),
+               ('IMG_0801.jpg', '#1864ab', 5.5, 1, None),
+               ('IMG_0802.jpg', '#a61e4d', 5.0, 1, None),
+               ('IMG_0803.jpg', '#e67700', 4.5, 1, None)],
+    # 21 map: two photos with GPS (EXTRA) and one without.
+    'places': [('IMG_0900.jpg', '#087f5b', 6.0, 1, None),
+               ('IMG_0901.jpg', '#c92a2a', 5.0, 1, None),
+               ('IMG_0902.jpg', '#343a40', 4.0, 1, None)],
+    # 14, 17 photo page edits (rating, favourite): a single photo.
+    'edit': [('IMG_0600.jpg', '#495057', 5.5, 1, None)],
 }
 DATE = {'burst': '2026:01:10 10:00:', 'reuse': '2026:01:11 10:00:', 'lead': '2026:01:12 10:00:',
         'album_a': '2026:01:13 10:00:', 'album_b': '2026:01:14 10:00:', 'layout': '2026:01:15 10:00:',
-        'tagged': '2026:01:16 10:00:'}
+        'tagged': '2026:01:16 10:00:',
+        'review': '2026:01:13 10:00:', 'filter': '2026:02:14 10:00:', 'cull': '2026:03:15 10:00:',
+        'edit': '2026:04:16 10:00:', 'trash': '2026:05:17 10:00:',
+        'people': '2026:06:18 10:00:', 'places': '2026:07:19 10:00:'}
 # folder -> (album name, colour, file prefix). Read-only: two manual albums with disjoint photos,
 # each photo its own one-frame burst so Hide bursts folds nothing. (album-switch flow)
 ALBUMS = {'album_a': ('E2E Album A', '#c92a2a', 'ALB_A'),
@@ -70,6 +104,21 @@ LAYOUT_ALBUM, LAYOUT_SIZE, LAYOUT_TAG_COUNT, LAYOUT_PEOPLE = 'E2E Layout', 80, 2
 LAYOUT_CAMERA = 'E2E Camera Company Professional Mirrorless Full Frame Body Model Number One Hundred Twenty Three'
 LAYOUT_CAPTION = ('A long caption that keeps going well past the width of the picture it describes, so that a caption '
                   'line which could widen the floating card would do so: ' + 'words ' * 30).strip()
+# Folders whose every photo is its own one-photo group (no burst), so Hide bursts folds nothing.
+SOLO = ('review', 'filter', 'edit', 'trash', 'people', 'places')
+# (folder, file name) -> extra photos columns. Only what a flow filters, sorts or searches on.
+EXTRA = {
+    ('filter', 'IMG_0400.jpg'): {'camera_model': 'E2E Alpha', 'iso': 100, 'caption': 'a red kayak on a calm lake'},
+    ('filter', 'IMG_0401.jpg'): {'camera_model': 'E2E Alpha', 'iso': 200, 'caption': 'a mountain hut at dawn'},
+    ('filter', 'IMG_0402.jpg'): {'camera_model': 'E2E Beta', 'iso': 400, 'caption': 'a crowded market street'},
+    ('filter', 'IMG_0403.jpg'): {'camera_model': 'E2E Beta', 'iso': 800, 'caption': 'a sleeping cat on a sofa'},
+    ('filter', 'IMG_0404.jpg'): {'camera_model': 'E2E Beta', 'iso': 1600, 'caption': 'a dark empty corridor'},
+    ('places', 'IMG_0900.jpg'): {'gps_latitude': 48.8584, 'gps_longitude': 2.2945},
+    ('places', 'IMG_0901.jpg'): {'gps_latitude': 40.6892, 'gps_longitude': -74.0445},
+}
+# 'people' faces: person key -> (name or None, [file names]). Two of them are the same person
+# (IMG_0800 + IMG_0801, named 'Ada E2E'); the other is an unnamed cluster (IMG_0802 + IMG_0803).
+PEOPLE = {'ada': ('Ada E2E', ['IMG_0800.jpg', 'IMG_0801.jpg']), 'unnamed': (None, ['IMG_0802.jpg', 'IMG_0803.jpg'])}
 
 
 def _jpeg(colour, size):
@@ -89,6 +138,7 @@ def _histogram(thumbnail):
 
 
 def _insert_photo(conn, folder, name, colour, aggregate, lead, group, second):
+    extra = EXTRA.get((folder, name), {})
     path = os.path.join(LIBRARY, folder, name)
     with open(path, 'wb') as fh:
         fh.write(_jpeg(colour, (1200, 800)))
@@ -99,7 +149,30 @@ def _insert_photo(conn, folder, name, colour, aggregate, lead, group, second):
         "VALUES (?, ?, ?, ?, 1200, 800, ?, ?, 'default', ?, ?, ?, ?, datetime('now'))",
         (path, name, thumbnail, _histogram(thumbnail), aggregate, aggregate, DATE[folder] + f'{second:02d}',
          group, lead, f'{group:016x}'))
+    if extra:
+        conn.execute(f"UPDATE photos SET {', '.join(f'{c} = ?' for c in extra)} WHERE path = ?", (*extra.values(), path))
     return path
+
+
+def _seed_people(conn):
+    import numpy as np
+    conn.execute('DELETE FROM faces')
+    conn.execute('DELETE FROM persons')
+    for number, (name, files) in enumerate(PEOPLE.values()):
+        vector = np.zeros(512, dtype=np.float32)
+        vector[number] = 1.0
+        thumb = _jpeg('#888888', (160, 160))
+        cursor = conn.execute('INSERT INTO persons (name, face_count, face_thumbnail, centroid, auto_clustered) '
+                              'VALUES (?, ?, ?, ?, ?)', (name, len(files), thumb, vector.tobytes(), 0 if name else 1))
+        person = cursor.lastrowid
+        for index, file in enumerate(files):
+            path = os.path.join(LIBRARY, 'people', file)
+            face = conn.execute('INSERT INTO faces (photo_path, face_index, embedding, bbox_x1, bbox_y1, bbox_x2, '
+                                'bbox_y2, confidence, person_id, face_thumbnail) VALUES (?, 0, ?, 400, 200, 800, 600, '
+                                '0.99, ?, ?)', (path, vector.tobytes(), person, thumb)).lastrowid
+            conn.execute('UPDATE photos SET face_count = 1, face_ratio = 0.25 WHERE path = ?', (path,))
+            if index == 0:
+                conn.execute('UPDATE persons SET representative_face_id = ? WHERE id = ?', (face, person))
 
 
 def _seed_folder(conn, folder):
@@ -107,11 +180,14 @@ def _seed_folder(conn, folder):
     photos = PHOTOS[folder]
     os.makedirs(os.path.join(LIBRARY, folder))
     for second, (name, colour, aggregate, lead, _) in enumerate(photos):
-        _insert_photo(conn, folder, name, colour, aggregate, lead, group, second)
+        _insert_photo(conn, folder, name, colour, aggregate, lead, group * 100 + second if folder in SOLO else group,
+                      second)
     for revision, (name, _, _, _, source) in enumerate((p for p in photos if p[4]), start=1):
         conn.execute('INSERT INTO photo_ai_edits (edit_path, source_path, tool, note, revision, captioned) '
                      "VALUES (?, ?, 'antigravity-gemini', 'e2e edit', ?, 1)",
                      (os.path.join(LIBRARY, folder, name), os.path.join(LIBRARY, folder, source), revision))
+    if folder == 'people':
+        _seed_people(conn)
 
 
 def _seed_layout(conn):
@@ -208,7 +284,8 @@ def seed(edition_password):
     with open(CONFIG_PATH, 'w', encoding='utf-8') as fh:
         json.dump({'viewer': {'edition_password': edition_password, 'scan_directories': [LIBRARY],
                               'cull': {'allow_trash': True},
-                              'features': {'show_scan_button': True}},
+                              'features': {'show_scan_button': True},
+                              'export': {'allowed_target_dirs': [EXPORTS]}},
                    'addons': {'enabled': True}}, fh, indent=2)
     init_database(DB_PATH)
     conn = sqlite3.connect(DB_PATH)

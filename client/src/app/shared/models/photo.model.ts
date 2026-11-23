@@ -68,6 +68,20 @@ export interface Photo {
    *  ShutterSpeedPipe coerces before formatting. */
   shutter_speed: string | null;
   focal_length: number | null;
+  /** 35 mm equivalent focal length; absent on a store copy that predates the field. */
+  focal_length_35mm?: number | null;
+  /** Exposure compensation in EV. `0` is a real value, so test `!= null`. */
+  exposure_compensation?: number | null;
+  /** Raw EXIF Flash code; bit 0 = fired. `0` means did not fire. */
+  flash?: number | null;
+  /** Raw EXIF WhiteBalance: 0 auto, 1 manual. */
+  white_balance?: number | null;
+  /** Raw EXIF MeteringMode: 0 unknown, 1 average, 2 center-weighted, 3 spot, 4 multi-spot, 5 pattern, 6 partial, 255 other. */
+  metering_mode?: number | null;
+  artist?: string | null;
+  copyright?: string | null;
+  /** File size in bytes; null until the exiftool read or `--backfill-exif-meta` stored it. */
+  file_size?: number | null;
   // Technical
   noise_sigma?: number | null;
   contrast_score?: number | null;
@@ -102,6 +116,9 @@ export interface Photo {
   channel_clip_highlight_pct?: number | null;
   // Metadata
   date_taken: string | null;
+  /** When the row was first scanned into the library (ISO UTC). Null for a photo
+   *  that predates the column and has not been rescanned since. */
+  date_added?: string | null;
   /** Pixel dimensions of the frame the scan analysed. Null when the recorded
    *  pair was proven to have been fabricated from the thumbnail and cleared —
    *  see `image_aspect`, and `repair_thumbnail_dimensions` server-side. */
@@ -233,6 +250,11 @@ export type PhotoFlagCoverage = AssertNever<Exclude<PhotoBooleanField, PhotoFlag
 /** Whether the photo carries any EXIF field a viewer shows. */
 export function hasExifFields(p: Photo): boolean {
   return !!(p.camera_model || p.lens_model || p.focal_length || p.f_stop || p.shutter_speed || p.iso);
+}
+
+/** Whether the photo carries a stored file fact (size) the EXIF tab shows; dimensions and path are on nearly every row and would pin the tab. */
+export function hasFileFields(p: Photo): boolean {
+  return p.file_size != null;
 }
 
 

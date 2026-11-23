@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output } f
 import { MatIconModule } from '@angular/material/icon';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { Photo, hasExifFields } from '../../models/photo.model';
+import { Photo, hasExifFields, hasFileFields } from '../../models/photo.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { FEATURE_MARK, MarkTonePipe } from '../../pipes/mark-tone.pipe';
 import { HistogramSurface } from '../../../core/services/histogram-preferences.service';
@@ -85,7 +85,7 @@ export class PhotoMetricsTabsComponent {
   readonly explainable = input(false);
   readonly explain = output<void>();
 
-  protected readonly hasExif = computed(() => hasExifFields(this.photo()));
+  protected readonly hasExif = computed(() => hasExifFields(this.photo()) || hasFileFields(this.photo()));
   /** Which tabs this instance offers, in order (the photo page splits them over Grade and Camera). */
   readonly sections = input<readonly MetricsTab[]>(METRICS_TABS);
   /** The AI score line above the tabs. */

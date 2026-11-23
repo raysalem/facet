@@ -91,7 +91,8 @@
     "light_mode": "浅色模式",
     "version": "Facet {version}",
     "display_menu": "显示",
-    "jobs_diagnostics": "任务与诊断"
+    "jobs_diagnostics": "任务与诊断",
+    "copy_failed": "复制失败"
   },
   "dialog": {
     "cancel": "取消",
@@ -215,7 +216,30 @@
     "caption": "照片描述",
     "filter_by_person": "按 {name} 筛选",
     "more_count": "还有 {count} 个",
-    "histogram": "直方图"
+    "histogram": "直方图",
+    "focal_35mm": "35 毫米等效",
+    "exposure_compensation": "曝光补偿",
+    "flash": "闪光灯",
+    "flash_fired": "已闪光",
+    "flash_off": "未闪光",
+    "white_balance": "白平衡",
+    "white_balance_auto": "自动",
+    "white_balance_manual": "手动",
+    "metering": "测光",
+    "metering_unknown": "未知",
+    "metering_average": "平均",
+    "metering_center_weighted": "中央重点",
+    "metering_spot": "点测光",
+    "metering_multi_spot": "多点测光",
+    "metering_pattern": "多区评价",
+    "metering_partial": "局部",
+    "metering_other": "其他",
+    "dimensions": "尺寸",
+    "file_size": "文件大小",
+    "folder": "文件夹",
+    "copy_folder": "复制文件夹路径",
+    "artist": "作者",
+    "copyright": "版权"
   },
   "photoCard": {
     "embed_to_file": "将元数据写入文件",
@@ -232,6 +256,8 @@
     "copied_count_plural": "已复制 {count} 个文件名",
     "link_copied": "链接已复制到剪贴板",
     "copy_failed": "复制链接失败",
+    "folder_copied": "已复制文件夹路径",
+    "folder_copy_failed": "无法复制文件夹路径",
     "person_renamed": "人物已重命名为“{name}”",
     "failed_rename": "重命名人物失败",
     "error_merging": "合并人物出错",
@@ -489,6 +515,8 @@
     "aesthetic": "美观度",
     "qrealign_score": "Q-ReAlign（美观度）",
     "date_taken": "拍摄日期",
+    "date_added": "添加日期",
+    "date_added_library": "添加到图库的日期",
     "star_rating": "星级评分",
     "face_quality": "人脸画质",
     "eye_sharpness": "眼睛清晰度",
@@ -1290,6 +1318,12 @@
       "paths_too_many": "此操作涉及的照片过多，请缩小筛选范围后重试",
       "download_confirm_title": "下载 {count} 张照片？",
       "download_confirm_message": "每张照片都会单独下载为一个文件。{count} 张需要较长时间，并可能导致浏览器不堪重负。",
+      "download_progress": "正在下载 {done}/{total}…",
+      "download_progress_failed": "{failed} 张失败",
+      "download_done": "已下载 {count} 张照片",
+      "download_done_one": "照片已下载",
+      "download_partial": "已下载 {saved}/{total} 张，{failed} 张失败",
+      "download_cancelled": "下载已停止 — 已保存 {saved}/{total} 张",
       "mark_bracket": "标记为一组曝光包围",
       "marked_bracket": "{count} 张照片已标记为一组曝光包围",
       "select": "选择",
@@ -2088,7 +2122,6 @@
     "loading_directories": "正在加载目录…",
     "no_directories": "尚未配置扫描目录。",
     "pick_directory": "选择要扫描的目录：",
-    "eta": "预计剩余时间",
     "starting": "正在启动…",
     "running": "运行中",
     "completed": "扫描已完成",
@@ -2125,6 +2158,7 @@
         "save": "保存",
         "composition": "构图分析",
         "embedding": "嵌入分析",
+        "gpu_thread": "GPU 线程崩溃",
         "other": "其他阶段"
       },
       "pipeline": "处理流程：{state} · 最后记录阶段：{phase}",
@@ -2158,7 +2192,34 @@
         "duplicate": "已省略重复目标",
         "raw_paired": "已省略具有已捕获 JPEG/HEIF 配对文件的 RAW 文件"
       }
-    }
+    },
+    "step": {
+      "decode": "正在读取照片",
+      "models": "正在加载模型",
+      "analyze": "正在分析照片",
+      "save": "正在保存结果"
+    },
+    "analyze": {
+      "content": "正在理解每张照片的内容",
+      "quality": "正在评估画质",
+      "subject": "正在寻找主体",
+      "composition": "正在分析构图",
+      "faces": "正在检测人脸"
+    },
+    "stage": {
+      "find": "查找",
+      "analyze": "分析",
+      "organize": "整理"
+    },
+    "stages_label": "扫描步骤",
+    "count": "{current} / {total} 张照片",
+    "time_left_seconds": "大约还需 {n} 秒",
+    "time_left_minutes": "大约还需 {n} 分钟",
+    "details": "技术日志",
+    "added": "已添加 {count} 张新照片",
+    "added_plural": "已添加 {count} 张新照片",
+    "none_new": "未发现新照片",
+    "progress_label": "扫描进度"
   },
   "persons": {
     "help": "通过人脸识别检测到的人物。你可以为未命名的人脸组命名、合并重复人物、设置头像或隐藏人物。点击人物可查看其照片。",
@@ -3011,7 +3072,8 @@
       "reject_sequence_title": "拒绝这些序列帧？",
       "reject_sequence_body": "这 {count} 张照片中，{sequence_count} 张属于通常保持帧完整的 {kinds} 集合。拒绝它们会覆盖该默认行为。不会删除任何文件。保存前仍可取消待确认操作。",
       "reject_sequence_confirm": "拒绝所有这些照片"
-    }
+    },
+    "error_external_changes": "无法获取选片列表的外部变更。"
   },
   "scenes": {
     "title": "场景",
@@ -3253,7 +3315,11 @@
     "date_from": "从",
     "date_to": "至",
     "no_gps_title": "没有带位置的照片",
-    "no_gps_hint": "当前范围内的照片都没有 GPS 坐标。打开一张照片，用其位置面板标注地点——标注后会显示在这里。"
+    "no_gps_hint": "当前范围内的照片都没有 GPS 坐标。打开一张照片，用其位置面板标注地点——标注后会显示在这里。",
+    "basemap": "地图来源",
+    "basemap_osm": "OpenStreetMap",
+    "basemap_custom": "自定义源",
+    "load_failed": "地图照片加载失败。平移或缩放即可重试。"
   },
   "photo_detail": {
     "copy_image": "复制图像",
@@ -3386,7 +3452,8 @@
       "maps_moved": "图钉已移到 {lat}, {lng}。请确认后保存。",
       "maps_unrecognized": "未找到坐标。请粘贴 Google 地图链接，或在 Google 地图中右键点击地图并复制数字。",
       "maps_unreachable": "无法打开该链接。请检查网络连接，或改为复制坐标。",
-      "maps_pick": "在 Google 地图上选择"
+      "maps_pick": "在 Google 地图上选择",
+      "osm_pick": "在 OpenStreetMap 中打开"
     },
     "distribution": {
       "scope": "分布范围",
@@ -3450,7 +3517,8 @@
     "tag_refine_collection": "细化此集合",
     "tag_search_library": "搜索图库",
     "add_caption": "添加照片描述",
-    "capture_settings": "拍摄参数"
+    "capture_settings": "拍摄参数",
+    "labelled_value": "{label}：{value}"
   },
   "manual_tags": {
     "batch": {
@@ -3817,7 +3885,9 @@
       "stored": "已存渲染图像直方图",
       "thumbnail": "缩略图估计",
       "note": "此曲线描述渲染后的图像，并非 RAW 传感器数值。溢出标记优先使用已存测量值；缩略图采样不能确定传感器是否发生溢出。"
-    }
+    },
+    "unavailable": "直方图不可用",
+    "retry": "重试"
   },
   "manual_faces": {
     "title": "标记遗漏的人脸或物体 / 管理标记",

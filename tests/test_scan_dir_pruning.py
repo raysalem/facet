@@ -2,6 +2,8 @@
 
 import json
 import logging
+import os
+from pathlib import Path
 
 import pytest
 
@@ -13,7 +15,9 @@ DEFAULT_GLOBS = ["@eaDir", "#recycle", "#snapshot", "@Recycle"]
 
 def _gather(paths, settings):
     from facet import _gather_scan_files
-    return _gather_scan_files([str(p) for p in paths], settings)
+    # (files, dead_roots): the pruning tests exercise roots that exist, so the
+    # dead-root half stays empty.
+    return _gather_scan_files([str(p) for p in paths], settings)[0]
 
 
 def _names(files):
@@ -124,3 +128,80 @@ class TestGather:
         _tree(tmp_path)
         files = _gather([tmp_path], {"skip_hidden_directories": True})
         assert "z.jpg" in _names(files)
+
+    def test_skip_raw_excludes_raw_files_when_enabled(self, tmp_path):
+        _touch(tmp_path, "shot.jpg")
+        _touch(tmp_path, "shot.cr2")
+        _touch(tmp_path, "other.nef")
+        assert _names(_gather([tmp_path], {"skip_raw": False})) == ["other.nef", "shot.cr2", "shot.jpg"]
+        assert _names(_gather([tmp_path], {"skip_raw": True})) == ["shot.jpg"]
+
+
+@pytest.mark.parametrize('operation', ['resolve', 'exists', 'is_file'])
+def test_unreadable_root_does_not_discard_other_roots(tmp_path, monkeypatch, operation):
+    from facet import _gather_scan_files
+    blocked = tmp_path / 'blocked'
+    blocked.mkdir()
+    good = _touch(tmp_path, 'valid/ok.jpg')
+    original = getattr(Path, operation)
+
+    def denied(self, *args, **kwargs):
+        if self == blocked:
+            raise PermissionError(13, 'Permission denied', str(self))
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, operation, denied)
+    files, dead = _gather_scan_files([str(blocked), str(good.parent)], {})
+    assert files == [good]
+    assert dead == [str(blocked)]
+
+
+@pytest.mark.skipif(os.name == 'nt' or getattr(os, 'geteuid', lambda: 0)() == 0,
+                    reason='requires POSIX permission checks as a non-root user')
+def test_root_with_inaccessible_parent_is_classified_as_dead(tmp_path):
+    from facet import _gather_scan_files
+    blocked = tmp_path / 'blocked'
+    hidden = blocked / 'photos'
+    hidden.mkdir(parents=True)
+    good = _touch(tmp_path, 'valid/ok.jpg')
+    blocked.chmod(0)
+    try:
+        files, dead = _gather_scan_files([str(hidden), str(good.parent)], {})
+        assert files == [good]
+        assert dead == [str(hidden)]
+    finally:
+        blocked.chmod(0o700)
+
+
+class TestPathsUnder:
+    """--recompute-saliency <paths> scopes the recompute to those files and folders."""
+
+    @pytest.fixture
+    def lib(self, tmp_path):
+        root = tmp_path.resolve()
+        rel = ["trip/a.jpg", "trip/day2/b.jpg", "trip2/c.jpg", "other/d.jpg"]
+        return root, [str(root / r) for r in rel]
+
+    def test_directory_takes_its_whole_subtree(self, lib):
+        from facet import _paths_under
+        root, paths = lib
+        assert _paths_under(paths, [root / "trip"]) == paths[:2]
+
+    def test_sibling_sharing_a_name_prefix_is_not_claimed(self, lib):
+        from facet import _paths_under
+        root, paths = lib
+        assert paths[2] not in _paths_under(paths, [root / "trip"])
+
+    def test_exact_file_matches_itself_only(self, lib):
+        from facet import _paths_under
+        root, paths = lib
+        assert _paths_under(paths, [root / "other" / "d.jpg"]) == [paths[3]]
+
+    def test_several_roots_union(self, lib):
+        from facet import _paths_under
+        root, paths = lib
+        assert _paths_under(paths, [root / "trip2", str(root / "other") + "/"]) == paths[2:]
+
+    def test_no_roots_match_nothing(self, lib):
+        from facet import _paths_under
+        assert _paths_under(lib[1], []) == []

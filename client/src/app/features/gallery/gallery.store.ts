@@ -169,6 +169,10 @@ export interface SortOption {
 
 export interface ViewerConfig {
   place_search_enabled?: boolean;
+  /** The operator's self-hosted basemap; '' (absent) keeps the OSM default. */
+  map_tile_url?: string;
+  map_tile_attribution?: string;
+  map_tile_max_zoom?: number;
   /** Release version of the running server (pyproject). */
   version?: string;
   /** Source the server image was built from (branch@commit), when recorded. */
@@ -2901,7 +2905,11 @@ export class GalleryStore {
           : p),
       );
       if (this.filters().faces_need_names) await this.refreshPaths([photoPath]);
-    } catch { /* ignore */ }
+    } catch {
+      // The chip the user asked to remove stays on screen: say the action
+      // failed instead of leaving them to wonder.
+      this.notifyActionFailed();
+    }
   }
 
   /**

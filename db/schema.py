@@ -188,6 +188,11 @@ PHOTOS_COLUMNS = [
 
     # Scan bookkeeping (ISO timestamp of last successful scoring)
     ('scanned_at', 'TEXT'),
+    # When the row was first inserted (ISO UTC, `...Z`); never updated afterwards, so it
+    # survives a forced rescan that rewrites scanned_at. NULL for a row that predates
+    # the column until a scan rewrites it (it then inherits the old scanned_at): an
+    # upgrade-time backfill would rewrite every row, thumbnail and all.
+    ('date_added', 'TEXT'),
 
     # Narrative moment (opt-in --detect-moments; NULL until that pass runs)
     ('narrative_moment', 'TEXT'),              # e.g. 'celebration', 'beach', 'other'
@@ -220,6 +225,17 @@ PHOTOS_COLUMNS = [
     ('date_manually_set', 'INTEGER NOT NULL DEFAULT 0'),
     # Manual GPS (including intentional clears) survives EXIF rescans.
     ('gps_manually_set', 'INTEGER NOT NULL DEFAULT 0'),
+    # File and camera metadata the info panel shows. EXIF codes are stored raw
+    # (exiftool runs with -n); NULL = unknown. file_size is bytes from exiftool's
+    # FileSize, or os.stat when the scan fell back to exifread/Pillow; a stored
+    # size means some EXIF reader ran (--backfill-exif-meta selects on file_size IS NULL).
+    ('file_size', 'INTEGER'),
+    ('exposure_compensation', 'REAL'),
+    ('flash', 'INTEGER'),
+    ('white_balance', 'INTEGER'),
+    ('metering_mode', 'INTEGER'),
+    ('artist', 'TEXT'),
+    ('copyright', 'TEXT'),
 ]
 
 FACES_COLUMNS = [
@@ -484,6 +500,12 @@ INDEXES = [
     # idx_qrealign_score (dropped on upgrade): CREATE INDEX IF NOT EXISTS cannot
     # reshape an index, hence the new name.
     ('idx_qrealign_sort', 'photos', 'qrealign_score DESC, path'),
+    # "Date Added" sort: same (X DESC, path) shape and ANALYZE-on-build.
+    ('idx_date_added_sort', 'photos', 'date_added DESC, path'),
+    # Its ASC direction: api.types.order_by_clause keeps NULLs last with
+    # `(date_added IS NULL) ASC, date_added ASC`, which the DESC index cannot serve
+    # (each page would scan the table). The expression text must match it.
+    ('idx_date_added_asc', 'photos', '(date_added IS NULL), date_added, path'),
     # DeQA sort + min/max_deqa range filter: same (X DESC, path) shape and ANALYZE-on-build
     # as idx_qrealign_sort. Replaces the bare idx_deqa_score (dropped on upgrade).
     ('idx_deqa_sort', 'photos', 'deqa_score DESC, path'),
@@ -816,7 +838,7 @@ SCAN_RETRY_RECEIPTS_COLUMNS = [
 SCAN_FAILURES_COLUMNS = [
     ('scan_run_id', 'INTEGER NOT NULL REFERENCES scan_runs(id) ON DELETE CASCADE'),
     ('path', 'TEXT NOT NULL'),
-    ('stage', 'TEXT'),         # load|decode_timeout|score|save
+    ('stage', 'TEXT'),         # load|decode_timeout|score|save|gpu_thread
     ('error', 'TEXT'),
     ('timestamp', "TEXT DEFAULT (datetime('now'))"),
 ]
@@ -1873,8 +1895,8 @@ ANALYZE_KEY_INDEXES = ('idx_moment_confidence', 'idx_gallery_aggregate')
 # without a sqlite_stat1 row for the new index the planner ignores it next to
 # stale partial stats. A one-index ANALYZE scans the small covering index, not the
 # 16 GB table, so it costs seconds where ``ANALYZE photos`` costs the whole file.
-ANALYZE_ON_BUILD_INDEXES = ('idx_post_scan', 'idx_date_asc_cover', 'idx_qrealign_sort',
-                            'idx_deqa_sort', 'idx_aesthetic_v25_sort', 'idx_faces_photo_person')
+ANALYZE_ON_BUILD_INDEXES = ('idx_post_scan', 'idx_date_asc_cover', 'idx_qrealign_sort', 'idx_date_added_sort',
+                            'idx_date_added_asc', 'idx_deqa_sort', 'idx_aesthetic_v25_sort', 'idx_faces_photo_person')
 
 
 def missing_photo_indexes(conn):

@@ -1,5 +1,5 @@
 import { I18N } from '../../core/i18n/keys';
-import { CaptureDatePipe } from '../../shared/pipes/capture-date.pipe';
+import { formatCaptureDate } from '../../shared/utils/date-format';
 import { isUnavailableKey, unavailableSet } from '../../shared/utils/unavailable-metrics';
 import { folderDisplayName } from '../folders/folders.util';
 import { albumTagLabel } from './album-tag-groups.util';
@@ -55,7 +55,6 @@ export const RANGE_CHIPS: readonly { minKey: string; maxKey: string; labelKey: s
   { minKey: 'min_channel_clip_highlight', maxKey: 'max_channel_clip_highlight', labelKey: 'gallery.channel_clip_highlight_range' },
 ];
 
-const date = new CaptureDatePipe();
 
 /** The filters that define a collection, beside its name: an album chip is the name, not one of them. */
 export function definingFilters(chips: readonly GalleryFilterChip[]): GalleryFilterChip[] {
@@ -63,7 +62,7 @@ export function definingFilters(chips: readonly GalleryFilterChip[]): GalleryFil
 }
 
 /** The collection's active filters as labelled chips (`t` translates a chip value); the criteria row makes them removable. */
-export function galleryFilterChips(store: GalleryStore, t: (key: string) => string): GalleryFilterChip[] {
+export function galleryFilterChips(store: GalleryStore, t: (key: string) => string, locale = 'en'): GalleryFilterChip[] {
   const f = store.filters();
   const chips: GalleryFilterChip[] = [];
 
@@ -150,8 +149,8 @@ export function galleryFilterChips(store: GalleryStore, t: (key: string) => stri
     if (scorePolicies?.[minKey] === 'missing_only') continue;
     const rawMin = (f as unknown as Record<string, string>)[minKey];
     const rawMax = (f as unknown as Record<string, string>)[maxKey];
-    const min = minKey === 'date_from' ? date.transform(rawMin) : rawMin;
-    const max = maxKey === 'date_to' ? date.transform(rawMax) : rawMax;
+    const min = minKey === 'date_from' ? formatCaptureDate(rawMin, locale) : rawMin;
+    const max = maxKey === 'date_to' ? formatCaptureDate(rawMax, locale) : rawMax;
     if (min || max) {
       const value = (min && max) ? `${min}–${max}` : min ? `≥${min}` : `≤${max}`;
       chips.push({ id: minKey, labelKey, value, clearKeys: [minKey, maxKey] });

@@ -21,6 +21,7 @@ import { toIsoDateString } from '../../utils/date-format';
 import { firstValueFrom } from 'rxjs';
 import { Photo, normalisePhotoFlagsAll } from '../../models/photo.model';
 import { ApiService } from '../../../core/services/api.service';
+import { DownloadProgressService } from '../../../core/services/download-progress.service';
 import { I18nService } from '../../../core/services/i18n.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { SortGroupKeyPipe } from '../../pipes/sort-group-key.pipe';
@@ -28,7 +29,6 @@ import { FilterDisplayPipe } from '../../pipes/filter-display.pipe';
 import { AdditionalFilterDef } from '../../models/filter-def.model';
 import { computeRangeFilterUpdate } from '../../utils/range-filter';
 import { useDesktopSignal } from '../../utils/media-query';
-import { downloadBlob } from '../../utils/download';
 import { SharedAlbumMediaScope, sharedAlbumMediaUrl } from '../../utils/shared-album-media';
 import { copyLines } from '../../utils/clipboard';
 import {
@@ -121,6 +121,10 @@ const HIDE_TOGGLE_KEYS = ['hide_blinks', 'hide_bursts', 'hide_duplicates'] as co
       <div class="flex flex-col items-center justify-center h-64 text-[var(--mat-sys-on-surface-variant)]">
         <mat-icon class="!text-5xl !w-12 !h-12 mb-4" aria-hidden="true">lock</mat-icon>
         <h1 role="alert" class="m-0 text-base font-normal">{{ error() | translate }}</h1>
+        @if (error() === I18N.albums.load_error) {
+          <!-- Only a load failure is retryable: an invalid or revoked link fails the same way every time. -->
+          <button mat-stroked-button class="mt-4" (click)="retryAlbumLoad()">{{ I18N.gallery.load_error.retry | translate }}</button>
+        }
       </div>
     } @else {
       <div class="bg-[var(--mat-sys-surface)] border-b border-[var(--mat-sys-outline-variant)] px-2 md:px-4 py-1 md:py-3">
@@ -535,6 +539,7 @@ export class SharedViewComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly api = inject(ApiService);
+  private readonly downloadProgress = inject(DownloadProgressService);
   private readonly i18n = inject(I18nService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly destroyRef = inject(DestroyRef);
@@ -840,8 +845,10 @@ export class SharedViewComponent implements OnInit {
       this.loadingMore.set(true);
       const request = this.loadPage(this.currentPage + 1, true);
       const epoch = this.requestEpoch;
-      request.then(() => {
-        if (epoch === this.requestEpoch && !this.destroyRef.destroyed) this.scrollDirective()?.recheck();
+      request.then(loaded => {
+        // A failed page leaves the sentinel on screen: re-arming it would refire
+        // the failing request at once. Scrolling away and back retries it.
+        if (loaded && epoch === this.requestEpoch && !this.destroyRef.destroyed) this.scrollDirective()?.recheck();
       }).finally(() => {
         if (epoch === this.requestEpoch && !this.destroyRef.destroyed) this.loadingMore.set(false);
       });
@@ -879,9 +886,10 @@ export class SharedViewComponent implements OnInit {
 
   protected copyPaths(): void {
     const filenames = [...this.selectedFiles().values()];
-    copyLines(filenames).then(() => {
-      this.snackBar.open(this.i18n.t(I18N.gallery.selection.copied), '', { duration: 2000 });
-    });
+    copyLines(filenames).then(
+      () => this.snackBar.open(this.i18n.t(I18N.gallery.selection.copied), '', { duration: 2000 }),
+      () => this.snackBar.open(this.i18n.t(I18N.ui.copy_failed), '', { duration: 3000 }),
+    );
   }
 
   protected async downloadSelected(type = 'original', profile?: string): Promise<void> {
@@ -892,14 +900,10 @@ export class SharedViewComponent implements OnInit {
     const files = [...this.selectedFiles()];
     this.downloading.set(true);
     try {
-      for (const [path, filename] of files) {
-        if (!current()) break;
-        const blob = await firstValueFrom(this.api.getRaw(sharedAlbumMediaUrl(scope, 'download', path)));
-        if (!current()) break;
-        downloadBlob(blob, filename);
-      }
-    } catch {
-      if (current()) this.snackBar.open(this.i18n.t(I18N.errors.action_failed), '', { duration: 4000 });
+      await this.downloadProgress.run(
+        files.map(([path, filename]) => ({ url: sharedAlbumMediaUrl(scope, 'download', path), filename })),
+        current,
+      );
     } finally {
       this.downloading.set(false);
     }
@@ -1054,19 +1058,39 @@ export class SharedViewComponent implements OnInit {
     await this.loadPage(1);
   }
 
-  private async loadPage(page: number, append = false): Promise<void> {
+  protected retryAlbumLoad(): void {
+    this.error.set('');
+    this.loading.set(true);
+    void this.loadPage(1);
+  }
+
+  /** Resolves false when the request failed. */
+  private async loadPage(page: number, append = false): Promise<boolean> {
     const scope = this.mediaScope();
-    if (!scope || !this.mediaCurrent(scope)) return;
+    if (!scope || !this.mediaCurrent(scope)) return false;
     const epoch = ++this.requestEpoch;
     try {
       await this.loadAlbumPage(page, append, scope, epoch);
+      return true;
     } catch (e: unknown) {
-      if (epoch !== this.requestEpoch || !this.mediaCurrent(scope)) return;
-      if (e instanceof HttpErrorResponse && (e.status === 403 || e.status === 401)) {
-        this.error.set(I18N.albums.share_link_revoked);
-      } else {
-        this.error.set(I18N.albums.load_error);
+      if (epoch !== this.requestEpoch || !this.mediaCurrent(scope)) return false;
+      const failure = e instanceof HttpErrorResponse && (e.status === 403 || e.status === 401)
+        ? I18N.albums.share_link_revoked
+        : I18N.albums.load_error;
+      // The first page reaching an empty grid is the one case the error page
+      // fits: there is nothing on screen to preserve. An append or an in-place
+      // refresh keeps the grid -- one failed request must not throw away what
+      // the guest is already looking at; scrolling or re-picking a filter
+      // retries it.
+      if (page === 1 && !append && this.photos().length === 0) {
+        this.error.set(failure);
+        return false;
       }
+      // A kept grid after a failed refresh still holds the previous filter's
+      // photos: paging it would append the new filter's next page onto them.
+      if (!append) this.hasMore.set(false);
+      this.snackBar.open(this.i18n.t(failure), '', { duration: 3000 });
+      return false;
     } finally {
       if (epoch === this.requestEpoch && this.mediaCurrent(scope)) this.loading.set(false);
     }

@@ -9,6 +9,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, ParamMap, Router, NavigationStart, NavigationEnd, convertToParamMap } from '@angular/router';
 import { Location } from '@angular/common';
 import { MatDialog } from '@angular/material/dialog';
+import type { DestroyRef } from '@angular/core';
 import { BehaviorSubject, finalize, Observable, of, Subject, throwError } from 'rxjs';
 import { UserActivityJournal } from '../../core/agent/user-activity-journal.service';
 import { ApplicationRef, Component, computed, signal } from '@angular/core';
@@ -943,11 +944,12 @@ describe('PhotoDetailComponent', () => {
       ] })
       : of(samplePhoto));
     const view = renderDetail();
-    view.componentInstance.photo.set(makePhoto({ persons: [{ id: 1, name: 'Alice' }], image_width: 1000, image_height: 800 }));
+    view.componentInstance.photo.set(makePhoto({ path: samplePhoto.path, persons: [{ id: 1, name: 'Alice' }], image_width: 1000, image_height: 800 }));
     view.detectChanges();
     await view.whenStable();
     view.detectChanges();
     const avatar = view.nativeElement.querySelector('button[data-person-avatar]') as HTMLButtonElement;
+    expect(mockApi.get).toHaveBeenCalledWith('/photo/faces', { path: samplePhoto.path });
     expect(avatar.getAttribute('aria-haspopup')).toBe('menu');
     avatar.click();
     view.detectChanges();
@@ -982,6 +984,16 @@ describe('PhotoDetailComponent', () => {
     expect(root.querySelector('app-photo-analysis')).toBeNull();
     expect(mockRouter.navigate).not.toHaveBeenCalled();
     expect(mockApi.post.mock.calls.filter(([url]) => url === '/critique/vlm')).toHaveLength(0);
+  });
+
+  it.each([[true, 1], [false, 0]])('gates the albums section on features.show_albums (%s)', async (enabled, count) => {
+    const view = renderDetail();
+    const photo = makePhoto({ camera_model: 'X100V' });
+    mockApi.get.mockImplementation((url: string) => of(url === '/photo' ? photo : {}));
+    TestBed.inject(GalleryStore).config.set({ features: { show_albums: enabled } } as never);
+    view.componentInstance.photo.set(photo);
+    view.detectChanges(); await view.whenStable(); view.detectChanges();
+    expect((view.nativeElement as HTMLElement).querySelectorAll('app-photo-albums')).toHaveLength(count);
   });
 
   it('lays the inspector out like the gallery rail: untitled Review, then the metric tabs, no accordions', async () => {
@@ -1034,7 +1046,7 @@ describe('PhotoDetailComponent', () => {
 
   it('orders each rail panel by priority and pins Review on wide screens', async () => {
     const view = renderDetail();
-    const photo = makePhoto({ camera_model: 'Canon EOS R6', focal_length: 85, f_stop: 2.8, shutter_speed: '0.01', iso: 4000,
+    const photo = makePhoto({ camera_model: 'Canon EOS R6', lens_model: 'RF 85mm F2', focal_length: 85, f_stop: 2.8, shutter_speed: '0.01', iso: 4000,
       caption: 'A street', tags_list: ['street'], gps_latitude: 1, gps_longitude: 2, persons: [{ id: 1, name: 'Alice' }],
       burst_group_id: 7 });
     const set = { kind: 'burst', count: 5, ev_span: null, members: [1, 2, 3, 4, 5].map(n => ({ path: `/m${n}.jpg`, ev_offset: null, ai_edit_of: null, is_blink: false, preview_revision: null })) };
@@ -1078,7 +1090,7 @@ describe('PhotoDetailComponent', () => {
     // Each item carries the "·" before it inside a clipped row, so a wrapped line never opens with one; W × H keeps its ?.
     expect(exposure.classList).toContain('overflow-x-clip');
     const items = [...exposure.querySelectorAll<HTMLElement>(':scope > div > span')];
-    expect(items.map(span => (span.querySelector('[data-photo-dimensions]') ?? span).textContent!.trim())).toEqual(['Canon EOS R6', '85mm', 'f/2.8', '1/100', 'ISO 4000', '1920 × 1080']);
+    expect(items.map(span => (span.querySelector('[data-photo-dimensions]') ?? span).textContent!.trim())).toEqual(['Canon EOS R6', 'RF 85mm F2', '85mm', 'f/2.8', '1/100', 'ISO 4000', '1920 × 1080']);
     const dimensions = items[items.length - 1];
     expect(dimensions.classList).toContain('whitespace-nowrap');
     expect(exposure.getAttribute('aria-label')).toBe('photo_detail.capture_settings');
@@ -1921,6 +1933,7 @@ describe('PhotoDetailComponent', () => {
       await promise;
       expect(component.downloading()).toBe(false);
       expect(mockApi.getRaw).toHaveBeenCalled();
+      expect((clickSpy.mock.contexts[0] as HTMLAnchorElement).download).toBe('test.jpg');
 
       appendSpy.mockRestore();
       removeSpy.mockRestore();
@@ -1948,6 +1961,7 @@ describe('PhotoDetailComponent', () => {
       expect(mockApi.getRaw).toHaveBeenCalledWith(
         `/api/photo/social_crop?path=${encodeURIComponent('/photos/test.jpg')}&preset=square`,
       );
+      expect((clickSpy.mock.contexts[0] as HTMLAnchorElement).download).toBe('test.jpg');
 
       appendSpy.mockRestore();
       removeSpy.mockRestore();
@@ -3190,6 +3204,37 @@ describe('PhotoDetailComponent', () => {
       await component.generateCaption(edited.path);
 
       expect(TestBed.inject(GalleryStore).config()?.features?.show_captions).toBe(false);
+    });
+
+    it('stops applying caption results once the page is destroyed', async () => {
+      createComponent();
+      seedGrid({ caption: 'stale' });
+      const closed = new Subject<string | undefined>();
+      mockDialog.open.mockReturnValue({ afterClosed: () => closed.asObservable() });
+      // Same loader warm-up the caption test needs: editCaption is void and
+      // resolves its dynamic import on its own.
+      await import('./caption-edit-dialog.component');
+
+      // The fix registers the dialog subscription's teardown with the page's
+      // DestroyRef; capture what the editCaption call registered.
+      const dr = (component as unknown as { destroyRef: DestroyRef }).destroyRef;
+      const onDestroySpy = vi.spyOn(dr, 'onDestroy');
+      const registeredBefore = onDestroySpy.mock.calls.length;
+
+      component.editCaption({ ...edited });
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+      const newTeardowns = onDestroySpy.mock.calls
+        .slice(registeredBefore)
+        .map(call => call[0] as () => void);
+      expect(newTeardowns.length).toBeGreaterThan(0);
+
+      // Simulate the page teardown, then close the dialog: the result must not
+      // land on the destroyed page's store view.
+      newTeardowns.forEach(fn => fn());
+      closed.next('an edited caption');
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+
+      expect(stored().caption).toBe('stale');
     });
 
     it('the caption edit dialog result reaches the store', async () => {

@@ -91,7 +91,8 @@
     "light_mode": "Mode clair",
     "version": "Facet {version}",
     "display_menu": "Affichage",
-    "jobs_diagnostics": "Tâches et diagnostics"
+    "jobs_diagnostics": "Tâches et diagnostics",
+    "copy_failed": "Échec de la copie"
   },
   "dialog": {
     "cancel": "Annuler",
@@ -215,7 +216,30 @@
     "caption": "Légende",
     "filter_by_person": "Filtrer par {name}",
     "more_count": "+{count} de plus",
-    "histogram": "Histogramme"
+    "histogram": "Histogramme",
+    "focal_35mm": "Équiv. 35 mm",
+    "exposure_compensation": "Comp. d'exposition",
+    "flash": "Flash",
+    "flash_fired": "Déclenché",
+    "flash_off": "Non déclenché",
+    "white_balance": "Balance des blancs",
+    "white_balance_auto": "Auto",
+    "white_balance_manual": "Manuelle",
+    "metering": "Mesure",
+    "metering_unknown": "Inconnue",
+    "metering_average": "Moyenne",
+    "metering_center_weighted": "Pondérée centrale",
+    "metering_spot": "Spot",
+    "metering_multi_spot": "Multi-spot",
+    "metering_pattern": "Multi-zones",
+    "metering_partial": "Partielle",
+    "metering_other": "Autre",
+    "dimensions": "Dimensions",
+    "file_size": "Taille du fichier",
+    "folder": "Dossier",
+    "copy_folder": "Copier le chemin du dossier",
+    "artist": "Artiste",
+    "copyright": "Copyright"
   },
   "photoCard": {
     "embed_to_file": "Écrire les métadonnées dans le fichier",
@@ -232,6 +256,8 @@
     "copied_count_plural": "Copies {count} noms de fichiers",
     "link_copied": "Lien copie dans le presse-papiers",
     "copy_failed": "Échec de la copie du lien",
+    "folder_copied": "Chemin du dossier copié",
+    "folder_copy_failed": "Impossible de copier le chemin du dossier",
     "person_renamed": "Personne renommée en \"{name}\"",
     "failed_rename": "Échec du renommage",
     "error_merging": "Erreur lors de la fusion",
@@ -489,6 +515,8 @@
     "aesthetic": "Esthétique",
     "qrealign_score": "Q-ReAlign (esthétique)",
     "date_taken": "Date de prise",
+    "date_added": "Date d'ajout",
+    "date_added_library": "Date d'ajout à la bibliothèque",
     "star_rating": "Étoiles",
     "face_quality": "Qualité visage",
     "eye_sharpness": "Netteté yeux",
@@ -1290,6 +1318,12 @@
       "paths_too_many": "Trop de photos pour cette action — affinez les filtres et réessayez",
       "download_confirm_title": "Télécharger {count} photos ?",
       "download_confirm_message": "Chaque photo est téléchargée sous forme de fichier séparé. {count} d'entre elles prendront du temps et pourraient surcharger le navigateur.",
+      "download_progress": "Téléchargement {done} sur {total}…",
+      "download_progress_failed": "{failed} en échec",
+      "download_done": "{count} photos téléchargées",
+      "download_done_one": "Photo téléchargée",
+      "download_partial": "{saved} sur {total} téléchargées, {failed} en échec",
+      "download_cancelled": "Téléchargement arrêté — {saved} sur {total} enregistrées",
       "mark_bracket": "Marquer comme un seul bracket",
       "marked_bracket": "{count} photos marquées comme un seul bracket",
       "select": "Sélectionner",
@@ -2088,7 +2122,6 @@
     "loading_directories": "Chargement des dossiers…",
     "no_directories": "Aucun dossier de scan configuré.",
     "pick_directory": "Choisissez un dossier à scanner :",
-    "eta": "Estimation",
     "starting": "Démarrage...",
     "running": "En cours",
     "completed": "Scan terminé",
@@ -2125,6 +2158,7 @@
         "save": "Enregistrement",
         "composition": "Analyse de composition",
         "embedding": "Analyse des vecteurs",
+        "gpu_thread": "Crash du thread GPU",
         "other": "Autre étape"
       },
       "pipeline": "Pipeline : {state} · dernière phase enregistrée : {phase}",
@@ -2158,7 +2192,34 @@
         "duplicate": "Cibles en double omises",
         "raw_paired": "Fichiers RAW avec partenaire JPEG/HEIF capturé omis"
       }
-    }
+    },
+    "step": {
+      "decode": "Lecture des photos",
+      "models": "Chargement des modèles",
+      "analyze": "Analyse des photos",
+      "save": "Enregistrement des résultats"
+    },
+    "analyze": {
+      "content": "Compréhension du contenu de chaque photo",
+      "quality": "Évaluation de la qualité d'image",
+      "subject": "Recherche du sujet principal",
+      "composition": "Lecture de la composition",
+      "faces": "Détection des visages"
+    },
+    "stage": {
+      "find": "Recherche",
+      "analyze": "Analyse",
+      "organize": "Organisation"
+    },
+    "stages_label": "Étapes de l'analyse",
+    "count": "{current} sur {total} photos",
+    "time_left_seconds": "environ {n} s restantes",
+    "time_left_minutes": "environ {n} min restantes",
+    "details": "Journal technique",
+    "added": "{count} nouvelle photo ajoutée",
+    "added_plural": "{count} nouvelles photos ajoutées",
+    "none_new": "Aucune nouvelle photo trouvée",
+    "progress_label": "Progression de l'analyse"
   },
   "persons": {
     "help": "Personnes détectées par la reconnaissance faciale. Nommez les groupes sans nom, fusionnez les doublons, définissez un avatar ou masquez une personne. Cliquez sur une personne pour voir ses photos.",
@@ -3011,7 +3072,8 @@
       "reject_sequence_title": "Rejeter ces images de séquence ?",
       "reject_sequence_body": "Sur ces {count} photos, {sequence_count} appartiennent à des ensembles {kinds} dont les images restent normalement ensemble. Les rejeter remplace ce comportement par défaut. Aucun fichier n’est supprimé. Vous pouvez encore annuler la confirmation en attente avant son enregistrement.",
       "reject_sequence_confirm": "Rejeter toutes ces photos"
-    }
+    },
+    "error_external_changes": "Impossible de récupérer les modifications externes du flux de sélection."
   },
   "scenes": {
     "title": "Scènes",
@@ -3253,7 +3315,11 @@
     "date_from": "Du",
     "date_to": "Au",
     "no_gps_title": "Aucune photo avec un lieu",
-    "no_gps_hint": "Rien dans le périmètre ne porte de coordonnées GPS. Ouvrez une photo et utilisez son panneau Lieu pour la placer — les photos placées apparaissent ici."
+    "no_gps_hint": "Rien dans le périmètre ne porte de coordonnées GPS. Ouvrez une photo et utilisez son panneau Lieu pour la placer — les photos placées apparaissent ici.",
+    "basemap": "Source de la carte",
+    "basemap_osm": "OpenStreetMap",
+    "basemap_custom": "Source personnalisée",
+    "load_failed": "Impossible de charger les photos de la carte. Déplacez ou zoomez pour réessayer."
   },
   "photo_detail": {
     "copy_image": "Copier l’image",
@@ -3386,7 +3452,8 @@
       "maps_moved": "Épingle placée sur {lat}, {lng}. Vérifiez, puis enregistrez.",
       "maps_unrecognized": "Aucune coordonnée trouvée. Collez un lien Google Maps, ou faites un clic droit sur la carte dans Google Maps et copiez les nombres.",
       "maps_unreachable": "Impossible d’ouvrir le lien. Vérifiez la connexion, ou copiez plutôt les coordonnées.",
-      "maps_pick": "Choisir sur Google Maps"
+      "maps_pick": "Choisir sur Google Maps",
+      "osm_pick": "Ouvrir dans OpenStreetMap"
     },
     "distribution": {
       "scope": "Portée de la distribution",
@@ -3450,7 +3517,8 @@
     "tag_refine_collection": "Affiner cette collection",
     "tag_search_library": "Rechercher dans la bibliothèque",
     "add_caption": "Ajouter une légende",
-    "capture_settings": "Réglages de prise de vue"
+    "capture_settings": "Réglages de prise de vue",
+    "labelled_value": "{label} : {value}"
   },
   "manual_tags": {
     "batch": {
@@ -3817,7 +3885,9 @@
       "stored": "Histogramme du rendu enregistré",
       "thumbnail": "Estimation de la miniature",
       "note": "Cette courbe décrit une image rendue, pas les valeurs RAW du capteur. Les repères d’écrêtage utilisent les mesures enregistrées lorsqu’elles sont disponibles ; l’échantillonnage d’une miniature ne permet pas d’établir l’écrêtage du capteur."
-    }
+    },
+    "unavailable": "Histogramme indisponible",
+    "retry": "Réessayer"
   },
   "manual_faces": {
     "title": "Marquer un visage manquant ou un objet / Gérer les marques",

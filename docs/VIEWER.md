@@ -229,11 +229,13 @@ The sort button in the header (and mobile toolbar) shows the current sort's icon
 
 Shutter speeds sort by duration, so `1/250` and `0.004` are equal. Missing or invalid values sort last in either direction.
 
+**Date Added** sorts by when Facet first scanned a photo, so a new import comes first in descending order whatever its capture date. A rescan, even with `--force`, keeps it. A photo you moved yourself comes back as a new one unless you run [`--relink-photos`](RELINK.md). Photos already in the library when you upgrade have no date until a scan rewrites them (they then take the time of their previous scan), and sort last in either direction. Until at least one photo has a date, the option is left out of the sort menu. Inside an album it reads **Date Added to Library**, because it is not when the photo joined the album. Shared-album links neither show this date nor sort by it. Only list view shows the added date; grid cards keep showing the capture date.
+
 Sortable columns by group (from `viewer.sort_options`):
 
 | Group | Columns |
 |-------|---------|
-| **General** | Aggregate Score, Aesthetic, Quality Score, Date Taken, Star Rating, Aesthetic (IAA), LIQE Score, Q-ReAlign (Aesthetic), DeQA, Aesthetic v2.5 (the last three appear once a photo has that score) |
+| **General** | Aggregate Score, Aesthetic, Quality Score, Date Taken, Date Added, Star Rating, Aesthetic (IAA), LIQE Score, Q-ReAlign (Aesthetic), DeQA, Aesthetic v2.5 (the last three appear once a photo has that score) |
 | **Face Metrics** | Face Quality, Face Quality (IQA), Eye Sharpness, Face Sharpness, Face Ratio, Face Count |
 | **Technical** | Tech Sharpness, Contrast, Noise Level |
 | **Color** | Color Score, Saturation |
@@ -334,7 +336,7 @@ Open the count badge or a stacked photo to browse permitted members in the photo
 - Category badge
 - Right-click (or Shift+F10) opens the [context menu](#multi-select--bulk-actions)
 
-Photo-detail metrics use EXIF, Quality, Composition, Technical and Histogram tabs. The last tab is remembered. A chart button beside each finite score opens its distribution on demand, marks the current photo, and switches between your visible library and the current category. These scopes ignore gallery filters and exclude photos you cannot access. Failed reads offer Retry. Shared-album viewers do not expose library distribution controls.
+Photo-detail metrics use EXIF, Quality, Composition, Technical and Histogram tabs. The last tab is remembered. A chart button beside each finite score opens its distribution on demand, marks the current photo, and switches between your visible library and the current category. These scopes ignore gallery filters and exclude photos you cannot access. Failed reads offer Retry. Shared-album viewers do not expose library distribution controls. The EXIF tab also shows the 35 mm equivalent focal length, exposure compensation, flash (fired or did not fire), white balance, metering mode, image dimensions with megapixels, file size, folder, artist and copyright; it appears when the photo has camera EXIF or a recorded file size. The detail page's summary line includes the lens, and its sidebar lists the albums that contain the photo (manual and smart, only those you may open; hidden when albums are disabled). Clicking the folder copies its path. On an existing library the new fields stay empty until `python facet.py --backfill-exif-meta` (or a forced rescan with `--force`) runs. Shared-album links leave out the artist and copyright.
 
 **Collection sidebar.** On wide screens (1280 px and up), a photo that is in the gallery's loaded collection (outside Timeline navigation) shows those photos in a sidebar on its left, in the same filters and sort. Click a thumbnail to open it; with a thumbnail focused, `↑`/`↓` open the previous or next photo (one photo per key, in one or two columns), and Home/End open the first/last photo in the visible section. `←`/`→` there behave as on the rest of the page. **Load more** fetches the next page. Drag the divider, or focus it and use Left/Right, Home and End, to resize it: one photo per row when narrow, two when wide. The chevron collapses it. The sidebar never changes the gallery's filters, selection or the Back destination. For large loaded collections, use Previous loaded photos and Next loaded photos to move between sections.
 
@@ -490,7 +492,7 @@ Response fields and status codes: [API.md](API.md).
 
 Click **Similar** on a photo and choose a mode:
 
-- **Visual** (default) — pHash similarity (70%) + CLIP/SigLIP similarity (30%). When two photos share only one of the two signals, it counts at full weight; photos sharing neither are never listed. All matches above the threshold are returned, page by page. If the photo has neither signal, rescan it with `--force` (a plain `python facet.py <dir>` skips processed files).
+- **Visual** (default) — pHash similarity (30%) + CLIP/SigLIP similarity (70%). When two photos share only one of the two signals, it counts at full weight; photos sharing neither are never listed. All matches above the threshold are returned, page by page. If the photo has neither signal, rescan it with `--force` (a plain `python facet.py <dir>` skips processed files).
 - **Color** — histogram intersection (70%) + saturation distance (10%) + luminance distance (10%) + monochrome bonus (10%). Pre-filters by monochrome flag and saturation range.
 - **Person** — photos with the same person(s), by `person_id` when available, otherwise face embedding similarity.
 
@@ -635,8 +637,9 @@ On an open single-user install (empty `viewer.edition_password`, the default), n
 
 The empty gallery offers **Scan photos to get started**. **Scan for new photos** is also available in the global navigation area at every width. Both open the scan launcher:
 
-- Pick a directory from the list and start the scan.
-- Live progress and output lines stream into the dialog. The gallery refreshes when the scan ends.
+- Pick a directory from the list and start the scan. When only one directory is configured it is already selected.
+- While it runs, the dialog shows the three stages of a scan (**Find**, **Analyze**, **Organize**), what the current step is doing in plain words ("Finding the main subject"), how many photos are done and roughly how long the analysis has left (the Organize stage has no estimate). The raw output lines are folded under **Technical log**, which opens by itself when a scan fails.
+- The gallery refreshes when the scan ends, and a message says how many new photos were added.
 - The scan runs `facet.py` in the background; one scan at a time.
 - The directory list combines each user's `directories`, shared directories, `path_mapping` targets and `viewer.scan_directories`. Seed `viewer.scan_directories` (e.g. `/data/photos`) so single-user and Docker installs have a target.
 
@@ -817,7 +820,7 @@ python facet.py --extract-gps    # Extract GPS lat/lng from EXIF into database
 
 New photos get their coordinates during scoring.
 
-Open `/map`. Controlled by `viewer.features.show_map` (default: `true`). Map backgrounds come from OpenStreetMap and need an internet connection, even in the installed app. In dark mode the tiles are shown inverted, so the map matches the theme.
+Open `/map`. Controlled by `viewer.features.show_map` (default: `true`). The default OpenStreetMap background needs an internet connection, even in the installed app; a same-origin self-hosted source does not. With `viewer.map_tile_url` configured, a **Map source** button on the map switches between OpenStreetMap and your self-hosted tiles (the choice is stored per browser, and the same switch appears above the location dialog's map). OpenStreetMap plots the WGS-84 coordinates EXIF GPS carries exactly, which matters inside mainland China where commercial basemaps shift pins by the GCJ-02 datum. In dark mode the tiles are shown inverted, so the map matches the theme.
 
 ### Saved places and manual GPS
 
@@ -853,13 +856,14 @@ Use **Address or business → Search online** to look up a place with Photon (Op
 The location dialog (one photo, or **Set location** for a selection or a whole album view) also takes points from Google Maps. Nothing is saved until you click **Save** (or preview and apply a batch), as with any other point.
 
 - **Pick on Google Maps** opens Google Maps in a new tab at the current pin, else at the first geotagged photo of the selection, else at the map's centre. Find the spot there and copy it.
+- **Open in OpenStreetMap** opens openstreetmap.org at the same point, with a marker on the coordinates — the fuller basemap inside mainland China, plotted on the same WGS-84 the GPS coordinates carry.
 - **Google Maps link or coordinates**: paste, then press Enter or click **Go to point**. The pin moves to the point for you to check. Accepted:
   - the pair Google copies when you right-click the map, e.g. `32.6064, -116.3239` (a space instead of the comma works too);
   - degrees, minutes, seconds such as `32°36'23.0"N 116°19'26.0"W`;
   - a full Google Maps URL. The dropped pin (`!3d…!4d…`) wins over a `q=`, `query=`, `ll=` or `center=` value, which wins over the `@lat,lon` view centre;
   - a short link (`maps.app.goo.gl/…`, `goo.gl/maps/…`). The browser cannot open these, so the viewer follows the redirect (`POST /api/geo/resolve_maps_link`, edition only).
 - The short-link lookup only requests `maps.app.goo.gl`, `goo.gl`, `maps.google.com`, `www.google.com` and `google.com` over HTTPS, at public addresses only, at most 5 redirects within 5 seconds, and never reads a page body. Any other host is refused without a request. Links are not logged.
-- Facet uses no Google API, API key or Google map tiles: Google's terms do not allow its tiles inside another map, so the dialog's map stays OpenStreetMap.
+- Facet uses no Google API, API key or Google map tiles: Google's terms do not allow its tiles inside another map, so the dialog's map is never Google's — it stays OpenStreetMap, or shows the operator's self-hosted tiles when `viewer.map_tile_url` is configured.
 
 ## Capsules
 
@@ -878,6 +882,8 @@ Facet generates capsules from your library:
 - **Location** — geotagged photo clusters with place names
 - **Favorites** — favorited photos grouped by year and season
 - **Dimension-based** — by camera, lens, category, composition pattern, focal length range, time of day, star rating, and combinations
+
+Photos you have rejected never appear in a capsule: not as its cover, not in its slideshow and not in an album saved from it. In multi-user mode, each user's own rejections count.
 
 ### Slideshow
 
@@ -967,6 +973,8 @@ Download photos from photo detail or the selection bar. The per-photo download m
 
 A newly added RAW companion can take up to five minutes to appear in this menu.
 
+Downloading several selected photos — in the gallery or a shared album — shows a notification with the running count, a progress bar and **Cancel**, then a message once the last file is saved. A photo that fails (a darktable render error, a file gone from disk) is skipped and counted, and the rest still download. A lost connection or session, or three failures in a row (a revoked shared link, a server that is down), stops the batch instead. The final message waits for an **Undo** offer still on screen rather than replacing it.
+
 **Saliency-aware social crop.** With `viewer.features.show_social_export` on (default `true`) and edition unlocked, the photo detail download bar has a **Social crop** menu. It lists `social_export.presets` (square 1:1, portrait 4:5, story 9:16 by default). Choosing one downloads a full-resolution JPEG cropped to that aspect and centered on the subject. The subject comes from the BiRefNet subject box (`photos.subject_bbox`, from `--recompute-saliency`), else the detected faces, else the center. The menu tooltip shows which was used (`saliency` / `faces` / `center`).
 
 Endpoints: [API.md — Download](API.md#download).
@@ -1017,7 +1025,7 @@ Granularity, sort and category persist in `localStorage`. Controls that don't ap
 
 **Scoped culling.** Narrow the darkroom with URL parameters: `?group_by=scene` for scenes, `?album=<id>` for an album, `?from=&to=` for a capture-time window (EXIF text or ISO dates such as `2026-06-01`). A banner shows the scope with **Exit scene**. Bursts that cross the window's edge still show all their frames.
 
-**Date range.** The **date range** button (icon `date_range`) offers **Last 7 days**, **Last 30 days**, **This year**, **Last year**, **Custom range...** and **All dates**. Dates show as dd/MM/yyyy.
+**Date range.** The **date range** button (icon `date_range`) offers **Last 7 days**, **Last 30 days**, **This year**, **Last year**, **Custom range...** and **All dates**. Dates are written the way the viewer's language writes them (English `1 Jul 2026`).
 
 - It combines with the album scope. Photos without a capture date drop out of a dated range.
 - Presets resolve when picked, so a bookmarked "Last 7 days" is a fixed window.
@@ -1329,7 +1337,7 @@ Smart photo frames, Home Assistant dashboards and ImmichFrame / Immich-Kiosk sty
 | Endpoint | Returns | Cache |
 |----------|---------|-------|
 | `GET /api/frame/photos?token=&count=` | `{photos: [{id, caption?, date_taken?, width, height}]}` — `count` capped at `frame.max_count` (default 100), defaults to `frame.count` (20) | — |
-| `GET /api/frame/image/{id}?token=&max_edge=` | the photo JPEG — original downscaled to `max_edge` (capped by `frame.max_edge`, default 1920), or the stored thumbnail if the original is unreachable | long immutable |
+| `GET /api/frame/image/{id}?token=&max_edge=` | the photo JPEG — original downscaled to `max_edge` (capped by `frame.max_edge`, default 1920, and by the cap the id was minted with), or the stored thumbnail if the original is unreachable | long immutable |
 | `GET /api/frame/next?token=` | one random curated JPEG, different on every call — for simple frames and Home Assistant | `no-store` |
 
 ### Generating a token
@@ -1368,7 +1376,7 @@ camera:
 
 Add the camera to a Picture Glance / Picture Entity card to get a self-updating photo frame.
 
-For an **ImmichFrame-style** client that runs its own slideshow, poll `GET /api/frame/photos?token=…&count=30` for ids, then fetch each `GET /api/frame/image/{id}?token=…&max_edge=1920`. Ids are stable and images are cached long-term, so each photo downloads once.
+For an **ImmichFrame-style** client that runs its own slideshow, poll `GET /api/frame/photos?token=…&count=30` for ids, then fetch each `GET /api/frame/image/{id}?token=…&max_edge=1920`. An id changes only when the photo's preview or `frame.max_edge` changes, and images are cached long-term, so each photo downloads once.
 
 ## Phone Auto-Upload
 

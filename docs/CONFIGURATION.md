@@ -163,7 +163,8 @@ Controls which directories the scan visits.
 {
   "scanning": {
     "skip_hidden_directories": true,
-    "skip_directories": ["@eaDir", "#recycle", "#snapshot", "@Recycle"]
+    "skip_directories": ["@eaDir", "#recycle", "#snapshot", "@Recycle"],
+    "skip_raw": false
   }
 }
 ```
@@ -172,6 +173,7 @@ Controls which directories the scan visits.
 |---------|---------|-------------|
 | `skip_hidden_directories` | `true` | Skip directories whose name starts with `.` |
 | `skip_directories` | `["@eaDir", "#recycle", "#snapshot", "@Recycle"]` | Folder-name globs skipped at any depth |
+| `skip_raw` | `false` | Skip camera RAW files during directory scans |
 
 Notes on `skip_directories`:
 - Globs use `fnmatch`, are case-sensitive and match the folder name only.
@@ -969,6 +971,7 @@ Groups similar photos taken in quick succession.
 | `similarity_threshold_percent` | `70` | Image hash similarity threshold |
 | `time_window_minutes` | `0.8` | Maximum time between photos |
 | `rapid_burst_seconds` | `0.4` | Photos within this auto-grouped |
+| `embedding_cosine_threshold` | `0.0` | Optional (not in the shipped file). A burst candidate only joins when the CLIP/SigLIP cosine of the pair is >= this (`0.0` = disabled). A pair where either photo has no embedding, or the two differ in width, is grouped on pHash alone. Loads every embedding into memory while grouping (about `4 x dim` bytes per photo, roughly 460 MB at 100k photos with SigLIP) |
 
 ---
 
@@ -1153,6 +1156,7 @@ Finds duplicate photos across the whole library: loose pHash candidates, confirm
 
 | Setting | Default | Description |
 |---------|---------|-------------|
+| `enabled` | `false` | Optional (not in the shipped file). Run global near-duplicate detection at the end of each scan. Off by default: the pass reads every pHash and embedding in the library, and `hide_duplicates` is on by default, so enabling it hides photos on the next scan. `--detect-duplicates` runs it on demand |
 | `similarity_threshold_percent` | `90` | Strict pHash gate (90% = Hamming distance <= 6 of 64 bits); the only test when either photo lacks an embedding |
 | `prefilter_hamming` | `12` | Optional (not in the shipped file). Loose Hamming gate for candidates when both photos have embeddings (at least the strict gate) |
 | `embedding_cosine_threshold` | `0.90` | Optional (not in the shipped file). A candidate merges only when SigLIP/CLIP cosine >= this |
@@ -1615,6 +1619,9 @@ Web gallery display and behavior.
 | `edition_password` | `""` | Password to unlock edition mode; empty = read-only (except under `trusted_local_editing`) |
 | `trusted_local_editing` | `false` | Grant edition rights to a browser on the same computer, without a password. See [Trusted Local Editing](#trusted-local-editing) |
 | `place_search_url` | `"https://photon.komoot.io/api"` | Photon endpoint for the gallery's **Search online** lookup; `""` disables it. See [Online place search](#online-place-search) |
+| `map_tile_url` | `""` | Self-hosted basemap tiles for the map surfaces; `""` keeps the OpenStreetMap default. Same-origin path (e.g. `/tiles/{z}/{x}/{y}.png`) or `https://` — `http://` is refused, the CSP only permits 'self' and https images |
+| `map_tile_attribution` | `""` | Attribution line shown for the custom tiles (HTML allowed; operator-configured, so trusted). Empty shows a generic self-hosted label |
+| `map_tile_max_zoom` | `19` | Maximum zoom level the custom tile server serves |
 | **comparison_mode** | | |
 | `min_comparisons_for_optimization` | `50` | Decisive comparisons (ties excluded) needed in a category before weights are suggested |
 | `pair_selection_strategy` | `"learning"` | Pair strategy: `learning`, `uncertainty`, `boundary`, `active`, `random` |
@@ -1688,7 +1695,7 @@ Web gallery display and behavior.
 | `security_headers.content_security_policy` | _(SPA-safe default)_ | Content-Security-Policy header; `""` disables it, or supply a stricter policy |
 | `security_headers.hsts` | `false` | Send `Strict-Transport-Security`. Enable only when the viewer is served over HTTPS. |
 | **Other** | | |
-| `cache_ttl_seconds` | `3600` | TTL of the in-memory stats/query caches; keep it longer than a full stats computation (can take minutes) |
+| `cache_ttl_seconds` | `3600` | TTL of the in-memory stats/query caches; keep it longer than a full stats computation (can take minutes); an unparseable or non-finite value falls back to `3600` with a warning, `0` or a negative value expires entries at once |
 | `notification_duration_ms` | `2000` | Toast duration |
 | `moment_confidence_min` | `0` | Moment labels below this confidence (0–1) render dimmed with "(uncertain)"; `0` = never dim |
 
@@ -1835,7 +1842,7 @@ Notes:
 |---------|---------|-------------|
 | `features.show_proofing` | `false` | Master switch for client proofing on shared albums |
 | `proofing.pin` | `""` | Optional PIN a client must enter with the share link; empty = no PIN (attempts are rate-limited) |
-| `proofing.session_minutes` | `1440` | Client session lifetime in minutes (24h); ends at once if the album is unshared or proofing is off |
+| `proofing.session_minutes` | `1440` | Client session lifetime in minutes (24h), clamped to at most a week; an unparseable or non-positive value falls back to the default; ends at once if the album is unshared or proofing is off |
 
 ### Path Mapping
 
@@ -2715,7 +2722,7 @@ Serves curated best shots to kiosk devices without a login: smart photo frames, 
 | `count` | `20` | Default number of photos returned by `/api/frame/photos` |
 | `max_count` | `100` | Hard cap on the `count` query parameter |
 | `min_aggregate` | `7.0` | Minimum aggregate score for a photo to be curated |
-| `max_edge` | `1920` | Long-edge cap (px) for served JPEGs; the `max_edge` query parameter can only lower it |
+| `max_edge` | `1920` | Long-edge cap (px) for served JPEGs; the `max_edge` query parameter can only lower it. Minted photo ids carry the cap: raising it reaches displays on their next poll, lowering it applies at once |
 | `favorites_only` | `false` | When `true`, only favorited photos are curated |
 | `categories` | `[]` | Allow-list of category names (empty = all categories) |
 

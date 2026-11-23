@@ -83,7 +83,7 @@ describe('CullingStore', () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: ApiService, useValue: api },
-        { provide: I18nService, useValue: { t: vi.fn((key: string) => key) } },
+        { provide: I18nService, useValue: { locale: signal('en'), t: vi.fn((key: string) => key) } },
         { provide: UserActivityJournal, useValue: { record: journalRecord } },
       ],
     });
@@ -821,6 +821,18 @@ describe('CullingStore', () => {
       expect(store.selectionsMap().get('2_similar')?.size ?? 0).toBe(0);
     });
 
+    it('a failed by_paths fetch tells the user and does not wedge the chain', async () => {
+      api.post.mockReturnValue(throwError(() => new Error('boom')));
+      await store.applyExternalChanges(['/a.jpg']);
+      const failureNotices = notices.filter(n => n.key === 'culling.error_external_changes');
+      expect(failureNotices).toHaveLength(1);
+
+      // The next batch still lands: one failure never wedges the chain.
+      api.post.mockReturnValue(of({ photos: [fresh('/a.jpg', { is_rejected: 1 })], total: 1, missing: [] }));
+      await store.applyExternalChanges(['/a.jpg']);
+      expect(store.groups()[0].photos[0].is_rejected).toBe(1);
+    });
+
     it('a null batch with a user decision keeps state, raises pendingReload and does not reload', async () => {
       store.setPhotoKept(store.groups()[0], '/b.jpg', true);
       expect(store.pendingReload()).toBe(false);
@@ -1520,7 +1532,7 @@ describe('CullingStore', () => {
         expect(store.scopeLabel()).toBeNull();
         store.scopeFrom.set('2026-07-01');
         store.scopeTo.set('2026-07-31');
-        expect(store.scopeLabel()).toBe('01/07/2026 - 31/07/2026');
+        expect(store.scopeLabel()).toBe('1 Jul 2026 - 31 Jul 2026');
         expect(store.albumScopeLabel()).toBeNull();
       });
     });
@@ -1947,7 +1959,7 @@ describe('CullingStore suggested stacks HTTP isolation', () => {
     TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(),
       { provide: Router, useValue: { events, url: '/culling?mode=stacks' } },
       { provide: AuthService, useValue: { status: signal({ user_id: 'editor' }), token: 'fixture',  identity, isEdition: edition } },
-      { provide: I18nService, useValue: { t: (key: string) => key } },
+      { provide: I18nService, useValue: { locale: signal('en'), t: (key: string) => key } },
       { provide: GalleryStore, useValue: { refreshPaths: stackRefresh } },
       { provide: UserActivityJournal, useValue: { record: stackJournal } },
       { provide: UndoService, useValue: { register: (command: UndoableCommand) => commands.push(command) } },

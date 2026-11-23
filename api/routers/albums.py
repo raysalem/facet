@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from db.preview_versions import attach_preview_versions
-from api.auth import CurrentUser, get_optional_user, require_edition
+from api.auth import CurrentUser, get_optional_user, require_authenticated, require_edition
 from api.config import VIEWER_CONFIG, server_scoring_config
 from api.database import get_async_db, get_db
 from api.db_helpers import (
@@ -25,8 +25,9 @@ from api.db_helpers import (
     split_photo_tags, attach_person_data_async, format_date, paginate,
     is_access_controlled_install, resolve_hide_defaults, get_preference_columns,
 )
-from api.models.albums import AlbumPhotosResponse, SharedAlbumResponse
+from api.models.albums import AlbumPhotosResponse, PhotoAlbum, SharedAlbumResponse
 from api.models.gallery import BY_PATHS_MISSING_CAP
+from api.shared_assets import OWNER_HISTORY_FIELDS
 from api.top_picks import get_top_picks_score_sql, with_top_picks_alias
 from db.stats_cache import cache_stats_best_effort
 from metric_columns import SCORE_RANGE_COLUMNS
@@ -89,6 +90,11 @@ def _get_user_id(user):
     return user.user_id if user else None
 
 
+def _may_open_album(album, user_id):
+    """The album-ownership rule: only the owner on an access-controlled install, anyone otherwise."""
+    return not is_access_controlled_install() or album['user_id'] == user_id
+
+
 def _check_album_access(conn, album_id, user_id):
     """Fetch album and verify ownership. Returns album row or raises 404/403.
 
@@ -101,7 +107,7 @@ def _check_album_access(conn, album_id, user_id):
     album = conn.execute("SELECT * FROM albums WHERE id = ?", (album_id,)).fetchone()
     if not album:
         raise HTTPException(status_code=404, detail="Album not found")
-    if is_access_controlled_install() and album['user_id'] != user_id:
+    if not _may_open_album(album, user_id):
         raise HTTPException(status_code=403, detail="Access denied")
     return album
 
@@ -113,7 +119,7 @@ async def _check_album_access_async(conn, album_id, user_id):
     await cur.close()
     if not album:
         raise HTTPException(status_code=404, detail="Album not found")
-    if is_access_controlled_install() and album['user_id'] != user_id:
+    if not _may_open_album(album, user_id):
         raise HTTPException(status_code=403, detail="Access denied")
     return album
 
@@ -441,6 +447,54 @@ def _compute_smart_album_cover(conn, album_row, user_id=None):
 
 # --- Endpoints ---
 
+@router.get("/api/photo/albums", response_model=list[PhotoAlbum])
+def photo_albums(
+    path: str = Query(...),
+    token: Optional[str] = Query(None),
+    user: CurrentUser = Depends(require_authenticated),
+):
+    """Albums (manual and smart) the caller may open that contain ``path``.
+
+    Registered before the ``/api/albums/{album_id}`` routes and under a distinct
+    prefix, so it cannot collide with them. Never reachable through a share token.
+    """
+    if token is not None:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    source, source_params = get_photos_from_clause(user.user_id)
+    visibility, visibility_params = get_visibility_clause(user.user_id)
+    try:
+        with get_db() as conn:
+            conn.execute("BEGIN")
+            if not conn.execute(
+                f"SELECT 1 FROM {source} WHERE photos.path = ? AND {visibility}",
+                [*source_params, path, *visibility_params],
+            ).fetchone():
+                raise HTTPException(status_code=404, detail="Photo not found")
+            member_ids = {row['album_id'] for row in conn.execute(
+                "SELECT album_id FROM album_photos WHERE photo_path = ?", (path,)).fetchall()}
+            albums = []
+            for album in conn.execute(
+                "SELECT id, name, is_smart, smart_filter_json, user_id FROM albums "
+                "ORDER BY name COLLATE NOCASE, id",
+            ).fetchall():
+                if not _may_open_album(album, user.user_id):
+                    continue
+                if album['is_smart'] and album['smart_filter_json']:
+                    try:
+                        member = _photo_in_album(conn, album, path)
+                    except (sqlite3.Error, ValueError, KeyError, TypeError):
+                        logger.warning("Skipping smart album %s with unusable filter", album['id'], exc_info=True)
+                        continue
+                else:
+                    member = album['id'] in member_ids
+                if member:
+                    albums.append({'id': album['id'], 'name': album['name'], 'is_smart': bool(album['is_smart'])})
+            return albums
+    except sqlite3.Error:
+        logger.exception("Failed to read photo albums")
+        raise HTTPException(status_code=503, detail="Albums could not be read") from None
+
+
 @router.get("/api/albums")
 def list_albums(
     user: Optional[CurrentUser] = Depends(get_optional_user),
@@ -706,13 +760,45 @@ def _other_context_albums(conn, exclude_album_id):
     ).fetchall()
 
 
+def _album_membership_probe(conn, album_row):
+    """Compile one album's membership check: ``(album, probe(path) -> bool)``.
+
+    The smart branch re-parsed the stored filter and rebuilt the WHERE clause
+    for every (path, album) pair; a large removal against a few context albums
+    re-derived the same clauses thousands of times inside the write
+    transaction. Compiled once, the loop only binds the path.
+    """
+    if album_row['is_smart'] and album_row['smart_filter_json']:
+        from api.routers.gallery import _build_gallery_where
+        owner_id = album_row['user_id']
+        saved_filters = _normalize_smart_filters(json.loads(album_row['smart_filter_json']))
+        where_clauses, sql_params = _build_gallery_where(saved_filters, conn, user_id=owner_id, single_photo=True)
+        from_clause, from_params = get_photos_from_clause(owner_id)
+        where_str = f" WHERE {' AND '.join(list(where_clauses) + ['path = ?'])}"
+        sql = f"SELECT 1 FROM {from_clause}{where_str} LIMIT 1"
+        params = [*from_params, *sql_params]
+
+        def probe(path, _sql=sql, _params=params, _conn=conn):
+            return _conn.execute(_sql, [*_params, path]).fetchone() is not None
+
+        return album_row, probe
+
+    album_id = album_row['id']
+
+    def probe(path, _sql="SELECT 1 FROM album_photos WHERE album_id = ? AND photo_path = ?",
+              _params=(album_id,), _conn=conn):
+        return _conn.execute(_sql, (*_params, path)).fetchone() is not None
+
+    return album_row, probe
+
+
 def _photo_in_album(conn, album_row, path):
     """Whether ``path`` is currently a member of ``album_row`` (smart or manual)."""
     if album_row['is_smart'] and album_row['smart_filter_json']:
         from api.routers.gallery import _build_gallery_where
         owner_id = album_row['user_id']
         saved_filters = _normalize_smart_filters(json.loads(album_row['smart_filter_json']))
-        where_clauses, sql_params = _build_gallery_where(saved_filters, conn, user_id=owner_id)
+        where_clauses, sql_params = _build_gallery_where(saved_filters, conn, user_id=owner_id, single_photo=True)
         from_clause, from_params = get_photos_from_clause(owner_id)
         where_str = f" WHERE {' AND '.join(list(where_clauses) + ['path = ?'])}"
         row = conn.execute(
@@ -772,9 +858,20 @@ def _clear_album_context_overrides(conn, album_id, paths=None):
     cleared_paths = [r['photo_path'] for r in rows]
     other_albums = _other_context_albums(conn, album_id) if paths is not None else []
 
+    # Each album's probe is compiled the first time a path needs it, not up
+    # front: most removals clear nothing, and building every smart album's
+    # filter would also let one malformed filter fail removals it never affects.
+    probes = {}
+
+    def _member_of(album, path):
+        probe = probes.get(album['id'])
+        if probe is None:
+            probe = probes[album['id']] = _album_membership_probe(conn, album)[1]
+        return probe(path)
+
     cleared = 0
     for path in cleared_paths:
-        other = next((a for a in other_albums if _photo_in_album(conn, a, path)), None)
+        other = next((album for album in other_albums if _member_of(album, path)), None)
         if other is not None:
             set_photo_scoring_override(
                 conn, path, scoring_context=other['scoring_context'], source=f"album:{other['id']}"
@@ -1220,7 +1317,7 @@ async def get_shared_album(
                 pass
 
         sort = explicit_sort or saved_sort or 'aggregate'
-        private_sort_columns = get_preference_columns()
+        private_sort_columns = {*get_preference_columns(), *OWNER_HISTORY_FIELDS}
         if sort not in VALID_SORT_COLS or sort in private_sort_columns:
             sort = 'aggregate'
         effective_sort_dir = explicit_sort_dir or saved_sort_dir or 'DESC'

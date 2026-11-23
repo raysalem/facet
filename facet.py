@@ -106,7 +106,7 @@ from metric_columns import JSON_LEGACY_SCORE_COLUMNS, JSON_SCORE_COLUMNS
 from utils.image_loading import (
     RAW_EXTENSIONS, HEIF_EXTENSIONS, JPEG_EXTENSIONS, SCANNABLE_IMAGE_EXTENSIONS,
 )
-from utils.exit_codes import LIBRARY_LOCK_HELD_EXIT_CODE, SAVED_NOTHING_EXIT_CODE
+from utils.exit_codes import LIBRARY_LOCK_HELD_EXIT_CODE, SAVED_NOTHING_EXIT_CODE, SCAN_DID_NOT_RUN_EXIT_CODE
 
 
 
@@ -192,29 +192,111 @@ def _gather_scan_files(photo_paths, scanning_settings):
 
     Walk roots are never pruned; only their descendant directories are, by the
     hidden-directory rule and the ``skip_directories`` name globs.
+
+    Returns ``(files, dead_roots)``: the second list names every root that is
+    missing or unreadable -- a dead NAS mount must be distinguishable from a
+    library that is genuinely empty, or cron and ``--watch`` read a scan that
+    never ran as a clean "nothing new".
     """
     valid_suffixes = SCANNABLE_IMAGE_EXTENSIONS
+    if scanning_settings.get('skip_raw', False):
+        valid_suffixes = valid_suffixes - RAW_EXTENSIONS
     skip_hidden = scanning_settings.get('skip_hidden_directories', True)
     skip_globs = _scan_skip_globs(scanning_settings)
     all_files = []
+    dead_roots = []
     for path_str in photo_paths:
-        base_path = Path(path_str).resolve()
-        if not base_path.exists():
-            logger.warning("Path does not exist: %s", path_str)
+        try:
+            base_path = Path(path_str).resolve()
+            exists = base_path.exists()
+            is_file = base_path.is_file() if exists else False
+        except OSError as root_error:
+            logger.warning("Path is unreadable: %s (%s)", path_str, root_error)
+            dead_roots.append(path_str)
             continue
-        if base_path.is_file():
+        if not exists:
+            logger.warning("Path does not exist: %s", path_str)
+            dead_roots.append(path_str)
+            continue
+        if is_file:
             if base_path.suffix.lower() in valid_suffixes:
                 all_files.append(base_path)
             else:
                 logger.warning("Unsupported file type: %s", path_str)
         else:
-            for root, dirs, files in os.walk(base_path):
+            walk_errors = []
+            root_listed = False
+            for root, dirs, files in os.walk(base_path, onerror=walk_errors.append):
+                # os.walk yields a directory only once it listed it, so the root
+                # appearing here means the root itself is readable.
+                root_listed = root_listed or Path(root) == base_path
                 dirs[:] = _prune_scan_dirs(dirs, skip_hidden, skip_globs)
                 for f in files:
                     p = Path(root) / f
                     if p.suffix.lower() in valid_suffixes:
                         all_files.append(p)
-    return all_files
+            if not root_listed:
+                # A root that could not be listed is unreadable, not empty: the
+                # walk swallowed that failure silently before.
+                logger.warning("Path is unreadable: %s", path_str)
+                dead_roots.append(path_str)
+            for error in walk_errors:
+                # An unreadable subfolder (a root-owned lost+found, a restricted
+                # album) loses only that folder, never the whole root.
+                if error.filename is None or Path(error.filename) != base_path:
+                    logger.warning("Skipping unreadable folder: %s", error.filename or error)
+    return all_files, dead_roots
+
+
+def _watch_scan_args(args):
+    """The scan modifier flags --watch forwards to every scan it spawns. A flag
+    the user started --watch with that quietly did nothing was a promise
+    silently broken. --force is not here: it re-scores the whole library, so it
+    applies to the initial scan only (``initial_scan_args``). --force-since is
+    safe on every scan, since rows rescanned after the date drop out of it."""
+    extra = []
+    if args.force_since:
+        extra += ['--force-since', args.force_since]
+    if args.single_pass:
+        extra.append('--single-pass')
+    if args.single_pass_name:
+        extra += ['--pass', args.single_pass_name]
+    return extra
+
+
+def _viewer_spawn_env(db_path):
+    """The environment for a viewer this command spawns: it must open the same
+    library the command targets, not viewer.py's CWD default -- without DB_PATH,
+    a multi-library user's ``--db`` silently shows another library's persons."""
+    return {**os.environ, 'DB_PATH': str(Path(db_path).resolve())}
+
+
+def _paths_under(paths, roots):
+    """The stored ``paths`` that are one of ``roots`` or live below one of them.
+
+    Stored paths are resolved at scan time, so the roots are resolved the same way.
+    A root matches whole path components only: ``/photos/trip`` does not claim
+    ``/photos/trip2``.
+    """
+    resolved = tuple(os.path.realpath(str(r)) for r in roots)
+    return [p for p in paths
+            if any(p == root or p.startswith(root.rstrip(os.sep) + os.sep) for root in resolved)]
+
+
+def _maybe_detect_duplicates(scorer):
+    """Run the library-wide duplicate pass at the end of a scan when ``duplicate_detection.enabled``.
+
+    Off by default: the pass reads every pHash and embedding in the library, and
+    ``hide_duplicates`` defaults to on, so enabling it silently hides photos on the
+    next scan. A failure is logged and never fails the scan.
+    """
+    if not scorer.config.get_duplicate_detection_settings().get('enabled', False):
+        return
+    from utils.duplicate import detect_duplicates
+    try:
+        detect_duplicates(scorer.db_path, config_path=scorer.config.config_path)
+    except Exception:
+        logger.warning("Duplicate detection failed (non-fatal)", exc_info=True)
 
 
 def _photos_saved(processor):
@@ -827,6 +909,7 @@ DEFAULT_SCAN_STALE_SECONDS = 120
 LIBRARY_JOB_ARGS = (
     'apply_recommendations',
     'backfill_clipping',
+    'backfill_exif_meta',
     'backfill_focal_35mm',
     'cluster_faces_force',
     'cluster_faces_incremental',
@@ -1766,6 +1849,10 @@ def _run_scan_pipeline(args, resumed_run, lifecycle):
     """
     from processing.scan_state import viewer_job_id
     job_id = viewer_job_id()
+    # Announce the first phase before the heavy imports: a viewer watching this scan
+    # otherwise shows no phase at all for the several seconds they take.
+    from processing.progress import emit_progress
+    emit_progress('gather', force=True)
     # The lock is already held here. Revalidate BEFORE constructing Facet:
     # its constructor initializes the schema and may load heavy models.
     retry_plan = None
@@ -1815,8 +1902,16 @@ def _run_scan_pipeline(args, resumed_run, lifecycle):
     init_global_plugin_manager(config=scorer.config.config)
 
     # 1. Gather files recursively from subfolders (or single files)
-    all_files = (retry_plan_paths(retry_plan) if retry_plan is not None else
-                 _gather_scan_files(args.photo_paths, scorer.config.get_scanning_settings()))
+    if retry_plan is not None:
+        all_files, dead_roots = retry_plan_paths(retry_plan), []
+    else:
+        all_files, dead_roots = _gather_scan_files(args.photo_paths, scorer.config.get_scanning_settings())
+
+    # Some roots dead while others still hold the library: the scan proceeds,
+    # but a warning that scrolls away is not enough for half a library.
+    if dead_roots and len(dead_roots) < len(args.photo_paths):
+        logger.error("Scan proceeds without %d missing/unreadable root(s): %s",
+                     len(dead_roots), ', '.join(str(r) for r in dead_roots))
 
     # Deduplicate (needed for case-insensitive filesystems like Windows).
     #
@@ -1888,6 +1983,11 @@ def _run_scan_pipeline(args, resumed_run, lifecycle):
     # Filter the list to only include new or un-scanned files
     todo_list = [f for f in all_files if _resolved(f) in unscanned
                  and not _raw_paired_with_jpeg(f)]
+    # The pipelines resolve each path again (EXIF lookup, chunk lookups, override
+    # lookup, result dict); hand them the answers the walk above already paid for.
+    from utils.path_cache import seed_resolved
+    todo_paths = [str(f) for f in todo_list]
+    seed_resolved({p: _resolved(f) for p, f in zip(todo_paths, todo_list)})
     raw_paired_files = [f for f in all_files if _raw_paired_with_jpeg(f)]
     raw_paired_skipped = len(raw_paired_files)
 
@@ -1916,7 +2016,19 @@ def _run_scan_pipeline(args, resumed_run, lifecycle):
     logger.info("Found %d total, processing %d new files.", len(all_files), len(todo_list))
 
     if not todo_list:
+        # Every root gone is not "nothing new": the library was never seen. A
+        # non-zero exit is what cron, wrapper scripts and --watch need to tell
+        # a dead mount from a clean, empty run.
+        # --retry-failed still walks the roots, but its worklist comes from
+        # scan_failures, so dead roots must not turn it into a failure.
+        if dead_roots and len(dead_roots) == len(args.photo_paths) and not args.retry_failed:
+            logger.error(
+                "Scan did not run: all %d scan root(s) are missing or unreadable: %s. "
+                "If these live on a network mount, check that it is mounted.",
+                len(dead_roots), ', '.join(str(r) for r in dead_roots))
+            raise SystemExit(SCAN_DID_NOT_RUN_EXIT_CODE)
         logger.info("No new files to process.")
+        emit_progress('done', extra={'saved': 0}, force=True)
         return True
 
     # Dry-run mode - score sample photos without saving to database
@@ -2022,12 +2134,26 @@ def _run_scan_pipeline(args, resumed_run, lifecycle):
         scan_run.update_progress(processed)
         elapsed = time.time() - _scan_t0
         eta = (total - processed) * elapsed / processed if processed else None
-        report_progress('scoring', processed, total, eta_seconds=eta)
+        _scan_done[0] = processed
+        # Forced: a chunk save lands right after the forced 'save' step, so the
+        # throttle would drop the one event that advances the photo count.
+        report_progress('scoring', processed, total, eta_seconds=eta, force=True)
 
+    _scan_done = [0]
+
+    def _on_scan_step(step, detail, fraction):
+        # Between chunk saves: which step is running, and how far the whole scan is.
+        elapsed = time.time() - _scan_t0
+        eta = elapsed * (1 - fraction) / fraction if fraction >= 0.1 else None
+        report_progress('scoring', _scan_done[0], len(todo_list), eta_seconds=eta, force=True,
+                        extra={'step': step, 'detail': detail, 'fraction': round(fraction, 3)})
+
+    from utils import fast_load
     ledger.begin('scoring', group='scoring')
     report_progress('scoring', 0, len(todo_list), force=True)
     processor = None
     calibration_saved = 0
+    calibration_unprocessed = []
     try:
         # Check for single-pass mode or specific pass
         if route == 'pass':
@@ -2036,7 +2162,6 @@ def _run_scan_pipeline(args, resumed_run, lifecycle):
             from models.model_manager import ModelManager
 
             model_manager = ModelManager(scorer.config)
-            todo_paths = [str(f) for f in todo_list]
             processed = run_single_pass(todo_paths, args.single_pass_name, scorer, model_manager)
             if processed == 0:
                 # A pass the commercial policy refuses did nothing: say so in the
@@ -2066,7 +2191,6 @@ def _run_scan_pipeline(args, resumed_run, lifecycle):
             }
 
             tuning_enabled = auto_tuning.get('enabled', True)
-            todo_paths = [str(f) for f in todo_list]
 
             logger.info("Single-pass mode: %d batch, %d workers",
                         current_settings['batch_size'], current_settings['num_workers'])
@@ -2110,6 +2234,9 @@ def _run_scan_pipeline(args, resumed_run, lifecycle):
 
             if remaining_paths:
                 calibration_saved = _photos_saved(processor)
+                # The calibration processor is replaced below: keep what its GPU
+                # thread never reached, or that tail is neither scored nor recorded.
+                calibration_unprocessed = list(processor.metrics.get('unprocessed_paths', []))
                 processor = BatchProcessor(
                     scorer,
                     batch_size=current_settings['batch_size'],
@@ -2132,7 +2259,6 @@ def _run_scan_pipeline(args, resumed_run, lifecycle):
             from models.model_manager import ModelManager
 
             model_manager = ModelManager(scorer.config)
-            todo_paths = [str(f) for f in todo_list]
 
             # `processing.mode: single-pass` from config, after the TOPIQ-profile fallback
             proc_settings = scorer.config.get_processing_settings()
@@ -2143,6 +2269,13 @@ def _run_scan_pipeline(args, resumed_run, lifecycle):
                     on_error=scan_run.record_failure,
                     on_progress=_on_scan_progress,
                 )
+                # The moment and junk steps below score against CLIP's text tower.
+                # Hand them this manager with CLIP still in its RAM cache, instead of
+                # the scorer's own idle one, which rebuilt the model from disk.
+                processor.keep_cached_after_scan = ('clip',)
+                fast_load.prefer_local_hub = True
+                processor.on_step = _on_scan_step
+                scorer.model_manager = model_manager
                 processor.process_directory(todo_paths)
             else:
                 # Force single-pass mode
@@ -2168,13 +2301,22 @@ def _run_scan_pipeline(args, resumed_run, lifecycle):
         raise
     else:
         saved_nothing = route != 'pass' and _photos_saved(processor) + calibration_saved == 0
-        recorded = scan_run.finish('failed' if saved_nothing else 'completed')
+        # The GPU thread dying mid-chunk is not a completed scan: everything it
+        # never reached was neither scored nor recorded as a failure, and a
+        # 'completed' mark would hide the gap from --resume and --retry-failed.
+        metrics = getattr(processor, 'metrics', None) or {}
+        unprocessed = calibration_unprocessed + list(metrics.get('unprocessed_paths', []))
+        gpu_died = bool(calibration_unprocessed) or bool(metrics.get('gpu_thread_died'))
+        if gpu_died:
+            for path in unprocessed:
+                scan_run.record_failure(path, 'gpu_thread', 'GPU thread exited before this photo was scored')
+        recorded = scan_run.finish('failed' if (saved_nothing or gpu_died) else 'completed')
         if not recorded:
             scorer.commit()
             logger.error('Scan bookkeeping could not be saved. Existing failure records '
                          'were retained; inspect the library before creating a new preview.')
             raise SystemExit(1)
-        if saved_nothing:
+        if saved_nothing and not gpu_died:
             logger.error("Scan failed: saved 0 of %d photos (see the model load and pass "
                          "errors above, or `--retry-failed` after fixing them).", len(todo_list))
             exit(SAVED_NOTHING_EXIT_CODE)
@@ -2197,7 +2339,16 @@ def _run_scan_pipeline(args, resumed_run, lifecycle):
                     [(p, scan_run.run_id) for p in retried_paths],
                 )
                 conn.commit()
+        if gpu_died:
+            # After the retry cleanup, not before: the photos this retry did save
+            # before the thread died must still drop their old failure records.
+            logger.error(
+                "Scan failed: the GPU thread exited before %d of %d photos were scored; "
+                "the run is recorded as failed -- re-run with `--retry-failed` to finish them.",
+                len(unprocessed), len(todo_list))
+            exit(1)
     finally:
+        fast_load.prefer_local_hub = False
         ledger.end('scoring')
 
     # 3. Finalization
@@ -2205,8 +2356,11 @@ def _run_scan_pipeline(args, resumed_run, lifecycle):
     scorer.commit()
     ledger.end('finalize')
 
+    saved = _photos_saved(processor) + calibration_saved if processor is not None else None
+    done_extra = None if saved is None else {'saved': saved}
+
     if retry_plan is not None:
-        report_progress('done', force=True)
+        report_progress('done', force=True, extra=done_extra)
         logger.info('Captured retry ended. Library-wide burst, sequence, tagging, '
                     'moment, junk and vector finalization were not run.')
         return True
@@ -2231,7 +2385,7 @@ def _run_scan_pipeline(args, resumed_run, lifecycle):
             logger.warning("%d scanned file(s) were not put in a burst: not a recorded AI edit, or "
                            "the edit or its original is missing or has no phash.", len(scanned) - placed)
         _log_scan_db_destination(scorer.db_path)
-        report_progress('done', force=True)
+        report_progress('done', force=True, extra=done_extra)
         logger.info("All tasks complete.")
         return True
 
@@ -2248,6 +2402,9 @@ def _run_scan_pipeline(args, resumed_run, lifecycle):
     ledger.begin('sequences')
     report_progress('sequences', force=True)
     detect_all_sequences(scorer.db_path, scorer.config.config_path, incremental=True)
+
+    # 5b. Opt-in global near-duplicate detection
+    _maybe_detect_duplicates(scorer)
     ledger.end('sequences')
 
     # 6. Auto-tag photos using stored CLIP/SigLIP embeddings
@@ -2326,7 +2483,7 @@ def _run_scan_pipeline(args, resumed_run, lifecycle):
     ledger.end('vec')
 
     _log_scan_db_destination(scorer.db_path)
-    report_progress('done', force=True)
+    report_progress('done', force=True, extra=done_extra)
     logger.info("All tasks complete.")
     logger.info(ledger.summary_line())
     return True
@@ -2991,6 +3148,47 @@ def main():
         repair_neutral_iqa(args.db)
         exit()
 
+    # Backfill file size and the extra EXIF fields (exposure compensation, flash,
+    # white balance, metering, artist, copyright). Only rows whose file_size is still
+    # NULL (no EXIF reader has run since the column was added) are re-read.
+    if args.backfill_exif_meta:
+        import shutil
+        if shutil.which('exiftool') is None:
+            logger.error("--backfill-exif-meta needs exiftool on PATH; install it and re-run.")
+            sys.exit(1)
+        from exiftool.exiftool_batch import EXIF_META_COLUMNS, get_exif_batch
+        init_database(args.db)
+        set_clause = ', '.join(f'{column} = ?' for column in EXIF_META_COLUMNS)
+        with get_connection(args.db) as conn:
+            # No covering index on purpose: the exiftool call per chunk dwarfs the overflow-page cost.
+            paths = [row['path'] for row in conn.execute("SELECT path FROM photos WHERE file_size IS NULL")]
+        if not paths:
+            logger.info("No photos need EXIF metadata backfill.")
+            exit()
+        logger.info("Backfilling file size and EXIF metadata for %d photos...", len(paths))
+        updated = 0
+        for start in range(0, len(paths), 500):
+            # Missing files are not sent (exiftool would only answer an 'Error' item for them);
+            # they stay NULL and are counted below.
+            chunk = [path for path in paths[start:start + 500] if os.path.isfile(path)]
+            found = get_exif_batch(chunk, chunk_size=500, timeout_per_chunk=120)
+            rows = []
+            for path in chunk:
+                exif = found.get(str(Path(path).resolve()))
+                if exif is None or exif.get('file_size') is None:
+                    continue
+                rows.append((*(exif[column] for column in EXIF_META_COLUMNS), path))
+            with get_connection(args.db) as conn:
+                conn.executemany(f"UPDATE photos SET {set_clause} WHERE path = ?", rows)
+                conn.commit()
+            updated += len(rows)
+        unreadable = len(paths) - updated
+        logger.info("Updated EXIF metadata for %d/%d photos.", updated, len(paths))
+        if unreadable:
+            logger.info("%d photos could not be read (missing or unreadable file) and stay NULL; "
+                        "run database.py --cleanup-missing-photos to drop rows whose file is gone.", unreadable)
+        exit()
+
     # Backfill focal_length_35mm from EXIF (lightweight - no GPU needed)
     if args.backfill_focal_35mm:
         from exiftool import get_exif_batch
@@ -3057,6 +3255,7 @@ def main():
                 [sys.executable, str(Path(__file__).resolve().parent / 'viewer.py')],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
+                env=_viewer_spawn_env(args.db),
             )
             time.sleep(2)
         else:
@@ -3233,6 +3432,9 @@ def main():
             paths = [row['path'] for row in conn.execute(
                 f"SELECT path FROM photos WHERE {where}"
             ).fetchall()]
+
+        if args.photo_paths:
+            paths = _paths_under(paths, args.photo_paths)
 
         if not paths:
             logger.info("No photos need saliency recompute (use --force to redo all).")
@@ -4245,10 +4447,12 @@ def main():
             sys.exit(1)
         logger.info(
             "Immich sync%s: %d matched, %d unmatched, %d updated, "
-            "%d skipped (unrated), %d identity conflict(s), %d album(s) created",
+            "%d skipped (unrated), %d identity conflict(s), %d album(s) created, "
+            "%d album asset(s) added, %d removed, %d removal failure(s)",
             " (dry-run)" if args.dry_run else "",
             stats['matched'], stats['unmatched'], stats['updated'],
             stats['skipped_unrated'], stats['identity_conflicts'], stats['albums_created'],
+            stats['album_added'], stats['album_removed'], stats['album_remove_failed'],
         )
         exit()
 
@@ -4401,6 +4605,16 @@ def main():
 
     # Watch mode: long-running daemon spawning incremental scans on changes
     if args.watch:
+        # The more specific refusal first: `--watch --retry-failed` with no path
+        # is a worklist misuse, not a missing path.
+        if args.retry_failed or args.retry_plan:
+            logger.error("--watch scans are incremental; --retry-failed and "
+                         "--retry-plan are one-shot worklists and cannot be combined with --watch")
+            exit(1)
+        # An empty path list would watch nothing and never fire.
+        if not args.photo_paths:
+            logger.error("--watch needs at least one photo path to watch")
+            exit(1)
         from processing.watcher import run_watch_loop
         # Giving up after consecutive failures is a fault, not a clean stop:
         # supervisors (and --watch's own restart story) need a non-zero exit.
@@ -4409,6 +4623,10 @@ def main():
             db_path=args.db,
             config_path=args.config,
             debounce_seconds=args.watch_debounce,
+            extra_scan_args=_watch_scan_args(args),
+            # --force re-scores every file under the watched roots, so it runs
+            # once at startup; each later change scan stays incremental.
+            initial_scan_args=['--force'] if args.force else None,
         )
         exit(0 if watch_ok else 1)
 

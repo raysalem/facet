@@ -1,5 +1,5 @@
 import {
-  Component, OnInit, OnDestroy, inject, signal, effect, viewChild, ElementRef,
+  Component, OnInit, OnDestroy, inject, signal, effect, computed, viewChild, ElementRef,
   ChangeDetectionStrategy
 } from '@angular/core';
 import { Router } from '@angular/router';
@@ -11,12 +11,14 @@ import { ApiService } from '../../core/services/api.service';
 import { I18nService } from '../../core/services/i18n.service';
 import { PageHelpService } from '../../core/services/page-help.service';
 import { MapFiltersService } from './map-filters.service';
+import { MapSourcePreferences } from '../../core/services/map-source-preferences.service';
+import { GalleryStore } from '../gallery/gallery.store';
 import { registerPageContext } from '../../core/agent/page-context.service';
 import { DateRangeFilterComponent } from '../../shared/components/date-range-filter/date-range-filter.component';
 import { ControlPopoverComponent } from '../../shared/components/control-popover/control-popover.component';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import * as L from 'leaflet';
-import { createLeafletMap } from '../../shared/leaflet';
+import { createLeafletMap, setMapSource } from '../../shared/leaflet';
 import { I18N, i18nKeys } from '../../core/i18n/keys';
 
 interface MapCluster {
@@ -51,12 +53,31 @@ interface MapResponse {
   template: `
     <h1 class="sr-only">{{ I18N.map.title | translate }}</h1>
     <div class="relative h-full">
-      <div class="absolute right-3 top-3 z-[1001] rounded bg-[var(--mat-sys-surface-container)] shadow-md" data-map-dates>
-        <app-control-popover icon="date_range" [label]="I18N.gallery.sidebar.date | translate" [content]="datesPanel" />
-        @if (mapFilters.dateFrom() || mapFilters.dateTo()) {
-          <span data-map-dates-dot aria-hidden="true" class="pointer-events-none absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[var(--mat-sys-primary)]"></span>
+      <div class="absolute right-3 top-3 z-[1001] flex items-start gap-1">
+        @if (hasCustomTiles()) {
+          <div class="rounded bg-[var(--mat-sys-surface-container)] shadow-md" data-map-source>
+            <app-control-popover icon="layers" [label]="I18N.map.basemap | translate" [content]="basemapPanel" />
+          </div>
         }
+        <div class="relative rounded bg-[var(--mat-sys-surface-container)] shadow-md" data-map-dates>
+          <app-control-popover icon="date_range" [label]="I18N.gallery.sidebar.date | translate" [content]="datesPanel" />
+          @if (mapFilters.dateFrom() || mapFilters.dateTo()) {
+            <span data-map-dates-dot aria-hidden="true" class="pointer-events-none absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[var(--mat-sys-primary)]"></span>
+          }
+        </div>
       </div>
+      <ng-template #basemapPanel>
+        <div class="flex flex-col">
+          <button mat-button class="!justify-start" (click)="mapSource.set('osm')" [attr.aria-pressed]="mapSource.source() === 'osm'">
+            <mat-icon>{{ mapSource.source() === 'osm' ? 'check' : 'radio_button_unchecked' }}</mat-icon>{{ I18N.map.basemap_osm | translate }}
+          </button>
+          @if (hasCustomTiles()) {
+            <button mat-button class="!justify-start" (click)="mapSource.set('custom')" [attr.aria-pressed]="mapSource.source() === 'custom'">
+              <mat-icon>{{ mapSource.source() === 'custom' ? 'check' : 'radio_button_unchecked' }}</mat-icon>{{ I18N.map.basemap_custom | translate }}
+            </button>
+          }
+        </div>
+      </ng-template>
       <ng-template #datesPanel>
         <div class="flex flex-col gap-2">
           <app-date-range-filter [from]="mapFilters.dateFrom()" [to]="mapFilters.dateTo()"
@@ -85,7 +106,21 @@ interface MapResponse {
           </button>
         </div>
       }
-      @if (noGpsResults() && !tileError()) {
+      @if (loadError()) {
+        <div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-[1001] flex items-center gap-2
+                    max-w-[90%] px-3 py-2 rounded-lg shadow-lg text-sm
+                    bg-[var(--mat-sys-error-container)] text-[var(--mat-sys-on-error-container)]"
+             role="status" data-map-load-error>
+          <mat-icon class="!text-base !w-4 !h-4 !leading-4 shrink-0">sync_problem</mat-icon>
+          <span>{{ I18N.map.load_failed | translate }}</span>
+          <button type="button" class="inline-flex items-center justify-center shrink-0 rounded-full p-0.5 hover:bg-black/20 transition-colors cursor-pointer"
+                  (click)="dismissLoadError()"
+                  [attr.aria-label]="I18N.ui.buttons.dismiss | translate">
+            <mat-icon class="!text-base !w-4 !h-4 !leading-4">close</mat-icon>
+          </button>
+        </div>
+      }
+      @if (noGpsResults() && !tileError() && !loadError()) {
         <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-[1000]">
           <div class="max-w-md mx-4 px-6 py-5 rounded-xl shadow-lg text-center
                       bg-[var(--mat-sys-surface-container)] text-[var(--mat-sys-on-surface)]">
@@ -125,11 +160,23 @@ export class MapComponent implements OnInit, OnDestroy {
   private readonly i18n = inject(I18nService);
   private readonly router = inject(Router);
   protected readonly mapFilters = inject(MapFiltersService);
+  protected readonly mapSource = inject(MapSourcePreferences);
+  private readonly store = inject(GalleryStore);
+  /** The custom-source switch is offered only when the operator configured one. */
+  protected readonly hasCustomTiles = computed(() => this.mapSource.hasCustom(this.store.config()));
   private readonly pageHelp = inject(PageHelpService);
   private readonly mapContainer = viewChild.required<ElementRef<HTMLDivElement>>('mapContainer');
 
   constructor() {
     registerPageContext('map', () => ({ date_from: this.mapFilters.dateFrom(), date_to: this.mapFilters.dateTo() }));
+    // A source switch swaps only the tile layer: zoom, centre and markers stay.
+    // this.map is read untracked on purpose — the two signals re-run this.
+    effect(() => {
+      const tiles = this.mapSource.tiles(this.store.config());
+      if (this.map) setMapSource(this.map, tiles, () => {
+        if (!this.tileErrorDismissed) this.tileError.set(true);
+      });
+    });
   }
 
   /**
@@ -166,11 +213,21 @@ export class MapComponent implements OnInit, OnDestroy {
    *  ordinary use. The card is pointer-transparent, so the map under it still
    *  pans and zooms. A failed count leaves it hidden. */
   protected readonly noGpsResults = signal(false);
+  /** The map data request failed: markers may be stale or missing, which reads
+   *  as a bug just like a tile outage. Cleared by the next successful load; a
+   *  dismissal sticks until then (every pan refires a failing request). */
+  protected readonly loadError = signal(false);
   private tileErrorDismissed = false;
+  private loadErrorDismissed = false;
 
   protected dismissTileError(): void {
     this.tileErrorDismissed = true;
     this.tileError.set(false);
+  }
+
+  protected dismissLoadError(): void {
+    this.loadErrorDismissed = true;
+    this.loadError.set(false);
   }
 
   private map: L.Map | null = null;
@@ -221,7 +278,7 @@ export class MapComponent implements OnInit, OnDestroy {
     const container = this.mapContainer().nativeElement;
     this.map = createLeafletMap(container, undefined, () => {
       if (!this.tileErrorDismissed) this.tileError.set(true);
-    }).setView([0, 0], 2);
+    }, this.mapSource.tiles(this.store.config())).setView([0, 0], 2);
 
     this.markersLayer.addTo(this.map);
 
@@ -293,6 +350,8 @@ export class MapComponent implements OnInit, OnDestroy {
 
       if (requestId !== this.loadMarkersRequestId || !this.map) return;
 
+      this.loadError.set(false);
+      this.loadErrorDismissed = false;
       this.markersLayer.clearLayers();
 
       if (data.clusters) {
@@ -362,6 +421,8 @@ export class MapComponent implements OnInit, OnDestroy {
         }
       }
     } catch (err) {
+      // A superseded request's failure says nothing about the map on screen.
+      if (requestId === this.loadMarkersRequestId && !this.loadErrorDismissed) this.loadError.set(true);
       console.error('Failed to load map data', err);
     } finally {
       if (requestId === this.loadMarkersRequestId) {

@@ -1254,6 +1254,71 @@ def load_viewer_config(config=None):
 
 VIEWER_CONFIG = load_viewer_config(_FULL_CONFIG)
 
+_BAD_CONFIG_WARNED: set = set()
+
+
+def warn_bad_config_once(key: str, raw, fallback: str) -> None:
+    """Warn that config ``key`` holds an unusable ``raw`` value, once per value.
+
+    The defensive readers below run on every request; without the memo one
+    mistyped value would log on each of them.
+    """
+    marker = (key, repr(raw))
+    if marker in _BAD_CONFIG_WARNED:
+        return
+    _BAD_CONFIG_WARNED.add(marker)
+    logger.warning(
+        "%s=%r is not usable; falling back to %s. Fix the config value to stop seeing this.",
+        key, raw, fallback)
+
+
+def viewer_cache_ttl() -> float:
+    """``viewer.cache_ttl_seconds`` as a float, defensive against hand edits.
+
+    The stats cache used to read this raw: a mistyped value (a string, null)
+    raised inside the flight that computes a stats endpoint -- raised before
+    that flight deregistered itself, so the flight stayed in the registry, its
+    ``done`` never fired and every later request for that key waited forever
+    until the thread pool starved every synchronous endpoint. An unparseable,
+    NaN or infinite TTL (an integer too large for a float included) now falls
+    back to the documented default (3600 s), warning once per bad value; a
+    parsed-but-silly value (0, negative) is honored as "expires immediately",
+    which only costs cache hits.
+    """
+    raw = VIEWER_CONFIG.get('cache_ttl_seconds', 3600)
+    try:
+        ttl = float(raw)
+    except (TypeError, ValueError, OverflowError):
+        ttl = math.nan
+    if not math.isfinite(ttl):
+        warn_bad_config_once('viewer.cache_ttl_seconds', raw, '3600 s')
+        return 3600.0
+    return ttl
+
+
+def config_number(source, key, *, default=None, name=''):
+    """Read ``source[key]`` as a float, defensively.
+
+    Returns ``default`` when the key is absent, null, or not a usable number
+    (a string like "512MB", NaN, infinity, an integer too large for a float);
+    otherwise the float value. A present-but-unusable value warns once per
+    value -- a hand edit that breaks one config key must not take the feature
+    it configures down, and must not spam the log on every request. Pass
+    ``default=None`` and treat ``None`` as "no override configured", like the
+    performance pragmas falling back to the live connection's values.
+    """
+    if not isinstance(source, dict) or source.get(key) is None:
+        return default
+    raw = source[key]
+    try:
+        value = float(raw)
+    except (TypeError, ValueError, OverflowError):
+        value = math.nan
+    if not math.isfinite(value):
+        warn_bad_config_once(name or key, raw, repr(default))
+        return default
+    return value
+
 
 def cull_allow_trash(viewer_config: dict) -> bool:
     """Whether OS-trash culling (``POST /api/cull/apply``'s ``trash_rejects``
@@ -1508,6 +1573,11 @@ PHOTO_TAGS_CACHE_TTL = 300  # seconds — recheck every 5 min
 # Cache for stats API responses
 _stats_cache: dict[Any, dict[str, Any]] = {}  # key -> {'data': ..., 'expires': float}
 _stats_cache_lock = threading.Lock()
+# Every key embeds client-query strings (a date-picker makes one per
+# combination), and an entry holds a full computed payload: without a cap the
+# mapping grew for the life of the process. In-flight keys are never swept --
+# their expired entries are the 'stale' served while the recompute runs.
+_STATS_CACHE_MAX_ENTRIES = 200
 _stats_inflight: dict[Any, Any] = {}  # key -> _StatsFlight, shared by the sync and async surfaces
 _stats_cache_generation = 0
 _STATS_FLIGHT_POLL_SECONDS = 0.02
@@ -1558,6 +1628,25 @@ def _lookup_or_claim_stats(cache_key):
         cached = _stats_cache.get(cache_key)
         if cached and time.time() < cached['expires']:
             return 'hit', cached['data']
+        # Sweep expired entries and cap the map: expired entries used to stay
+        # in this dict forever (only invalidate_stats_cache cleared it), and
+        # the keys embed client-query strings, so it grew without bound.
+        # An entry is swept only once it is a full TTL past expiry: a freshly
+        # expired one is the stale copy 'stale' serves while its key
+        # recomputes, and another key's miss must not take that away.
+        now = time.time()
+        grace = viewer_cache_ttl()
+        expired = [k for k, v in _stats_cache.items()
+                   if now >= v['expires'] + grace and k not in _stats_inflight
+                   and k != cache_key]
+        for k in expired:
+            _stats_cache.pop(k, None)
+        over = len(_stats_cache) - _STATS_CACHE_MAX_ENTRIES
+        if over > 0:
+            oldest = sorted(_stats_cache, key=lambda k: _stats_cache[k]['expires'])[:over]
+            for k in oldest:
+                if k not in _stats_inflight and k != cache_key:
+                    _stats_cache.pop(k, None)
         flight = _stats_inflight.get(cache_key)
         if flight is None:
             flight = _StatsFlight(_stats_cache_generation)
@@ -1576,17 +1665,24 @@ def _finish_stats_flight(cache_key, flight, data, error):
     next caller recomputes instead of serving pre-invalidation data for a
     whole TTL.
     """
-    with _stats_cache_lock:
-        if error is None and flight.generation == _stats_cache_generation:
-            _stats_cache[cache_key] = {
-                'data': data,
-                'expires': time.time() + VIEWER_CONFIG['cache_ttl_seconds'],
-            }
-        if _stats_inflight.get(cache_key) is flight:
-            del _stats_inflight[cache_key]
-    flight.data = data
-    flight.error = error
-    flight.done.set()
+    # Whatever the store path raises, the flight deregisters and wakes its
+    # waiters: a registered flight, or one whose done never fires, keeps every
+    # waiter waiting forever.
+    try:
+        with _stats_cache_lock:
+            try:
+                if error is None and flight.generation == _stats_cache_generation:
+                    _stats_cache[cache_key] = {
+                        'data': data,
+                        'expires': time.time() + viewer_cache_ttl(),
+                    }
+            finally:
+                if _stats_inflight.get(cache_key) is flight:
+                    del _stats_inflight[cache_key]
+    finally:
+        flight.data = data
+        flight.error = error
+        flight.done.set()
 
 
 def _run_stats_flight(cache_key, flight, compute_fn):

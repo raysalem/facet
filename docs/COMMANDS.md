@@ -33,9 +33,11 @@
 
 **`--resume`** also recovers a scan killed by a crash, out-of-memory or power loss: a run still marked `running` whose heartbeat is older than `processing.scan_stale_seconds` (default 120). It reuses that run's directories. With `--force`, it skips files already re-scored since the run started. It refuses to start if another scan looks live.
 
+**Exit codes for supervisors.** `0` means the scan ran (or found nothing new); `4` means it had photos to process and saved none of them; `5` means it never saw the library at all — every scan root is missing or unreadable (a dead network mount), so a scheduled scan fails loudly instead of reporting "no new files"; `1` also covers a mid-scan crash of the scoring worker — the photos it never reached are recorded as scan failures, so `--retry-failed` finishes them; `75` the library lock is held by another job. `--watch` treats `4` as neither success nor failure, and every other non-zero exit except `75` counts toward its consecutive-failure give-up. A change-triggered scan that outlives a generous 6-hour timeout is killed and counts as one failure, so a hung subprocess cannot stop the watcher from ever giving up; the initial scan is exempt, since a first watch over a large library (or an initial `--force`) legitimately runs longer. `--watch` forwards `--force-since`, `--single-pass` and `--pass` to every scan it spawns, and `--force` to its initial scan only (forcing every change-triggered scan would re-score the whole library each time); the one-shot worklists `--retry-failed` and `--retry-plan` are refused with `--watch`, which also needs at least one path to watch. Path resolution and permission errors mark only the affected root as unavailable. If the initial watch scan meets a busy library lock, it retries after the debounce interval without waiting for a file event and keeps its initial flags, including `--force`; later event-driven scans remain incremental.
+
 ### Scan Bookkeeping
 
-Facet records every scan (status, mode, directories, counters) and every per-file error. Ctrl+C marks the run `interrupted`, so `--resume` can continue it. An interrupted scan exits with code 130. Failed files are listed and retried only with `--retry-failed`. The viewer shows scan progress from the CLI's `@FACET_PROGRESS` lines. A scan that saved none of its photos exits with code 4 (every file failed, for example a required model that would not load); a scan with nothing to do exits 0, and `--watch` keeps watching after a code 4. A scan skipped because another job holds the library lock exits 75; `--watch` does not count it as a failure and retries the batch after the next quiet period. After 3 consecutive failed scans, the initial scan included, `--watch` stops and exits 1.
+Facet records every scan (status, mode, directories, counters) and every per-file error. Ctrl+C marks the run `interrupted`, so `--resume` can continue it. An interrupted scan exits with code 130. Failed files are listed and retried only with `--retry-failed`. The viewer shows scan progress from the CLI's `@FACET_PROGRESS` lines. A scan that saved none of its photos exits with code 4 (every file failed, for example a required model that would not load); a scan with nothing to do exits 0 unless every scan root is missing or unreadable (code 5, see above), and `--watch` keeps watching after a code 4. A scan skipped because another job holds the library lock exits 75; `--watch` does not count it as a failure and retries the batch after the next quiet period. After 3 consecutive failed scans, the initial scan included, `--watch` stops and exits 1.
 
 ### Processing Modes
 
@@ -173,7 +175,7 @@ These update metrics or derive new data without re-running the full scoring pipe
 | `python facet.py --discover-moments` | Propose a moment vocabulary from your captions into `scoring_config.discovered.json` |
 | `python facet.py --detect-junk` | Flag screenshots, documents, receipts, memes and slides (runs after every scan) |
 | `python facet.py --recompute-junk` | Re-evaluate `junk_kind` for the whole library |
-| `python facet.py --recompute-saliency` | `[GPU]` Recompute subject saliency from stored thumbnails; `--force` redoes all |
+| `python facet.py --recompute-saliency [paths]` | `[GPU]` Recompute subject saliency from stored thumbnails; `--force` redoes all. Paths (files or folders) limit the recompute to the photos stored under them |
 | `python facet.py --recompute-composition-cpu` | Recompute composition, rule-based (CPU, any profile) |
 | `python facet.py --recompute-composition-gpu` | `[GPU]` Recompute composition with SAMP-Net |
 | `python facet.py --recompute-iqa` | `[GPU]` Fill missing TOPIQ IAA, NR-Face and LIQE scores from stored thumbnails. Runs on every profile; on CPU (`legacy`) it is much slower. Streams in batches, so memory stays flat on large libraries; safe to interrupt and re-run. |
@@ -198,6 +200,7 @@ These update metrics or derive new data without re-running the full scoring pipe
 | `python facet.py --rescan-gps` | Re-extract EXIF GPS for all photos (overwrites); skips locations set in the viewer |
 | `python facet.py --recompute-embeddings` | Recompute CLIP/SigLIP embeddings for all photos (needed after a model switch) |
 | `python facet.py --score-topiq` | `[GPU]` Re-score `topiq_score` for every photo with a thumbnail (overwrites) |
+| `python facet.py --backfill-exif-meta` | Re-read file size, exposure compensation, flash, white balance, metering mode, artist and copyright with exiftool for photos whose file size is still empty, without rescoring. Requires exiftool; resumable (commits every 500 photos); files exiftool cannot read stay empty and are counted (see `python database.py --cleanup-missing-photos`) |
 | `python facet.py --backfill-focal-35mm` | Backfill 35mm-equivalent focal length from EXIF where missing |
 | `python facet.py --backfill-clipping` | Derive per-channel clipping percentages from stored histograms (resumable) |
 | `python facet.py --recompute-silhouette` | Re-derive `is_silhouette` with the face-aware rule (see note) |
@@ -488,7 +491,7 @@ The tagging step at the end of a scan is skipped when `tagging.enabled` is `fals
 
 Checks: score ranges, face metrics, BLOB corruption, embedding sizes, orphaned faces, rows whose foreign key points at a missing row, statistical outliers. The viewer DB export refuses a database with such rows. This check lists each such row and deletes none; only orphaned faces, which the orphaned-faces check covers too, are removed by `--auto-fix`. Most of those tables hold ratings, comparisons or albums, which a path correction can reconnect and a deletion would lose.
 
-Both interactive repairs and `--auto-fix` take the library lock and check the issues again before writing. Interactive mode waits for your initial confirmation before taking the lock. A busy library exits 75; an unusable lock exits 1. `--report-only` and declining repairs do not need the repair lock.
+Both interactive repairs and `--auto-fix` take the library lock and check the issues again before writing. Interactive mode waits for your initial confirmation before taking the lock. A busy library exits 75; an unusable lock exits 1. `--report-only` and declining repairs do not need the repair lock. Otherwise `validate_db.py` exits 0 only when nothing actionable was found or every issue was fixed, 3 when issues remain for a human (report only, declined or skipped repairs, unfixable issues), and 2 when an `--auto-fix` repair failed. Exit 1 remains reserved for runtime errors. After a successful repair batch, validation runs again while the library lock is still held. Its fresh findings determine exit 0 or 3, including issues exposed by a repair and findings that another repair cleared.
 
 ## Database Maintenance
 
@@ -517,7 +520,7 @@ Both interactive repairs and `--auto-fix` take the library lock and check the is
 | `python database.py --migrate-storage-db` | Move thumbnails and embeddings from the filesystem back to the database |
 | `python database.py --add-user alice --role admin` | Add a user (prompts for password) |
 | `python database.py --add-user alice --role user --display-name "Alice"` | Add a user with a display name |
-| `python database.py --migrate-user-preferences --user alice` | Copy ratings from photos to user_preferences |
+| `python database.py --migrate-user-preferences --user alice` | Copy ratings from photos to user_preferences (exits 1 when the `user_preferences` table is missing) |
 
 Choose one primary `database.py` command per invocation; conflicting commands and orphan modifiers exit 2 before initialization or lock checks. `--dry-run` and `--force` belong to `--cleanup-missing-photos`, `--force-export` to `--export-viewer-db`, `--role` / `--display-name` to `--add-user`, `--user` to `--migrate-user-preferences`, and `--keep` to `--backup`. Spell option names in full. With no primary command, the normal schema initialization still runs.
 

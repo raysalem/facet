@@ -130,6 +130,15 @@ def test_short_link_followed_to_pin(hops):
     assert requested == ['https://maps.app.goo.gl/abc']
 
 
+def test_first_hop_budget_never_exceeds_the_deadline(hops, monkeypatch):
+    # On a coarse clock (Windows) two reads return the same instant, and
+    # (t + 5.0) - t rounds above 5.0 for some t; the budget must stay capped.
+    monkeypatch.setattr(maps_link.time, 'monotonic', lambda: 131071.52317087211)
+    requested, script = hops
+    script['https://maps.app.goo.gl/abc'] = (302, PIN_URL)
+    assert maps_link.resolve('https://maps.app.goo.gl/abc') == (32.6064, -116.3239)
+
+
 def test_http_link_fetched_over_https(hops):
     requested, script = hops
     script['https://goo.gl/maps/abc'] = (301, 'https://maps.google.com/?q=1,2')
@@ -486,3 +495,16 @@ def test_declared_422_covers_both_wire_shapes(edition_client, hops):
     assert coded.status_code == invalid.status_code == 422
     assert isinstance(coded.json()['detail'], str)
     assert isinstance(invalid.json()['detail'], list)
+
+
+def test_browser_host_list_matches_the_server_allowlist():
+    # The server list is the security boundary; the browser copy only decides
+    # when to offer the server round trip, and must not drift from it.
+    import ast
+    import re
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parents[1] / 'client/src/app/shared/utils/google-maps-link.ts').read_text(encoding='utf-8')
+    match = re.search(r'RESOLVABLE_MAPS_HOSTS: readonly string\[\] = (\[[^\]]*\]);', source)
+    assert match, 'RESOLVABLE_MAPS_HOSTS not found in google-maps-link.ts'
+    assert frozenset(ast.literal_eval(match.group(1))) == maps_link.ALLOWED_HOSTS

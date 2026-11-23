@@ -28,6 +28,7 @@ from tqdm import tqdm
 import licensing
 from db.person_centroids import flush_centroids_safely
 from db.scoring_overrides import get_photo_scoring_overrides
+from exiftool.exiftool_batch import EXIF_META_COLUMNS
 from models.model_manager import UNIFIED_MEMORY_ACCELERATOR, ModelManager
 from processing import stage_timing
 from processing.routing import (
@@ -36,6 +37,7 @@ from processing.routing import (
 from processing.scorer import build_scoring_metrics
 from utils.device import clear_device_cache
 from utils.image_bounds import bound_to_inference_size
+from utils.path_cache import cached_resolve
 from utils.image_loading import (
     bgr_to_gray, clear_decode_timeouts, consume_decode_timeout, pil_to_bgr)
 from utils.system_memory import BYTES_PER_GB, commit_headroom_bytes, effective_memory
@@ -125,7 +127,7 @@ EXIF_CLOSE_JOIN_SECONDS = 2.0
 
 
 def _resolved(paths) -> List[str]:
-    return [str(Path(p).resolve()) for p in paths]
+    return [cached_resolve(p) for p in paths]
 
 
 class ExifPrefetcher:
@@ -349,6 +351,16 @@ class ChunkedMultiPassProcessor:
         """
         self.scorer = scorer
         self.model_manager = model_manager
+        # Models the caller will load again right after the scan (see
+        # ModelManager.unload_all). Empty: release everything, as a standalone run must.
+        self.keep_cached_after_scan = ()
+        # Optional callback(step, detail, fraction): what the chunk in flight is doing
+        # ('decode' | 'models' | 'analyze' | 'save'; detail names the model being run)
+        # and the whole scan's completed fraction. ``on_progress`` only fires once a
+        # chunk is saved, which leaves a small scan silent at 0% until it is over.
+        self.on_step = None
+        self._step_base = (0, 0, 0)
+        self._step_units = (0, 1)
         self.config = config or {}
         self.on_error = on_error
         self.on_progress = on_progress
@@ -680,6 +692,7 @@ class ChunkedMultiPassProcessor:
                 # collects no EXIF: this chunk's is taken over its real membership in _process_chunk.
                 self._exif_prefetcher.plan(self._next_paths)
 
+                self._step_base = (offset, len(chunk_paths), total)
                 self._process_chunk(chunk_paths, chunk_idx, num_chunks_est)
 
                 if pbar:
@@ -714,7 +727,7 @@ class ChunkedMultiPassProcessor:
             # Ensure all models are unloaded. The centroid flush (persons re-attached
             # during the scan, rebuilt once) runs even if this raises.
             try:
-                self.model_manager.unload_all()
+                self.model_manager.unload_all(keep_cached=self.keep_cached_after_scan)
             finally:
                 flush_centroids_safely(self.scorer)
 
@@ -754,6 +767,8 @@ class ChunkedMultiPassProcessor:
         # receives already loaded.
         first_group = self.pass_groups[0] if self.pass_groups else []
         preloaded = None
+        self._begin_steps()
+        self._step('decode')
         ahead, self._ahead = self._ahead, None
         decoded_ahead: Dict[str, Dict] = {}
         reported: Set[str] = set()
@@ -797,8 +812,10 @@ class ChunkedMultiPassProcessor:
             self._next_group_pos = group_idx + 1
             if group_idx == 0 and preloaded is not None:
                 loaded_models, preloaded = preloaded, None
+                self._step('models')
             else:
                 # Load models for this pass
+                self._step('models')
                 load_start = time.perf_counter()
                 loaded_models = self._load_pass_models(model_group, supplementary, failed_stages)
                 self.metrics['model_load_time'] += time.perf_counter() - load_start
@@ -808,6 +825,7 @@ class ChunkedMultiPassProcessor:
             device = getattr(self.model_manager, 'device', 'cpu')
             for model_name in list(loaded_models):
                 model_start = time.perf_counter()
+                self._step('analyze', model_name)
                 try:
                     self._run_model_pass(model_name, loaded_models[model_name], images, results)
                 except Exception as ex:
@@ -848,6 +866,7 @@ class ChunkedMultiPassProcessor:
             self._compute_aggregates(results, images)
             self.metrics['aggregate_time'] += time.perf_counter() - aggregate_start
 
+        self._step('save')
         save_start = time.perf_counter()
         if self.restricted:
             self._save_results_restricted(results, images)
@@ -858,6 +877,21 @@ class ChunkedMultiPassProcessor:
         # Free memory
         del images
         self._reclaim_freed_memory()
+
+    def _begin_steps(self):
+        """Count this chunk's steps: the decode, each group's load, each model, the save."""
+        self._step_units = (-1, 2 + sum(1 + len(group) for group in self.pass_groups))
+
+    def _step(self, step: str, detail: str | None = None):
+        """Report the step now starting; the one before it counts as finished."""
+        finished, units = self._step_units
+        finished = min(units, finished + 1)
+        self._step_units = (finished, units)
+        if self.on_step is None:
+            return
+        offset, chunk_len, total = self._step_base
+        fraction = (offset + chunk_len * finished / units) / total if total else 0.0
+        self.on_step(step, detail, fraction)
 
     def _supplementary_models(self) -> set:
         """Names whose load or inference failure skips the model instead of failing the chunk."""
@@ -1074,8 +1108,19 @@ class ChunkedMultiPassProcessor:
         """The prefetcher's EXIF for exactly ``paths``, booking the time spent blocked."""
         prefetcher = self._exif_prefetcher
         if prefetcher is None:
-            # Not inside a scan (direct call): a one-shot prefetcher with nothing pending
-            prefetcher = ExifPrefetcher(self._fetch_exif, self._book_exif_batch)
+            # Not inside a scan, or the shutdown unwind has already closed the
+            # prefetcher: fetch synchronously without building an object that
+            # could plan or start background exiftool work after the close.
+            # The decode stop event rides along so an unwind's batch aborts
+            # quickly instead of outliving the Ctrl-C.
+            wanted = _resolved(paths)
+            start = time.perf_counter()
+            found = self._fetch_exif(paths, self._decode_stop) or {}
+            spent = time.perf_counter() - start
+            self._book_exif_batch(spent)
+            with _EXIF_METRICS_LOCK:
+                self.metrics['exif_wait_time'] += spent
+            return {key: value for key, value in found.items() if key in set(wanted)}
         chunk_exif, exif_blocked = prefetcher.take(paths)
         with _EXIF_METRICS_LOCK:
             self.metrics['exif_wait_time'] += exif_blocked
@@ -1226,7 +1271,7 @@ class ChunkedMultiPassProcessor:
     def _attach_exif(self, images: Dict[str, Dict], chunk_exif: Dict[str, Any]):
         """Give decoded-ahead photos their EXIF: the chunk's batch, else the per-photo read."""
         for path, data in images.items():
-            exif_data = chunk_exif.get(str(Path(path).resolve()))
+            exif_data = chunk_exif.get(cached_resolve(path))
             if not exif_data:
                 start = time.perf_counter()
                 try:
@@ -1514,7 +1559,6 @@ class ChunkedMultiPassProcessor:
         _ensure_imports()
         import imagehash
         from concurrent.futures import ThreadPoolExecutor
-        from pathlib import Path
         from utils import load_image_and_thumbnail, load_image_from_path
         from analyzers import TechnicalAnalyzer, ImageCache, CompositionAnalyzer
         from analyzers.form_facet import compute_form_metrics, warmup
@@ -1579,7 +1623,7 @@ class ChunkedMultiPassProcessor:
             # Create ImageCache for efficient repeated operations
             cache = ImageCache(img_cv)
 
-            resolved = str(Path(path).resolve())
+            resolved = cached_resolve(path)
             exif_data = chunk_exif.get(resolved)
             if not exif_data and not defer_exif:
                 fallback_start = time.perf_counter()
@@ -1995,9 +2039,32 @@ class ChunkedMultiPassProcessor:
             tags_list = tagger.tag_batch(pil_imgs, max_tags=max_tags)
             for i, path in enumerate(paths):
                 results[path]['tags'] = tags_to_string(tags_list[i])
+            return
         except Exception as e:
             licensing.reraise_if_refused()
-            logger.error("VLM tagging failed: %s", e)
+            logger.error("VLM tagging failed for chunk, retrying photo by photo: %s", e)
+        # tag_batch only falls back per photo on out-of-memory, so one photo the
+        # model rejects fails the whole call. Retry each photo alone: a photo
+        # that still fails is recorded as failed (retryable) and left out of the
+        # save, instead of being scored on an empty tag feature space -- and the
+        # rest of the chunk is not lost with it, on every --retry-failed again.
+        failures = {}
+        for pil, path in zip(pil_imgs, paths):
+            try:
+                results[path]['tags'] = tags_to_string(tagger.tag_batch([pil], max_tags=max_tags)[0])
+            except Exception as e:
+                licensing.reraise_if_refused()
+                failures[path] = e
+        if failures and len(failures) == len(paths):
+            # Every photo failed alone too: the model itself is broken. Re-raise
+            # so the required-model branch of _process_chunk records the chunk.
+            raise next(iter(failures.values()))
+        on_error = getattr(self, 'on_error', None)
+        for path, error in failures.items():
+            logger.error("VLM tagging failed for %s: %s", path, error)
+            results[path][SCAN_FAILED_KEY] = 'vlm_tagger'
+            if on_error:
+                on_error(path, 'vlm_tagger', f"required model pass failed: vlm_tagger: {error}")
 
     def _pass_saliency(self, scorer: Any, images: Dict, results: Dict):
         """BiRefNet saliency pass: subject saliency detection and derived metrics."""
@@ -2021,6 +2088,13 @@ class ChunkedMultiPassProcessor:
         except Exception as e:
             licensing.reraise_if_refused()
             logger.error("BiRefNet saliency pass failed: %s", e)
+            # Flag every photo in the chunk exactly like the per-image failure
+            # branch above: without it a full save overwrites stored values
+            # with NULL, and --retry-failed never sees this batch.
+            for path in paths:
+                results[path][SALIENCY_FAILED_KEY] = True
+                if self.on_error:
+                    self.on_error(path, 'saliency', e)
 
     def _rebuild_gray(self, pil_img):
         """The gray plane ``ImageCache`` used to hold, rebuilt from the retained PIL image.
@@ -2145,7 +2219,7 @@ class ChunkedMultiPassProcessor:
         # Sticky per-photo scoring context/override, batched once per chunk
         # (not per photo) so a rescan preserves them instead of silently
         # dropping them. photos.path stores resolved paths.
-        resolved_paths = [str(Path(path).resolve()) for path in results]
+        resolved_paths = [cached_resolve(path) for path in results]
         chunk_overrides = get_photo_scoring_overrides(self.scorer.db_path, paths=resolved_paths)
 
         for path, data in results.items():
@@ -2197,7 +2271,7 @@ class ChunkedMultiPassProcessor:
             # builder — the single source of truth for the scan-time feature space,
             # also used by the single-pass batch and PIL scoring paths.
             exif = img_data.get('exif', {})
-            photo_override = chunk_overrides.get(str(Path(path).resolve()), {})
+            photo_override = chunk_overrides.get(cached_resolve(path), {})
             metrics = build_scoring_metrics(
                 aesthetic=data.get('aesthetic'),
                 face_count=data.get('face_count') or 0,
@@ -2267,7 +2341,7 @@ class ChunkedMultiPassProcessor:
         """Build the shared identity + EXIF record common to full and partial saves."""
         exif = img_data.get('exif', {})
         return {
-            'path': str(Path(path).resolve()),
+            'path': cached_resolve(path),
             'filename': Path(path).name,
             'image_width': img_data['width'],
             'image_height': img_data['height'],
@@ -2281,6 +2355,7 @@ class ChunkedMultiPassProcessor:
             'focal_length_35mm': exif.get('focal_length_35mm'),
             'gps_latitude': exif.get('gps_latitude'),
             'gps_longitude': exif.get('gps_longitude'),
+            **{column: exif.get(column) for column in EXIF_META_COLUMNS},
         }
 
     def _save_results(self, results: Dict, images: Dict):

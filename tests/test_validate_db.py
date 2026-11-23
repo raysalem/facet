@@ -3,8 +3,14 @@
 import os
 import shlex
 import sqlite3
+import subprocess
+import sys
+from types import SimpleNamespace
 
 import pytest
+
+import facet
+import validate_db
 
 from db.schema import init_database
 from validation.database_validator import DatabaseValidator
@@ -61,6 +67,45 @@ class TestDatabaseIntegrity:
         validator = DatabaseValidator(":memory:")
         validator._check_database_integrity(_FakeConn([("ok",)]))
         assert not validator.results[-1].has_issues
+
+
+class TestOrphanedPersonsReportOnly:
+    """An empty person is a legitimate assignment target (created empty on
+    purpose, filled by the review flow), so the check reports but never
+    deletes -- the old auto-fix wiped a person being populated."""
+
+    def _seed(self, tmp_path, persons, faces):
+        db = tmp_path / "t.db"
+        init_database(str(db))
+        conn = sqlite3.connect(str(db))
+        for pid, name in persons:
+            conn.execute("INSERT INTO persons (id, name) VALUES (?, ?)", (pid, name))
+        for fid, pid, path in faces:
+            conn.execute(
+                "INSERT INTO faces (id, person_id, photo_path, face_index, embedding) "
+                "VALUES (?, ?, ?, ?, zeroblob(128))",
+                (fid, pid, path, fid))
+        conn.commit()
+        return db, conn
+
+    def test_reports_empty_persons_without_deleting(self, tmp_path):
+        # Person 1 "Dad" is empty (created for the review flow to fill);
+        # person 2 has a face. Only the faceless one is reported -- and
+        # neither is ever deleted, because the check is report-only now.
+        db, conn = self._seed(tmp_path, [(1, "Dad"), (2, "ghost")], [(10, 2, '/p/a.jpg')])
+        validator = DatabaseValidator(str(db))
+        validator._check_referential_integrity(conn)
+        conn.close()
+
+        result = next(r for r in validator.results if r.check_name == "orphaned_persons")
+        assert result.has_issues
+        assert {i['record']['person_id'] for i in result.issues} == {1}
+        # Report-only: auto-fix has nothing to execute, so "Dad" survives.
+        assert result.fixable is False
+        assert not getattr(result, 'fix_query', '')
+        conn = sqlite3.connect(str(db))
+        assert {r[0] for r in conn.execute("SELECT id FROM persons")} == {1, 2}
+        conn.close()
 
 
 class TestDataTypeCorruption:
@@ -165,3 +210,132 @@ def test_viewer_export_names_the_tables_and_the_databases_to_inspect(tmp_path):
     for name in ('photo_scores.db', 'viewer.db'):
         path = shlex.quote(os.path.abspath(tmp_path / name))
         assert f'validate_db.py --report-only --db {path}' in message
+
+
+# ---------------------------------------------------------------------------
+# main()'s exit-status contract (B151): cron and wrappers read the code, so a
+# nightly validation must not come back green while its report lists issues.
+# ---------------------------------------------------------------------------
+
+
+def _result(has_issues=True, fixable=True, informational=False):
+    return SimpleNamespace(has_issues=has_issues, fixable=fixable, informational=informational,
+                           fix_query="UPDATE photos SET star_rating = NULL WHERE path = 'x'",
+                           fix_function=None, description="desc", count=1)
+
+
+class _FakeFixConn:
+    def __init__(self, fail):
+        self._fail = fail
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def commit(self):
+        pass
+
+    def cursor(self):
+        outer = self
+
+        class _Cursor:
+            rowcount = 3
+
+            def execute(self, sql):
+                if outer._fail:
+                    raise RuntimeError("locked")
+
+        return _Cursor()
+
+
+def _run_validate(monkeypatch, tmp_path, argv, results, fix_fails=False, answer='n',
+                  interactive_ok=True, recheck_results=None):
+    """Drive validate_db.main() with scripted pre-lock and post-repair checks."""
+    db = tmp_path / "v.db"
+    db.write_text("")
+    monkeypatch.setattr(sys, "argv", ["validate_db.py", "--db", str(db), *argv])
+    locked_results = results if recheck_results is None else recheck_results
+    # The fake successful fixes clear fixable findings; unfixable ones remain.
+    check_rounds = iter([results, locked_results,
+                         [r for r in locked_results if not r.fixable]])
+    validator = SimpleNamespace(
+        run_all_checks=lambda: next(check_rounds),
+        generate_report=lambda: "report",
+        interactive_fix=lambda result, conn: interactive_ok,
+    )
+    monkeypatch.setattr(validate_db, "DatabaseValidator", lambda _db: validator)
+    monkeypatch.setattr(validate_db, "get_connection", lambda _db, **kw: _FakeFixConn(fix_fails))
+    monkeypatch.setattr(facet, "hold_library_lock_or_exit",
+                        lambda *_a, **_k: SimpleNamespace(release=lambda: None))
+    monkeypatch.setattr("builtins.input", lambda *a: answer)
+    # main() returns the code; the __main__ wrapper turns it into sys.exit.
+    return validate_db.main()
+
+
+def test_validate_db_report_only_with_issues_exits_three(monkeypatch, tmp_path):
+    assert _run_validate(monkeypatch, tmp_path, ["--report-only"],
+                         [_result(fixable=False)]) == 3
+
+
+def test_validate_db_report_only_clean_exits_zero(monkeypatch, tmp_path):
+    assert _run_validate(monkeypatch, tmp_path, ["--report-only"], []) == 0
+
+
+def test_validate_db_failed_auto_fix_exits_two(monkeypatch, tmp_path):
+    assert _run_validate(monkeypatch, tmp_path, ["--auto-fix"],
+                         [_result(fixable=True)], fix_fails=True) == 2
+
+
+def test_validate_db_successful_auto_fix_exits_zero(monkeypatch, tmp_path):
+    assert _run_validate(monkeypatch, tmp_path, ["--auto-fix"],
+                         [_result(fixable=True)]) == 0
+
+
+def test_validate_db_declined_interactive_fix_exits_three(monkeypatch, tmp_path):
+    assert _run_validate(monkeypatch, tmp_path, [], [_result(fixable=True)]) == 3
+
+
+def test_validate_db_unfixable_issues_exits_three(monkeypatch, tmp_path):
+    # No fixable issues at all: the UNFIXABLE listing must not read as green.
+    assert _run_validate(monkeypatch, tmp_path, ["--report-only"],
+                         [_result(has_issues=True, fixable=False)]) == 3
+
+
+def test_validate_db_interactive_fix_applied_exits_zero(monkeypatch, tmp_path):
+    assert _run_validate(monkeypatch, tmp_path, [], [_result(fixable=True)], answer='y') == 0
+
+
+def test_validate_db_interactive_fix_skipped_or_failed_exits_three(monkeypatch, tmp_path):
+    # interactive_fix returns False for [s] Skip and for a fix that raised: the
+    # issue still stands, so the run must not read as clean.
+    assert _run_validate(monkeypatch, tmp_path, [], [_result(fixable=True)], answer='y',
+                         interactive_ok=False) == 3
+
+
+def test_validate_db_auto_fix_with_unfixable_left_exits_three(monkeypatch, tmp_path):
+    assert _run_validate(monkeypatch, tmp_path, ["--auto-fix"],
+                         [_result(fixable=True), _result(fixable=False)]) == 3
+
+
+def test_validate_db_informational_findings_alone_exit_zero(monkeypatch, tmp_path):
+    assert _run_validate(monkeypatch, tmp_path, ["--report-only"],
+                         [_result(fixable=False, informational=True)]) == 0
+
+
+def test_validate_db_runtime_database_error_exits_one(tmp_path):
+    db = tmp_path / "corrupt.db"
+    db.write_bytes(b"this is not a SQLite database")
+    result = subprocess.run(
+        [sys.executable, validate_db.__file__, "--db", str(db), "--report-only"],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 1
+    assert "sqlite3.DatabaseError" in result.stderr
+
+
+@pytest.mark.parametrize("remaining, expected", [([], 0), ([_result(fixable=False)], 3)])
+def test_validate_db_recheck_without_fixable_issues(monkeypatch, tmp_path, remaining, expected):
+    assert _run_validate(monkeypatch, tmp_path, ["--auto-fix"], [_result()],
+                         recheck_results=remaining) == expected

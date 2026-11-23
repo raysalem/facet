@@ -228,11 +228,13 @@ Il pulsante di ordinamento nell'intestazione (e nella barra mobile) mostra l'ico
 
 Le velocità dell'otturatore si ordinano per durata, quindi `1/250` e `0.004` sono uguali. I valori mancanti o non validi vanno in fondo in entrambe le direzioni.
 
+**Data di aggiunta** ordina in base a quando Facet ha scansionato una foto per la prima volta, così una nuova importazione compare per prima in ordine decrescente qualunque sia la sua data di scatto. Una nuova scansione, anche con `--force`, la conserva. Una foto che hai spostato tu stesso torna come una foto nuova, a meno che non esegui [`--relink-photos`](RELINK.md). Le foto già presenti nella libreria al momento dell'aggiornamento non hanno una data finché una scansione non le riscrive (prendono allora l'ora della loro scansione precedente), e vanno in fondo in entrambe le direzioni. Finché nessuna foto ha una data, l'opzione non compare nel menu di ordinamento. In un album si chiama **Data di aggiunta alla libreria**, perché non è il momento in cui la foto è entrata nell'album. I link degli album condivisi non mostrano questa data né consentono di ordinare in base a essa.
+
 Colonne ordinabili per gruppo (da `viewer.sort_options`):
 
 | Gruppo | Colonne |
 |-------|---------|
-| **Generale** | Punteggio aggregato, Estetica, Punteggio di qualità, Data di scatto, Valutazione a stelle, Estetica (IAA), Punteggio LIQE, Q-ReAlign (Estetica), DeQA, Estetica v2.5 (gli ultimi tre compaiono quando una foto ha quel punteggio) |
+| **Generale** | Punteggio aggregato, Estetica, Punteggio di qualità, Data di scatto, Data di aggiunta, Valutazione a stelle, Estetica (IAA), Punteggio LIQE, Q-ReAlign (Estetica), DeQA, Estetica v2.5 (gli ultimi tre compaiono quando una foto ha quel punteggio) |
 | **Metriche volti** | Qualità del volto, Qualità del volto (IQA), Nitidezza degli occhi, Nitidezza del volto, Rapporto del volto, Numero di volti |
 | **Tecnica** | Nitidezza tecnica, Contrasto, Livello di rumore |
 | **Colore** | Punteggio colore, Saturazione |
@@ -333,7 +335,7 @@ Il badge o una foto impilata apre il visualizzatore con miniature, pulsanti prec
 - Badge della categoria
 - Il clic destro (o Maiusc+F10) apre il [menu contestuale](#selezione-multipla-e-azioni-di-gruppo)
 
-Le metriche del dettaglio foto usano schede EXIF, Qualità, Composizione, Tecnica e Istogramma; l’ultima resta memorizzata. Il pulsante grafico accanto a ogni valore finito carica la distribuzione su richiesta, indica la foto attuale e passa dalla libreria visibile alla categoria attuale. I filtri della galleria non si applicano e le foto non accessibili sono escluse. Gli errori offrono Riprova. Gli album condivisi non espongono distribuzioni della libreria.
+Le metriche del dettaglio foto usano schede EXIF, Qualità, Composizione, Tecnica e Istogramma; l’ultima resta memorizzata. Il pulsante grafico accanto a ogni valore finito carica la distribuzione su richiesta, indica la foto attuale e passa dalla libreria visibile alla categoria attuale. I filtri della galleria non si applicano e le foto non accessibili sono escluse. Gli errori offrono Riprova. Gli album condivisi non espongono distribuzioni della libreria. La scheda EXIF mostra anche la lunghezza focale equivalente a 35 mm, la compensazione dell'esposizione, il flash (scattato o non scattato), il bilanciamento del bianco, la modalità di misurazione, le dimensioni dell'immagine con i megapixel, la dimensione del file, la cartella, l'artista e il copyright; compare quando la foto ha EXIF della fotocamera o una dimensione del file registrata. La riga di riepilogo della pagina di dettaglio include l'obiettivo, e la sua barra laterale elenca gli album che contengono la foto (manuali e smart, solo quelli che puoi aprire; nascosta quando gli album sono disattivati). Un clic sulla cartella ne copia il percorso. In una libreria esistente i nuovi campi restano vuoti finché non si esegue `python facet.py --backfill-exif-meta` (o una nuova scansione forzata con `--force`). I link agli album condivisi omettono artista e copyright.
 
 **Pannello della raccolta.** Sugli schermi larghi (da 1280 px), una foto presente nella raccolta caricata della galleria (fuori dalla navigazione della Cronologia) mostra alla sua sinistra quelle foto, con gli stessi filtri e lo stesso ordinamento. Fai clic su una miniatura per aprirla; quando una miniatura ha il focus, `↑`/`↓` aprono la foto precedente o successiva (una foto per tasto, in una o due colonne) e Inizio/Fine aprono la prima/ultima foto della sezione visibile. `←`/`→` qui si comportano come nel resto della pagina. **Carica altre** recupera la pagina successiva. Trascina il divisore, oppure dagli il focus e usa Sinistra/Destra, Inizio e Fine, per ridimensionarlo: una foto per riga se stretto, due se largo. La freccia lo comprime. Il pannello non cambia mai i filtri, la selezione o la destinazione di Indietro. Per raccolte caricate grandi, usa i pulsanti delle foto precedenti e successive per spostarti tra le sezioni.
 
@@ -488,7 +490,7 @@ Campi della risposta e codici di stato: [API.md](../API.md).
 
 Clicca **Simili** su una foto e scegli una modalità:
 
-- **Visivo** (predefinito) — somiglianza pHash (70%) + somiglianza CLIP/SigLIP (30%). Quando due foto condividono solo uno dei due segnali, conta a peso pieno; le foto che non ne condividono nessuno non vengono mai elencate. Vengono restituite, pagina per pagina, tutte le corrispondenze sopra la soglia. Se la foto non ha nessuno dei due segnali, riscansionala con `--force` (un semplice `python facet.py <dir>` salta i file già elaborati).
+- **Visivo** (predefinito) — somiglianza pHash (30%) + somiglianza CLIP/SigLIP (70%). Quando due foto condividono solo uno dei due segnali, conta a peso pieno; le foto che non ne condividono nessuno non vengono mai elencate. Vengono restituite, pagina per pagina, tutte le corrispondenze sopra la soglia. Se la foto non ha nessuno dei due segnali, riscansionala con `--force` (un semplice `python facet.py <dir>` salta i file già elaborati).
 - **Colore** — intersezione degli istogrammi (70%) + distanza di saturazione (10%) + distanza di luminanza (10%) + bonus monocromatico (10%). Pre-filtra per flag monocromatico e intervallo di saturazione.
 - **Persona** — foto con le stesse persone, per `person_id` quando disponibile, altrimenti per somiglianza dell'embedding del volto.
 
@@ -624,8 +626,9 @@ Su un'installazione aperta a utente singolo (`viewer.edition_password` vuota, il
 
 La galleria vuota offre **Scansiona le foto per iniziare**. **Scansiona nuove foto** è disponibile anche nell’area di navigazione globale a ogni larghezza. Entrambi aprono l’avvio scansione:
 
-- Scegli una directory dall'elenco e avvia la scansione.
-- Avanzamento in tempo reale e righe di output scorrono nella finestra. La galleria si aggiorna al termine della scansione.
+- Scegli una directory dall'elenco e avvia la scansione. Se è configurata una sola directory, è già selezionata.
+- Durante la scansione, la finestra mostra le sue tre fasi (**Ricerca**, **Analisi**, **Organizzazione**), che cosa sta facendo il passaggio corrente in parole semplici («Ricerca del soggetto principale»), quante foto sono pronte e quanto manca all'incirca alla fine dell'analisi (la fase Organizzazione non ha una stima). Le righe di output grezze sono ripiegate sotto **Registro tecnico**, che si apre da solo quando una scansione fallisce.
+- La galleria si aggiorna al termine della scansione, e un messaggio indica quante nuove foto sono state aggiunte.
 - La scansione esegue `facet.py` in background; una scansione alla volta.
 - L'elenco delle directory combina le `directories` di ogni utente, le directory condivise, i target di `path_mapping` e `viewer.scan_directories`. Imposta `viewer.scan_directories` (per es. `/data/photos`) così le installazioni a utente singolo e Docker hanno una destinazione.
 
@@ -806,7 +809,7 @@ python facet.py --extract-gps    # Estrae lat/lng GPS dall'EXIF nel database
 
 Le nuove foto ottengono le coordinate durante la valutazione.
 
-Apri `/map`. Controllato da `viewer.features.show_map` (predefinito: `true`). Gli sfondi della mappa provengono da OpenStreetMap e richiedono una connessione a Internet, anche nell'app installata. In modalità scura le tessere sono mostrate invertite, in linea con il tema.
+Apri `/map`. Controllato da `viewer.features.show_map` (predefinito: `true`). Lo sfondo predefinito di OpenStreetMap richiede una connessione a Internet, anche nell'app installata; una fonte propria dello stesso origine no. Con `viewer.map_tile_url` configurato, un pulsante **Sorgente della mappa** sulla mappa alterna tra OpenStreetMap e le tue tile auto-ospitate (la scelta è memorizzata per browser, e lo stesso interruttore compare sopra la mappa della finestra di posizione). OpenStreetMap traccia esattamente le coordinate WGS-84 che il GPS EXIF porta — cosa che conta nella Cina continentale, dove le basi commerciali spostano i segnaposto del datum GCJ-02. In modalità scura le tessere sono mostrate invertite, in linea con il tema.
 
 ### Luoghi salvati e GPS manuale
 
@@ -842,13 +845,14 @@ Usa **Indirizzo o attività → Cerca online** per cercare un luogo con Photon (
 La finestra della posizione (una foto, o **Imposta posizione** per una selezione o un'intera vista album) accetta anche punti da Google Maps. Nulla viene salvato finché non clicchi **Salva** (o non visualizzi l'anteprima e applichi un lotto), come per ogni altro punto.
 
 - **Scegli su Google Maps** apre Google Maps in una nuova scheda sul segnaposto attuale, altrimenti sulla prima foto geolocalizzata della selezione, altrimenti al centro della mappa. Trova lì il punto e copialo.
+- **Apri in OpenStreetMap** apre openstreetmap.org sullo stesso punto, con un segnaposto sulle coordinate — la base cartografica più completa nella Cina continentale, tracciata sullo stesso WGS-84 delle coordinate GPS.
 - **Link di Google Maps o coordinate**: incolla, poi premi Invio o clicca **Vai al punto**. Il segnaposto si sposta sul punto per la verifica. Formati accettati:
   - la coppia che Google copia con il clic destro sulla mappa, ad es. `32.6064, -116.3239` (va bene anche uno spazio al posto della virgola);
   - gradi, minuti, secondi come `32°36'23.0"N 116°19'26.0"W`;
   - un URL completo di Google Maps. Il segnaposto inserito (`!3d…!4d…`) prevale su un valore `q=`, `query=`, `ll=` o `center=`, che prevale sul centro della vista `@lat,lon`;
   - un link breve (`maps.app.goo.gl/…`, `goo.gl/maps/…`). Il browser non può aprirli, quindi la galleria segue il reindirizzamento (`POST /api/geo/resolve_maps_link`, solo in modalità modifica).
 - La risoluzione dei link brevi contatta solo `maps.app.goo.gl`, `goo.gl`, `maps.google.com`, `www.google.com` e `google.com` via HTTPS, solo su indirizzi pubblici, con al massimo 5 reindirizzamenti in 5 secondi, senza mai leggere il corpo di una pagina. Qualsiasi altro host viene rifiutato senza richiesta. I link non vengono registrati.
-- Facet non usa API Google, chiavi API né tile di Google: i termini di Google non consentono le sue tile in un'altra mappa, quindi la mappa della finestra resta OpenStreetMap.
+- Facet non usa API Google, chiavi API né tile di Google: i termini di Google non consentono le sue tile in un'altra mappa, quindi la mappa della finestra non è mai quella di Google — resta OpenStreetMap o mostra le tile auto-ospitate dell'operatore quando `viewer.map_tile_url` è configurato.
 
 ## Capsule
 
@@ -867,6 +871,8 @@ Facet genera capsule dalla tua libreria:
 - **Luogo** — cluster di foto geolocalizzate con nomi di luogo
 - **Preferiti** — foto preferite raggruppate per anno e stagione
 - **Basate su dimensione** — per fotocamera, obiettivo, categoria, modello compositivo, intervallo di lunghezza focale, ora del giorno, valutazione a stelle e combinazioni
+
+Le foto che hai scartato non compaiono mai in una capsula: né come copertina, né nella presentazione, né in un album salvato da essa. In modalità multiutente contano gli scarti di ciascun utente.
 
 ### Presentazione
 
@@ -956,6 +962,8 @@ Scarica le foto dal dettaglio foto o dalla barra di selezione. Il menu di downlo
 
 Un nuovo file RAW associato può impiegare fino a cinque minuti per comparire in questo menu.
 
+Il download di più foto selezionate — nella galleria o in un album condiviso — mostra una notifica con il conteggio in corso, una barra di avanzamento e **Annulla**, poi un messaggio quando l'ultimo file è salvato. Una foto non riuscita (errore di rendering darktable, file non più presente su disco) viene saltata e conteggiata, e le altre continuano a scaricarsi. Una connessione o una sessione persa, oppure tre errori consecutivi (un link di condivisione revocato, un server non raggiungibile), interrompono il download. Il messaggio finale attende che sparisca un'offerta di **Annulla** ancora visibile invece di sostituirla.
+
 **Ritaglio social basato sulla salienza.** Con `viewer.features.show_social_export` attivo (predefinito `true`) e la modifica sbloccata, la barra di download del dettaglio foto ha un menu **Ritaglio social**. Elenca `social_export.presets` (quadrato 1:1, verticale 4:5, storia 9:16 per impostazione predefinita). Sceglierne uno scarica un JPEG a piena risoluzione ritagliato a quella proporzione e centrato sul soggetto. Il soggetto proviene dal riquadro del soggetto BiRefNet (`photos.subject_bbox`, da `--recompute-saliency`), altrimenti dai volti rilevati, altrimenti dal centro. Il tooltip del menu mostra quale è stato usato (`saliency` / `faces` / `center`).
 
 Endpoint: [API.md — Download](../API.md#download).
@@ -1006,7 +1014,7 @@ Granularità, ordinamento e categoria persistono in `localStorage`. I controlli 
 
 **Selezione delimitata.** Restringi la camera oscura con parametri URL: `?group_by=scene` per le scene, `?album=<id>` per un album, `?from=&to=` per una finestra di ora di scatto (testo EXIF o date ISO come `2026-06-01`). Un banner mostra l'ambito con **Esci dalla scena**. Le raffiche che superano il bordo della finestra mostrano comunque tutti i loro fotogrammi.
 
-**Intervallo di date.** Il pulsante **intervallo di date** (icona `date_range`) offre **Ultimi 7 giorni**, **Ultimi 30 giorni**, **Quest'anno**, **Anno scorso**, **Intervallo personalizzato...** e **Tutte le date**. Le date sono mostrate come dd/MM/yyyy.
+**Intervallo di date.** Il pulsante **intervallo di date** (icona `date_range`) offre **Ultimi 7 giorni**, **Ultimi 30 giorni**, **Quest'anno**, **Anno scorso**, **Intervallo personalizzato...** e **Tutte le date**. Le date sono scritte come le scrive la lingua del visualizzatore (italiano `1 lug 2026`).
 
 - Si combina con l'ambito dell'album. Le foto senza data di scatto escono da un intervallo con date.
 - I preset si risolvono quando scelti, quindi un "Ultimi 7 giorni" nei segnalibri è una finestra fissa.
@@ -1318,7 +1326,7 @@ Cornici fotografiche smart, dashboard Home Assistant e display in stile ImmichFr
 | Endpoint | Restituisce | Cache |
 |----------|---------|-------|
 | `GET /api/frame/photos?token=&count=` | `{photos: [{id, caption?, date_taken?, width, height}]}` — `count` limitato a `frame.max_count` (predefinito 100), predefinito `frame.count` (20) | — |
-| `GET /api/frame/image/{id}?token=&max_edge=` | il JPEG della foto — originale ridimensionato a `max_edge` (limitato da `frame.max_edge`, predefinito 1920), o la miniatura memorizzata se l'originale non è raggiungibile | long immutable |
+| `GET /api/frame/image/{id}?token=&max_edge=` | il JPEG della foto — originale ridimensionato a `max_edge` (limitato da `frame.max_edge`, predefinito 1920, e dal limite con cui è stato emesso l'id), o la miniatura memorizzata se l'originale non è raggiungibile | long immutable |
 | `GET /api/frame/next?token=` | un JPEG selezionato a caso, diverso a ogni chiamata — per cornici semplici e Home Assistant | `no-store` |
 
 ### Generare un token
@@ -1357,7 +1365,7 @@ camera:
 
 Aggiungi la telecamera a una scheda Picture Glance / Picture Entity per ottenere una cornice fotografica che si aggiorna da sola.
 
-Per un client in stile **ImmichFrame** che gestisce una propria presentazione, interroga `GET /api/frame/photos?token=…&count=30` per gli id, poi recupera ciascuno con `GET /api/frame/image/{id}?token=…&max_edge=1920`. Gli id sono stabili e le immagini sono messe in cache a lungo termine, quindi ogni foto viene scaricata una sola volta.
+Per un client in stile **ImmichFrame** che gestisce una propria presentazione, interroga `GET /api/frame/photos?token=…&count=30` per gli id, poi recupera ciascuno con `GET /api/frame/image/{id}?token=…&max_edge=1920`. Un id cambia solo quando cambiano l'anteprima della foto o `frame.max_edge`, e le immagini sono messe in cache a lungo termine, quindi ogni foto viene scaricata una sola volta.
 
 ## Caricamento automatico dal telefono
 

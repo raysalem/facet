@@ -118,6 +118,17 @@ describe('GalleryFilterSidebarComponent', () => {
     expect(UNIT_PANEL['no_capture_date']).toBe('date');
   });
 
+  it('pulls a reversed date range back into order instead of filtering everything out', () => {
+    const filters = mockStore['filters'] as ReturnType<typeof signal<GalleryFilters>>;
+    filters.update(current => ({ ...current, date_to: '2026-06-15' }));
+    component.onDateChange('date_from', { value: new Date(2026, 10, 1) } as any);
+    expect(mockStore['updateFilters']).toHaveBeenLastCalledWith({ date_from: '2026-11-01', date_to: '2026-11-01', no_capture_date: '' });
+
+    filters.update(current => ({ ...current, date_from: '2026-11-01', date_to: '2026-11-01' }));
+    component.onDateChange('date_to', { value: new Date(2026, 5, 1) } as any);
+    expect(mockStore['updateFilters']).toHaveBeenLastCalledWith({ date_to: '2026-06-01', date_from: '2026-06-01', no_capture_date: '' });
+  });
+
   describe('unavailable metrics (commercial mode)', () => {
     const ids = () => component.advancedFilterGroups().flatMap(g => g.filters.map(f => f.id));
 
@@ -886,6 +897,18 @@ describe('GalleryFilterSidebarComponent', () => {
         expect(items.map(link => link.querySelector('[data-filter-tab-label]')!.textContent!.trim())).toEqual(names);
       });
 
+      it('keeps touch panning on every tooltip host the sidebar scrolls over, on every tab', () => {
+        // A tooltip left on its default touch gestures sets touch-action: none on its host on a phone,
+        // so a swipe starting there would not scroll the sidebar.
+        const hosts = new Set<MatTooltip>();
+        for (const tab of links()) {
+          tab.click(); settle();
+          for (const d of fixture.debugElement.queryAll(By.directive(MatTooltip))) hosts.add(d.injector.get(MatTooltip));
+        }
+        expect(hosts.size).toBeGreaterThan(links().length);
+        expect([...hosts].filter(tip => tip.touchGestures !== 'off').map(tip => tip.message)).toEqual([]);
+      });
+
       it('names a tab with its active count and puts the count on the icon as a corner badge', () => {
         setFilters({ camera: 'Sony', lens: 'FE' });
         const source = links()[1];
@@ -1003,8 +1026,12 @@ describe('GalleryFilterSidebarComponent', () => {
     });
 
     describe('tab content', () => {
+      // The title text without its leading icon's ligature, which a title wrapped in its own
+      // element is no longer separated from by whitespace.
       const titles = () => Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('mat-panel-title'))
-        .map(t => t.textContent!.trim());
+        .map(t => Array.from(t.childNodes)
+          .filter(node => node.nodeType !== Node.COMMENT_NODE && node.nodeName !== 'MAT-ICON')
+          .map(node => node.textContent).join('').trim());
 
       it.each(['quality', 'technical', 'subject'] as const)('gives every %s metric row its own tooltip and slider description', tab => {
         const help = I18N.gallery.sidebar.metric_help as Record<string, string>;
@@ -1074,7 +1101,7 @@ describe('GalleryFilterSidebarComponent', () => {
       it('gives tag rules their own Find section, after Content, with a help button on its header row', () => {
         store['tags'].set([{ value: 'sea', count: 3 }]);
         settle();
-        const order = titles().map(title => title.replace(/^\S+\s*/, ''));
+        const order = titles();
         expect(order.indexOf('gallery.tag_groups.title')).toBe(order.indexOf('gallery.sidebar.content') + 1);
         const rules = panelByTitle('gallery.tag_groups.title')!;
         expect(rules.querySelector('app-tag-groups')).toBeTruthy();

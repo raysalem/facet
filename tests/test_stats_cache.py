@@ -237,3 +237,157 @@ class TestAsyncSingleFlight:
             gate.set()
             tick_task.cancel()
             leader.join(timeout=10)
+
+
+# ---------------------------------------------------------------------------
+# A mistyped viewer.cache_ttl_seconds used to kill the flight that hit it:
+# the TypeError fired before the flight deregistered, so the flight stayed in
+# the registry, `done` never fired and every waiter spun until the thread pool
+# starved every synchronous endpoint. The TTL is read defensively now.
+# ---------------------------------------------------------------------------
+
+
+def test_string_ttl_falls_back_and_the_flight_completes(monkeypatch):
+    monkeypatch.setitem(api_config.VIEWER_CONFIG, 'cache_ttl_seconds', 'an hour')
+    entry = api_config._get_stats_cached('typo', lambda: {'value': 1})
+    assert entry == {'value': 1}
+    # The flight is gone: the next read is a fresh cache hit, not a wait.
+    assert api_config._stats_inflight == {}
+    assert api_config._get_stats_cached('typo', _fail_if_computed) == {'value': 1}
+
+
+def test_null_ttl_falls_back_and_the_flight_completes(monkeypatch):
+    monkeypatch.setitem(api_config.VIEWER_CONFIG, 'cache_ttl_seconds', None)
+    assert api_config._get_stats_cached('null-ttl', lambda: 7) == 7
+    assert api_config._stats_inflight == {}
+
+
+def test_the_flight_deregisters_even_if_the_store_path_raises(monkeypatch):
+    class _Boom(dict):
+        def __setitem__(self, key, value):
+            raise RuntimeError('store blew up')
+
+    monkeypatch.setattr(api_config, '_stats_cache', _Boom())
+    flight = api_config._StatsFlight(api_config._stats_cache_generation)
+    monkeypatch.setitem(api_config._stats_inflight, 'boom-key', flight)
+    # Whatever the publish path raises, the flight must not stay registered
+    # and its waiters must wake: either failure keeps every waiter spinning.
+    with pytest.raises(RuntimeError):
+        api_config._finish_stats_flight('boom-key', flight, {'v': 1}, None)
+    assert 'boom-key' not in api_config._stats_inflight
+    assert flight.done.is_set()
+    assert flight.data == {'v': 1}
+
+
+@pytest.mark.parametrize('bad', ['an hour', None, float('nan'), float('inf'), 10 ** 400])
+def test_an_unusable_ttl_falls_back_to_the_default(monkeypatch, bad):
+    monkeypatch.setitem(api_config.VIEWER_CONFIG, 'cache_ttl_seconds', bad)
+    assert api_config.viewer_cache_ttl() == 3600.0
+
+
+@pytest.mark.parametrize('ttl', [0, -5, 90, '120'])
+def test_a_numeric_ttl_is_honoured_even_when_silly(monkeypatch, ttl):
+    monkeypatch.setitem(api_config.VIEWER_CONFIG, 'cache_ttl_seconds', ttl)
+    assert api_config.viewer_cache_ttl() == float(ttl)
+
+
+def test_a_bad_ttl_warns_once_per_value(monkeypatch, caplog):
+    monkeypatch.setattr(api_config, '_BAD_CONFIG_WARNED', set())
+    monkeypatch.setitem(api_config.VIEWER_CONFIG, 'cache_ttl_seconds', 'an hour')
+    with caplog.at_level('WARNING', logger=api_config.logger.name):
+        api_config.viewer_cache_ttl()
+        api_config.viewer_cache_ttl()
+    assert sum('cache_ttl_seconds' in r.getMessage() for r in caplog.records) == 1
+
+
+@pytest.mark.parametrize('raw', ['512MB', None, float('nan'), float('inf'), float('-inf'), 10 ** 400, [1]])
+def test_config_number_falls_back_on_an_unusable_value(raw):
+    assert api_config.config_number({'k': raw}, 'k', default=7) == 7
+
+
+@pytest.mark.parametrize('raw, expected', [('20.5', 20.5), (3, 3.0), (0, 0.0), (-2, -2.0)])
+def test_config_number_parses_a_usable_value(raw, expected):
+    assert api_config.config_number({'k': raw}, 'k', default=7) == expected
+
+
+def test_config_number_returns_the_default_when_absent():
+    assert api_config.config_number({}, 'k', default=7) == 7
+    assert api_config.config_number(None, 'k', default=7) == 7
+    assert api_config.config_number({}, 'k') is None
+
+
+def test_config_number_warns_once_per_value(monkeypatch, caplog):
+    monkeypatch.setattr(api_config, '_BAD_CONFIG_WARNED', set())
+    with caplog.at_level('WARNING', logger=api_config.logger.name):
+        for _ in range(3):
+            api_config.config_number({'k': 'oops'}, 'k', default=1, name='section.k')
+        api_config.config_number({'k': 'other'}, 'k', default=1, name='section.k')
+    assert sum('section.k' in r.getMessage() for r in caplog.records) == 2
+
+
+def test_a_miss_sweeps_long_expired_entries_but_keeps_in_flight_ones():
+    past = time.time() - api_config.viewer_cache_ttl() - 1
+    api_config._stats_cache['expired'] = {'data': 1, 'expires': past}
+    api_config._stats_cache['in-flight'] = {'data': 2, 'expires': past}
+    api_config._stats_cache['fresh'] = {'data': 3, 'expires': time.time() + 60}
+    api_config._stats_inflight['in-flight'] = object()
+
+    assert api_config._get_stats_cached('new', lambda: {'v': 4}) == {'v': 4}
+
+    assert 'expired' not in api_config._stats_cache
+    assert 'in-flight' in api_config._stats_cache
+    assert 'fresh' in api_config._stats_cache
+
+
+def test_the_map_is_capped(monkeypatch):
+    monkeypatch.setattr(api_config, '_STATS_CACHE_MAX_ENTRIES', 5)
+    for i in range(20):
+        api_config._get_stats_cached(f'key-{i}', lambda i=i: {'v': i})
+    # The cap is enforced on lookup, before the new key is stored.
+    assert len(api_config._stats_cache) <= 6
+    assert 'key-19' in api_config._stats_cache
+
+
+def test_the_recomputed_keys_stale_copy_survives_the_cap(monkeypatch):
+    """At the cap the key being recomputed is the oldest entry (every other
+    expired one was just swept): evicting it would make concurrent callers
+    wait for the recompute instead of being served the stale copy."""
+    monkeypatch.setattr(api_config, '_STATS_CACHE_MAX_ENTRIES', 2)
+    future = time.time() + 60
+    api_config._stats_cache['a'] = {'data': 'a', 'expires': future}
+    api_config._stats_cache['b'] = {'data': 'b', 'expires': future}
+    api_config._stats_cache['stale-key'] = {'data': {'value': 'old'}, 'expires': time.time() - 1}
+
+    gate = threading.Event()
+    computing = threading.Event()
+    leader = threading.Thread(target=lambda: api_config._get_stats_cached(
+        'stale-key', _gated_compute(gate, computing, {'value': 'new'})))
+    leader.start()
+    try:
+        assert computing.wait(timeout=10)
+        assert api_config._get_stats_cached('stale-key', _fail_if_computed) == {'value': 'old'}
+    finally:
+        gate.set()
+        leader.join(timeout=10)
+
+
+def test_another_keys_miss_keeps_a_freshly_expired_stale_copy():
+    """A key that expired a moment ago is the stale copy its next recompute
+    serves; a miss on a different key must not sweep it."""
+    api_config._stats_cache['just-expired'] = {'data': {'value': 'old'}, 'expires': time.time() - 1}
+
+    assert api_config._get_stats_cached('other', lambda: {'v': 1}) == {'v': 1}
+
+    assert api_config._stats_cache['just-expired']['data'] == {'value': 'old'}
+
+    gate = threading.Event()
+    computing = threading.Event()
+    leader = threading.Thread(target=lambda: api_config._get_stats_cached(
+        'just-expired', _gated_compute(gate, computing, {'value': 'new'})))
+    leader.start()
+    try:
+        assert computing.wait(timeout=10)
+        assert api_config._get_stats_cached('just-expired', _fail_if_computed) == {'value': 'old'}
+    finally:
+        gate.set()
+        leader.join(timeout=10)

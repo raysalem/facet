@@ -17,7 +17,6 @@ import { I18N, i18nKeys } from '../../core/i18n/keys';
 import { I18nService } from '../../core/services/i18n.service';
 import { AuthService } from '../../core/services/auth.service';
 import { isUnavailableKey, unavailableSet } from '../../shared/utils/unavailable-metrics';
-import { CaptureDatePipe } from '../../shared/pipes/capture-date.pipe';
 import { GalleryAlbumRulesComponent } from './gallery-album-rules.component';
 import { GalleryVisit, GalleryVisitHistoryService } from './gallery-visit-history.service';
 import { DEFAULT_FILTERS, filterUnit, hasZeroStarFilter } from './gallery-filters.util';
@@ -224,7 +223,6 @@ export class GalleryCriteriaComponent {
    settled: event => { if(event instanceof NavigationEnd && this.canAct()) this.history.remember(event.urlAfterRedirects); },
  });
  protected readonly canAct=computed(()=>this.active()&&!this.pending()&&!this.pinned());
- private readonly date = new CaptureDatePipe();
  private readonly tooltips = viewChildren(MatTooltip);
  private readonly quickDetails = viewChild<ElementRef<HTMLDetailsElement>>('quickFilters');
  private readonly quickSummary = viewChild<ElementRef<HTMLElement>>('quickSummary');
@@ -332,7 +330,7 @@ export class GalleryCriteriaComponent {
 protected readonly activeFilterChips = computed<GalleryFilterChip[]>(() => {
     if (this.pinned()) return [];
     this.i18n.translations();  // re-run on language change so translated chip values stay current
-    return galleryFilterChips(this.store, key => this.i18n.t(key));
+    return galleryFilterChips(this.store, key => this.i18n.t(key), this.i18n.locale());
   });
 
  protected readonly logicRows = computed(() => this.activeFilterChips().filter(chip => chip.personId === undefined && !['album', 'type', 'semanticQuery', 'search_threshold'].includes(chip.id)));

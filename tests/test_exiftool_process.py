@@ -211,11 +211,14 @@ def test_a_process_that_died_while_idle_is_restarted_before_the_next_command(mon
 
 
 def test_an_idle_session_is_stopped_and_restarted_on_next_use(monkeypatch):
+    reap_idle = exiftool_process._reap_idle
+    # The background reaper's tick briefly holds the session lock, which makes this reap skip the session.
+    monkeypatch.setattr(exiftool_process, '_reap_idle', lambda now: None)
     started = exiftool_fake.install(monkeypatch, _ok(stdout='ok\n'))
     run_exiftool_process(['exiftool', 'a.jpg'], timeout=1)
-    exiftool_process._reap_idle(time.monotonic())
+    reap_idle(time.monotonic())
     assert started[0].returncode is None  # used just now
-    exiftool_process._reap_idle(time.monotonic() + exiftool_process.IDLE_SECONDS)
+    reap_idle(time.monotonic() + exiftool_process.IDLE_SECONDS)
     assert started[0].returncode == 0 and not started[0].killed
     assert run_exiftool_process(['exiftool', 'b.jpg'], timeout=1).stdout == 'ok\n'
     assert len(started) == 2
@@ -361,7 +364,8 @@ def test_a_killed_python_takes_its_exiftool_process_with_it(tmp_path):
         while time.monotonic() < deadline:
             try:
                 state = Path(f'/proc/{pid}/stat').read_text().rsplit(')', 1)[1].split()[0]
-            except FileNotFoundError:
+            # An exit between open and read raises ESRCH instead of ENOENT: gone either way.
+            except (FileNotFoundError, ProcessLookupError):
                 break
             if state == 'Z':
                 break

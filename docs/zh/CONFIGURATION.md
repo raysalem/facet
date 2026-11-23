@@ -162,7 +162,8 @@ python database.py --add-user alice --role superadmin --display-name "Alice"
 {
   "scanning": {
     "skip_hidden_directories": true,
-    "skip_directories": ["@eaDir", "#recycle", "#snapshot", "@Recycle"]
+    "skip_directories": ["@eaDir", "#recycle", "#snapshot", "@Recycle"],
+    "skip_raw": false
   }
 }
 ```
@@ -171,6 +172,7 @@ python database.py --add-user alice --role superadmin --display-name "Alice"
 |---------|---------|-------------|
 | `skip_hidden_directories` | `true` | 跳过名称以 `.` 开头的目录 |
 | `skip_directories` | `["@eaDir", "#recycle", "#snapshot", "@Recycle"]` | 在任意深度被跳过的文件夹名通配符 |
+| `skip_raw` | `false` | 扫描文件夹时跳过相机 RAW 文件 |
 
 关于 `skip_directories`：
 - 通配符使用 `fnmatch`，区分大小写，且只匹配文件夹名。
@@ -967,6 +969,7 @@ IEC 61966-2-1。NCLX 传递特征值 16：ISO/IEC 23001-8 / ITU-T H.273。
 | `similarity_threshold_percent` | `70` | 图像哈希相似度阈值 |
 | `time_window_minutes` | `0.8` | 照片之间的最大时间间隔 |
 | `rapid_burst_seconds` | `0.4` | 在此间隔内的照片自动归为一组 |
+| `embedding_cosine_threshold` | `0.0` | 可选（随附文件中没有）。只有该照片对的 CLIP/SigLIP 余弦值 >= 此值时，候选才会加入连拍（`0.0` = 禁用）。任一照片没有嵌入、或维度不同的照片对，仅按 pHash 分组。分组时会把所有嵌入载入内存（每张照片约 `4 x dim` 字节，10 万张 SigLIP 照片约 460 MB） |
 
 ---
 
@@ -1151,6 +1154,7 @@ IEC 61966-2-1。NCLX 传递特征值 16：ISO/IEC 23001-8 / ITU-T H.273。
 
 | 设置 | 默认值 | 说明 |
 |---------|---------|-------------|
+| `enabled` | `false` | 可选（随附文件中没有）。在每次扫描结束时运行全局近似重复检测。默认关闭：该过程会读取库中所有 pHash 和嵌入，而 `hide_duplicates` 默认开启，因此启用后下一次扫描就会隐藏照片。`--detect-duplicates` 可按需运行 |
 | `similarity_threshold_percent` | `90` | 严格的 pHash 门限（90% = 64 位中汉明距离 <= 6）；当两张照片中有一张缺少嵌入时，它就是唯一判据 |
 | `prefilter_hamming` | `12` | 可选（随附文件中没有）。两张照片都有嵌入时，用于筛出候选的宽松汉明门限（不低于严格门限） |
 | `embedding_cosine_threshold` | `0.90` | 可选（随附文件中没有）。只有 SigLIP/CLIP 余弦值 >= 此值时，候选才会合并 |
@@ -1612,6 +1616,9 @@ python facet.py --recompute-tags-vlm   # 用 VLM 标签模型重新打标签
 | `edition_password` | `""` | 解锁编辑模式的密码；留空 = 只读（`trusted_local_editing` 下除外） |
 | `trusted_local_editing` | `false` | 无需密码，即授予同一台计算机上的浏览器编辑权限。参见[受信任的本地编辑](#受信任的本地编辑) |
 | `place_search_url` | `"https://photon.komoot.io/api"` | 照片库**在线搜索**所用的 Photon 端点；`""` 表示关闭。参见[在线地点搜索](#在线地点搜索) |
+| `map_tile_url` | `""` | 地图各界面使用的自托管底图瓦片；`""` 保持 OpenStreetMap 默认。可为同源路径（如 `/tiles/{z}/{x}/{y}.png`）或 `https://` —— `http://` 会被拒绝，CSP 只允许 'self' 与 https 图片 |
+| `map_tile_attribution` | `""` | 自定义瓦片显示的署名行（可含 HTML；由运维配置，属受信内容）。为空显示通用的自托管署名 |
+| `map_tile_max_zoom` | `19` | 自定义瓦片服务器支持的最大缩放级别 |
 | **comparison_mode** | | |
 | `min_comparisons_for_optimization` | `50` | 建议权重之前，该类别所需的最少决定性比较次数（平局不计） |
 | `pair_selection_strategy` | `"learning"` | 配对策略：`learning`、`uncertainty`、`boundary`、`active`、`random` |
@@ -1685,7 +1692,7 @@ python facet.py --recompute-tags-vlm   # 用 VLM 标签模型重新打标签
 | `security_headers.content_security_policy` | _（兼容 SPA 的默认值）_ | Content-Security-Policy 头；`""` 表示关闭，或提供更严格的策略 |
 | `security_headers.hsts` | `false` | 发送 `Strict-Transport-Security`。仅在查看器通过 HTTPS 提供服务时才启用。 |
 | **其他** | | |
-| `cache_ttl_seconds` | `3600` | 内存中统计/查询缓存的 TTL；应比一次完整统计计算（可能耗时数分钟）更长 |
+| `cache_ttl_seconds` | `3600` | 内存中统计/查询缓存的 TTL；应比一次完整统计计算（可能耗时数分钟）更长；无法解析或非有限的值会带警告回退到 `3600`，`0` 或负值会让条目立即过期 |
 | `notification_duration_ms` | `2000` | 提示条显示时长 |
 | `moment_confidence_min` | `0` | 置信度（0–1）低于此值的时刻标签会变暗并显示“（不确定）”；`0` = 从不变暗 |
 
@@ -1832,7 +1839,7 @@ python facet.py --recompute-tags-vlm   # 用 VLM 标签模型重新打标签
 |---------|---------|-------------|
 | `features.show_proofing` | `false` | 共享相册上客户选片功能的总开关 |
 | `proofing.pin` | `""` | 客户连同分享链接必须输入的可选 PIN 码；留空 = 不需要 PIN（尝试次数有速率限制） |
-| `proofing.session_minutes` | `1440` | 客户会话的有效期（分钟，24 小时）；相册取消共享或选片功能被禁用时，会话立即失效 |
+| `proofing.session_minutes` | `1440` | 客户会话的有效期（分钟，24 小时）；相册取消共享或选片功能被禁用时，会话立即失效；无法解析或非正的值回退到默认值，最长钳制到一周 |
 
 ### 路径映射
 
@@ -2710,7 +2717,7 @@ python facet.py --recompute-text   # 重新读取整个图库
 | `count` | `20` | `/api/frame/photos` 默认返回的照片数 |
 | `max_count` | `100` | `count` 查询参数的硬上限 |
 | `min_aggregate` | `7.0` | 照片被选入所需的最低聚合分 |
-| `max_edge` | `1920` | 提供的 JPEG 的长边上限（像素）；`max_edge` 查询参数只能调低它 |
+| `max_edge` | `1920` | 提供的 JPEG 的长边上限（像素）；`max_edge` 查询参数只能调低它。签发的照片 id 携带此上限：调高后在显示端下一次轮询时生效，调低则立即生效 |
 | `favorites_only` | `false` | 为 `true` 时只选入已收藏的照片 |
 | `categories` | `[]` | 类别名白名单（为空 = 所有类别） |
 

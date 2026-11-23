@@ -163,7 +163,8 @@ Controlla quali directory visita la scansione.
 {
   "scanning": {
     "skip_hidden_directories": true,
-    "skip_directories": ["@eaDir", "#recycle", "#snapshot", "@Recycle"]
+    "skip_directories": ["@eaDir", "#recycle", "#snapshot", "@Recycle"],
+    "skip_raw": false
   }
 }
 ```
@@ -172,6 +173,7 @@ Controlla quali directory visita la scansione.
 |---------|---------|-------------|
 | `skip_hidden_directories` | `true` | Salta le directory il cui nome inizia con `.` |
 | `skip_directories` | `["@eaDir", "#recycle", "#snapshot", "@Recycle"]` | Glob di nomi di cartella saltati a qualsiasi profondità |
+| `skip_raw` | `false` | Salta i file RAW della fotocamera durante la scansione delle cartelle |
 
 Note su `skip_directories`:
 - I glob usano `fnmatch`, distinguono le maiuscole e confrontano solo il nome della cartella.
@@ -973,6 +975,7 @@ Raggruppa foto simili scattate in rapida successione.
 | `similarity_threshold_percent` | `70` | Soglia di similarità dell'hash dell'immagine |
 | `time_window_minutes` | `0.8` | Tempo massimo tra le foto |
 | `rapid_burst_seconds` | `0.4` | Foto entro questo intervallo raggruppate automaticamente |
+| `embedding_cosine_threshold` | `0.0` | Facoltativo (assente dal file fornito). Un candidato entra in una raffica solo se il coseno CLIP/SigLIP della coppia è >= questo valore (`0.0` = disattivata). Una coppia in cui una foto non ha embedding, o con dimensioni diverse, viene raggruppata solo con il pHash. Carica tutti gli embedding in memoria durante il raggruppamento (circa `4 x dim` byte per foto, quasi 460 MB con 100.000 foto e SigLIP) |
 
 ---
 
@@ -1158,6 +1161,7 @@ Trova le foto duplicate nell'intera libreria: candidati pHash permissivi, confer
 
 | Impostazione | Predefinito | Descrizione |
 |---------|---------|-------------|
+| `enabled` | `false` | Facoltativo (assente dal file fornito). Esegue il rilevamento globale dei quasi-duplicati alla fine di ogni scansione. Disattivato di default: il passaggio legge tutti i pHash e gli embedding della libreria, e `hide_duplicates` è attivo di default, quindi abilitarlo nasconde foto alla scansione successiva. `--detect-duplicates` lo esegue su richiesta |
 | `similarity_threshold_percent` | `90` | Soglia pHash rigorosa (90% = distanza di Hamming <= 6 su 64 bit); l'unico test quando una delle due foto non ha un embedding |
 | `prefilter_hamming` | `12` | Facoltativo (assente dal file fornito). Soglia di Hamming permissiva per i candidati quando entrambe le foto hanno embedding (almeno pari alla soglia rigorosa) |
 | `embedding_cosine_threshold` | `0.90` | Facoltativo (assente dal file fornito). Un candidato si unisce solo se il coseno SigLIP/CLIP è >= questo valore |
@@ -1619,6 +1623,9 @@ Visualizzazione e comportamento della galleria web.
 | `edition_password` | `""` | Password per sbloccare la modalità di modifica; vuoto = sola lettura (eccetto con `trusted_local_editing`) |
 | `trusted_local_editing` | `false` | Concede i diritti di modifica a un browser sullo stesso computer, senza password. Vedi [Modifica locale attendibile](#modifica-locale-attendibile) |
 | `place_search_url` | `"https://photon.komoot.io/api"` | Endpoint Photon per la ricerca **Cerca online** della galleria; `""` la disattiva. Vedi [Ricerca online di luoghi](#ricerca-online-di-luoghi) |
+| `map_tile_url` | `""` | Tile di base auto-ospitate per le superfici mappa; `""` mantiene il predefinito OpenStreetMap. Percorso stesso-origine (es. `/tiles/{z}/{x}/{y}.png`) o `https://` — `http://` viene rifiutato, la CSP consente solo 'self' e immagini https |
+| `map_tile_attribution` | `""` | Riga di attribuzione mostrata per le tile personalizzate (HTML consentito; configurata dall'operatore, quindi attendibile). Vuoto mostra un'etichetta generica auto-ospitata |
+| `map_tile_max_zoom` | `19` | Livello di zoom massimo servito dal server di tile personalizzato |
 | **comparison_mode** | | |
 | `min_comparisons_for_optimization` | `50` | Confronti decisivi (pareggi esclusi) necessari in una categoria prima che vengano suggeriti i pesi |
 | `pair_selection_strategy` | `"learning"` | Strategia di coppia: `learning`, `uncertainty`, `boundary`, `active`, `random` |
@@ -1692,7 +1699,7 @@ Visualizzazione e comportamento della galleria web.
 | `security_headers.content_security_policy` | _(predefinito sicuro per la SPA)_ | Header Content-Security-Policy; `""` lo disattiva, oppure fornisci una policy più restrittiva |
 | `security_headers.hsts` | `false` | Invia `Strict-Transport-Security`. Abilita solo quando il viewer è servito via HTTPS. |
 | **Altro** | | |
-| `cache_ttl_seconds` | `3600` | TTL delle cache in memoria di statistiche/query; tienilo più lungo di un calcolo completo delle statistiche (può richiedere minuti) |
+| `cache_ttl_seconds` | `3600` | TTL delle cache in memoria di statistiche/query; tienilo più lungo di un calcolo completo delle statistiche (può richiedere minuti); un valore non analizzabile o non finito torna a `3600` con un avviso, `0` o un valore negativo fa scadere subito le voci |
 | `notification_duration_ms` | `2000` | Durata del toast |
 | `moment_confidence_min` | `0` | Le etichette dei momenti sotto questa confidenza (0–1) appaiono attenuate con «(incerto)»; `0` = mai attenuate |
 
@@ -1839,7 +1846,7 @@ Note:
 |---------|---------|-------------|
 | `features.show_proofing` | `false` | Interruttore principale per la revisione del cliente sugli album condivisi |
 | `proofing.pin` | `""` | PIN facoltativo che un cliente deve inserire con il link di condivisione; vuoto = nessun PIN (i tentativi hanno un limite di frequenza) |
-| `proofing.session_minutes` | `1440` | Durata della sessione del cliente in minuti (24h); termina subito se l'album non è più condiviso o la revisione è disattivata |
+| `proofing.session_minutes` | `1440` | Durata della sessione del cliente in minuti (24h); termina subito se l'album non è più condiviso o la revisione è disattivata; un valore non analizzabile o non positivo torna al valore predefinito, al massimo una settimana |
 
 ### Mappatura dei percorsi
 
@@ -2717,7 +2724,7 @@ Distribuisce gli «scatti migliori» curati a dispositivi in modalità chiosco s
 | `count` | `20` | Numero predefinito di foto restituite da `/api/frame/photos` |
 | `max_count` | `100` | Limite rigido del parametro di query `count` |
 | `min_aggregate` | `7.0` | Punteggio aggregato minimo perché una foto venga curata |
-| `max_edge` | `1920` | Limite del lato lungo (px) dei JPEG serviti; il parametro `max_edge` può solo abbassarlo |
+| `max_edge` | `1920` | Limite del lato lungo (px) dei JPEG serviti; il parametro `max_edge` può solo abbassarlo. Gli id delle foto emessi portano il limite: alzarlo arriva ai display al loro prossimo sondaggio, abbassarlo si applica subito |
 | `favorites_only` | `false` | Se `true`, vengono curate solo le foto preferite |
 | `categories` | `[]` | Elenco consentito di nomi di categoria (vuoto = tutte) |
 

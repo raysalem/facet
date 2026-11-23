@@ -1,4 +1,5 @@
 import { ControlPopoverComponent } from '../../shared/components/control-popover/control-popover.component';
+import { I18nService } from '../../core/services/i18n.service';
 import { LogicalAssetApplied } from '../../shared/models/logical-asset-change';
 import { buildSyncParams } from '../gallery/gallery-filters.util';
 import { refineTagQuery } from '../gallery/tag-query.util';
@@ -7,6 +8,7 @@ import { PhotoCollectionSidebarComponent } from './photo-collection-sidebar.comp
 import { LogicalReviewService, LogicalReviewAction, LogicalReviewWriteError } from '../../core/services/logical-review.service';
 import { PhotoProvenanceComponent } from './photo-provenance.component';
 import { PhotoRelatedFilesComponent } from './photo-related-files.component';
+import { PhotoAlbumsComponent } from './photo-albums.component';
 import { TimelineFeedCache } from '../timeline/timeline-feed-cache.service';
 import { ContextHelpComponent } from '../../shared/components/context-help/context-help.component';
 import { Component, inject, signal, computed, linkedSignal, effect, untracked, OnInit, HostListener, DestroyRef, ElementRef, viewChild, ChangeDetectionStrategy, Injector, afterNextRender } from '@angular/core';
@@ -36,6 +38,7 @@ import { PhotoObjectLayerComponent } from './photo-object-layer.component';
 import { PhotoAnnotationLayerComponent } from './photo-annotation-layer.component';
 import { PhotoAnnotationsState } from './photo-annotations.state';
 import { FixedPipe } from '../../shared/pipes/fixed.pipe';
+import { IsLensNamePipe } from '../../shared/pipes/is-lens-name.pipe';
 import { ShutterSpeedPipe } from '../../shared/pipes/shutter-speed.pipe';
 import { CaptureDatePipe } from '../../shared/pipes/capture-date.pipe';
 import { RenditionReadoutComponent } from '../../shared/components/rendition-readout/rendition-readout.component';
@@ -55,12 +58,14 @@ import { PhotoMetricsTabsComponent } from '../../shared/components/photo-metrics
 import { HistogramMode, isHistogramMode } from '../../shared/utils/histogram';
 import { ComparisonCategoryExplainerComponent } from '../comparison/comparison-category-explainer.component';
 import { DownloadOption } from '../../core/api/types';
-import { downloadAll } from '../../shared/utils/download';
+import { downloadFile } from '../../shared/utils/download';
+import { basename } from '../../shared/utils/clipboard';
 import { GalleryStore } from '../gallery/gallery.store';
 import { aspectOf } from '../gallery/gallery-rows.util';
 import { setScopePatch } from '../gallery/gallery-filters.util';
 import * as L from 'leaflet';
-import { createLeafletMap } from '../../shared/leaflet';
+import { createLeafletMap, OSM_TILES } from '../../shared/leaflet';
+import { MapSourcePreferences } from '../../core/services/map-source-preferences.service';
 import { I18N, i18nKeys } from '../../core/i18n/keys';
 import { isPageShortcutBlocked } from '../../shared/utils/keyboard';
 import { privateImageSessionKey } from '../../shared/utils/private-image-session';
@@ -80,6 +85,7 @@ import { PersonFaceMenuComponent } from '../persons/person-face-menu.component';
 import {
   FaceBoxMode, FACE_BOX_MODE_ICONS, FACE_BOX_MODE_LABELS, nextFaceBoxMode, readFaceBoxMode, writeFaceBoxMode,
 } from './face-box-mode';
+import { captureSession } from '../../shared/utils/auth-session';
 
 interface PhotoTagOrigin {
   owner: string;
@@ -133,7 +139,7 @@ function inDetectedSet(photo: Photo): boolean {
 
 @Component({
   selector: 'app-photo-detail',
-  imports: [ControlPopoverComponent, PhotoCollectionSidebarComponent, ContextHelpComponent, PhotoProvenanceComponent, PhotoRelatedFilesComponent,
+  imports: [ControlPopoverComponent, PhotoCollectionSidebarComponent, ContextHelpComponent, PhotoProvenanceComponent, PhotoRelatedFilesComponent, PhotoAlbumsComponent, IsLensNamePipe,
     StackNavigatorComponent, NgTemplateOutlet, PanelRailComponent,
     ZoomPanDirective,
     PhotoObjectLayerComponent,
@@ -432,6 +438,12 @@ function inDetectedSet(photo: Photo): boolean {
                     <mat-option [value]="name">{{ name | categoryLabel }}</mat-option>
                   }
                 </mat-select>
+                @if (explainerLoadFailed()) {
+                  <p role="alert" class="mt-1 text-xs text-[var(--mat-sys-on-error-container)]">
+                    {{ I18N.errors.server_error | translate }}
+                    <button type="button" class="underline" (click)="loadExplainerCategories()">{{ I18N.gallery.load_error.retry | translate }}</button>
+                  </p>
+                }
                 <mat-hint>{{ I18N.photo.category_override.target_category_hint | translate }}</mat-hint>
               </mat-form-field>
               @if (explainerTargetCategory(); as target) {
@@ -547,11 +559,12 @@ function inDetectedSet(photo: Photo): boolean {
           <!-- Camera, "how was it shot": the capture line, then EXIF, Technical and the histogram with its clipping. -->
           <section id="photo-panel-camera" data-photo-panel="camera" role="tabpanel" aria-labelledby="photo-rail-camera" [hidden]="rail.shownPage() !== 'camera'" class="space-y-4">
             <div data-photo-capture class="text-xs text-[var(--mat-sys-on-surface-variant)]">
-            @if (p.camera_model || p.focal_length || p.f_stop || p.shutter_speed || p.iso || (p.image_width && p.image_height)) {
+            @if (p.camera_model || (p.lens_model | isLensName) || p.focal_length || p.f_stop || p.shutter_speed || p.iso || (p.image_width && p.image_height)) {
               <!-- Each item's "·" sits in the gap before it, so the one that would open a wrapped line is clipped. -->
               <div data-photo-exposure role="group" [attr.aria-label]="I18N.photo_detail.capture_settings | translate" class="overflow-x-clip">
                 <div class="-ms-3 flex flex-wrap items-center tabular-nums [&>span]:relative [&>span]:ms-3 [&>span]:before:absolute [&>span]:before:-start-2 [&>span]:before:content-['·']">
                 @if (p.camera_model) { <span>{{ p.camera_model }}</span> }
+                @if (p.lens_model && (p.lens_model | isLensName)) { <span>{{ p.lens_model }}</span> }
                 @if (p.focal_length) { <span>{{ p.focal_length }}mm</span> }
                 @if (p.f_stop) { <span>f/{{ p.f_stop }}</span> }
                 @if (p.shutter_speed | shutterSpeed; as shutter) { <span>{{ shutter }}</span> }
@@ -586,7 +599,7 @@ function inDetectedSet(photo: Photo): boolean {
                         <mat-icon class="!text-base !w-4 !h-4 !leading-4">edit_calendar</mat-icon>
                       </button>
                     }
-                    @if (p.date_taken) { <span class="leading-4">{{ p.date_taken | captureDate }}</span> }
+                    @if (p.date_taken) { <span class="leading-4">{{ p.date_taken | captureDate: locale() }}</span> }
                     @else { <span>{{ I18N.gallery.no_capture_date | translate }}</span> }
                   </span>
                 }
@@ -808,6 +821,9 @@ function inDetectedSet(photo: Photo): boolean {
               }
             </div>
 
+            <!-- The albums this photo is in (upstream #521). -->
+            @if (store.config()?.features?.show_albums) { <app-photo-albums [photo]="p" /> }
+
             <!-- Location, folded to one line near the bottom (map and exact coordinates on demand, remembered). -->
             @if (p.gps_latitude !== null && p.gps_longitude !== null) {
               <div data-photo-location>
@@ -897,6 +913,8 @@ function inDetectedSet(photo: Photo): boolean {
   host: { class: 'flex flex-col h-full overflow-y-auto lg:overflow-y-hidden' },
 })
 export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
+  /** The viewer's language, the argument of the date pipes. */
+  protected readonly locale = inject(I18nService).locale;
   protected readonly I18N = i18nKeys();
   protected readonly photoAspect = computed(() => {
     const photo = this.photo();
@@ -1000,7 +1018,7 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   protected readonly viewFilterChips = computed(() => {
     if (!this.collectionSidebarAvailable()) return [];
     this.i18n.translations();
-    return definingFilters(galleryFilterChips(this.store, key => this.i18n.t(key)));
+    return definingFilters(galleryFilterChips(this.store, key => this.i18n.t(key), this.i18n.locale()));
   });
   /** Showing's filter list, folded behind its count: the content comes first, its definition on demand. */
   protected readonly viewFiltersOpen = signal(false);
@@ -1045,6 +1063,7 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   }
   private readonly keymap = inject(KeyboardMappingService);
   private readonly stacks = inject(PhotoStackService);
+  private readonly mapSource = inject(MapSourcePreferences);
   private readonly stackNavigator = viewChild(StackNavigatorComponent);
   private readonly faceLayer = viewChild(PhotoFaceLayerComponent);
   private readonly personMenu = viewChild(PersonFaceMenuComponent);
@@ -1188,6 +1207,7 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   // Category explainer ("why isn't this photo classified as X?")
   protected readonly explainerCategories = signal<string[]>([]);
   protected readonly explainerTargetCategory = signal<string | null>(null);
+  protected readonly explainerLoadFailed = signal(false);
 
   // Face boxes: off, on hover, or always shown. Remembered per browser.
   protected readonly faceBoxMode = signal<FaceBoxMode>(readFaceBoxMode());
@@ -1320,6 +1340,7 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
     const p = this.photo();
     // The map is built only while the section is open, once it has its size, so it never measures a hidden box.
     const open = this.locationOpen() && this.rail.shownPage() === 'content' && !this.rail.addonActive();
+    const tiles = this.mapSource.tiles(this.store.config());
     if (this.locationMapTimeout !== null) {
       clearTimeout(this.locationMapTimeout);
       this.locationMapTimeout = null;
@@ -1335,12 +1356,14 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
       if (this.destroyRef.destroyed || this.locationMapContainer()?.nativeElement !== container.nativeElement || this.photo()?.path !== p.path) return;
       const map = createLeafletMap(container.nativeElement, {
         zoomControl: false,
-        attributionControl: false,
+        // The static preview hides the attribution row for the default OSM
+        // layer; a source that requires visible attribution shows it.
+        attributionControl: tiles.url !== OSM_TILES.url,
         dragging: false,
         scrollWheelZoom: false,
         doubleClickZoom: false,
         touchZoom: false,
-      }).setView([p.gps_latitude!, p.gps_longitude!], 13);
+      }, undefined, tiles).setView([p.gps_latitude!, p.gps_longitude!], 13);
 
       L.marker([p.gps_latitude!, p.gps_longitude!]).addTo(map);
       this.locationMap = map;
@@ -1672,11 +1695,7 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   protected async download(path: string, type = 'original', profile?: string): Promise<void> {
     this.downloading.set(true);
     try {
-      await downloadAll(
-        [path],
-        p => this.api.downloadUrl(p, type, profile),
-        url => this.api.getRaw(url),
-      );
+      await downloadFile(this.api.getRaw(this.api.downloadUrl(path, type, profile)), basename(path));
     } catch {
       // A 404 (the file moved on disk) or a 412 passes the interceptor's 5xx
       // toast silently — the click must not look like a no-op.
@@ -1689,10 +1708,9 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   protected async downloadSocialCrop(path: string, preset: string): Promise<void> {
     this.downloading.set(true);
     try {
-      await downloadAll(
-        [path],
-        p => `/api/photo/social_crop?path=${encodeURIComponent(p)}&preset=${encodeURIComponent(preset)}`,
-        url => this.api.getRaw(url),
+      await downloadFile(
+        this.api.getRaw(`/api/photo/social_crop?path=${encodeURIComponent(path)}&preset=${encodeURIComponent(preset)}`),
+        basename(path),
       );
     } catch {
       this.snackBar.open(this.i18n.t(I18N.errors.action_failed), '', { duration: 3000 });
@@ -1793,13 +1811,6 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
     } finally { guard.dispose(); }
   }
 
-  /** Accepted writes may repair the gallery after this view is destroyed, but never another session. */
-  private captureSession(): () => boolean {
-    const owner = this.auth.identity();
-    const token = this.auth.token;
-    return () => owner === this.auth.identity() && token === this.auth.token;
-  }
-
   private isCurrentViewer(): boolean {
     return !this.destroyRef.destroyed && this.viewerOwner === this.auth.identity() && this.viewerSession === privateImageSessionKey();
   }
@@ -1809,7 +1820,7 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
     if (!p || p.path !== path) return;
     const newRating = p.star_rating === rating ? 0 : rating;
     if (p.logical_review) { await this.saveLogicalReview(p, { rating: newRating }); return; }
-    const sameSession = this.captureSession();
+    const sameSession = captureSession(this.auth);
     try {
       await firstValueFrom(this.api.post('/photo/set_rating', { photo_path: path, rating: newRating }));
       // A confirmed write still repairs the same session's gallery after navigation.
@@ -1834,7 +1845,7 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
     if (!p || this.reviewSaving) return;
     this.reviewSaving = true;
     const isOrigin = this.store.captureReviewView();
-    const sameSession = this.captureSession();
+    const sameSession = captureSession(this.auth);
     const photos = this.store.photos();
     const index = photos.findIndex(photo => photo.path === p.path);
     const next = photos[index + 1];
@@ -1879,7 +1890,7 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
     const p = this.photo();
     if (!p || p.path !== path) return;
     if (p.logical_review) { await this.saveLogicalReview(p, 'favorite'); return; }
-    const sameSession = this.captureSession();
+    const sameSession = captureSession(this.auth);
     try {
       const res = await firstValueFrom(this.api.post<{ is_favorite: boolean; is_rejected: boolean | null }>('/photo/toggle_favorite', { photo_path: path }));
       if (!sameSession()) return;
@@ -1899,7 +1910,7 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
     const p = this.photo();
     if (!p || p.path !== path) return;
     const isOrigin = this.store.captureReviewView();
-    const sameSession = this.captureSession();
+    const sameSession = captureSession(this.auth);
     const photos = this.store.photos();
     const index = photos.findIndex(photo => photo.path === p.path);
     const next = photos[index + 1];
@@ -2045,12 +2056,14 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
         maxWidth: '500px',
         data: { path: p.path, filename: p.filename, caption: p.caption || '' },
       });
-      ref.afterClosed().subscribe(result => {
-        if (result !== undefined) {
-          this.translatedCaption.set(null);
-          this.applyConfirmed(p, { caption: result || null, caption_translated: undefined });
-        }
-      });
+      ref.afterClosed()
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe(result => {
+          if (result !== undefined) {
+            this.translatedCaption.set(null);
+            this.applyConfirmed(p, { caption: result || null, caption_translated: undefined });
+          }
+        });
     });
   }
 
@@ -2099,9 +2112,11 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
           hasBracketLead,
         },
       });
-      ref.afterClosed().subscribe(async result => {
+      ref.afterClosed()
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe(async result => {
         if (!result || !current()) return;
-        const sameSession = this.captureSession();
+        const sameSession = captureSession(this.auth);
         const res = await this.photoActions.deletePhotos([p.path], result);
         if (!res || !sameSession()) return;
         // `removed_missing` counts as deleted for this surface: the row is
@@ -2127,9 +2142,11 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
         maxWidth: '24rem',
         data: { path: p.path, currentCategory: p.category },
       });
-      ref.afterClosed().subscribe((result: CategoryOverrideResult | undefined) => {
-        if (result) this.applyConfirmed(p, { category: result.category, aggregate: result.aggregate });
-      });
+      ref.afterClosed()
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe((result: CategoryOverrideResult | undefined) => {
+          if (result) this.applyConfirmed(p, { category: result.category, aggregate: result.aggregate });
+        });
     });
   }
 
@@ -2147,9 +2164,14 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
 
   protected loadExplainerCategories(): void {
     if (this.explainerCategories().length === 0) {
+      this.explainerLoadFailed.set(false);
       firstValueFrom(this.api.get<{ categories: { name: string }[] }>('/config/category_priorities'))
         .then(res => this.explainerCategories.set(res.categories.map(c => c.name)))
-        .catch(() => this.explainerCategories.set([]));
+        .catch(() => {
+          // An empty dropdown with a disabled save gives the user nothing to
+          // do: surface the failure with a retry instead.
+          this.explainerLoadFailed.set(true);
+        });
     }
   }
 

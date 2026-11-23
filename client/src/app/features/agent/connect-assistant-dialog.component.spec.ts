@@ -4,7 +4,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { I18nService } from '../../core/services/i18n.service';
@@ -64,7 +64,7 @@ describe('ConnectAssistantDialogComponent', () => {
       providers: [
         { provide: ApiService, useValue: { listMcpTokens, createMcpToken, revokeMcpToken } },
         { provide: AuthService, useValue: { isMultiUser: () => multiUser, isEdition: () => edition, loginPasswordRequired: () => loginRequired, status: () => ({ features: { mcp_inpage: inpage } }) } },
-        { provide: I18nService, useValue: { t: (key: string, vars?: Record<string, string>) => (vars ? `${key} ${Object.values(vars).join(' ')}` : key), translations: signal({}) } },
+        { provide: I18nService, useValue: { locale: signal('en'), t: (key: string, vars?: Record<string, string>) => (vars ? `${key} ${Object.values(vars).join(' ')}` : key), translations: signal({}) } },
         { provide: MatSnackBar, useValue: { open: vi.fn() } },
         { provide: MatDialogRef, useValue: { close: vi.fn() } },
         { provide: AgentBridgeService, useValue: { tabId: 'tab123', connected } },
@@ -73,12 +73,12 @@ describe('ConnectAssistantDialogComponent', () => {
     });
   });
 
-  it('lists tokens with the prefix only as a tooltip, with dd/MM/yyyy dates and no plaintext', async () => {
+  it('lists tokens with the prefix only as a tooltip, with dates in the viewer language and no plaintext', async () => {
     await create();
     expect(queryAll('[data-testid="token-row"]')).toHaveLength(1);
     expect(query('[data-testid="token-row"] [title]')?.getAttribute('title')).toBe('fct_ab12…');
     expect(query('[data-testid="token-row"]')?.textContent).not.toContain('fct_ab12');
-    expect(text()).toContain('03/09/2026');
+    expect(text()).toContain('3 Sept 2026');
     expect(query('[data-testid="reveal"]')).toBeNull();
     expect(query('[data-testid="prompt"]')).toBeNull();
     expect(text()).not.toContain('SECRET');
@@ -124,7 +124,7 @@ describe('ConnectAssistantDialogComponent', () => {
       providers: [
         { provide: ApiService, useValue: { listMcpTokens, createMcpToken, revokeMcpToken } },
         { provide: AuthService, useValue: { isMultiUser: () => true, isEdition: () => true, loginPasswordRequired: () => true, status: signal({ features: { mcp_inpage: false } }) } },
-        { provide: I18nService, useValue: { t: (key: string, vars?: Record<string, string>) => (vars ? `${key} ${Object.values(vars).join(' ')}` : key), translations: signal({}) } },
+        { provide: I18nService, useValue: { locale: signal('en'), t: (key: string, vars?: Record<string, string>) => (vars ? `${key} ${Object.values(vars).join(' ')}` : key), translations: signal({}) } },
         { provide: MatSnackBar, useValue: { open: vi.fn() } },
         { provide: MatDialogRef, useValue: { close: vi.fn() } },
         { provide: AgentBridgeService, useValue: { tabId: 'tab123', connected } },
@@ -331,6 +331,18 @@ describe('ConnectAssistantDialogComponent', () => {
       expect(query('[data-testid="live-region"]')?.textContent).toContain('dialog.connect_assistant.copied');
     });
 
+    it('opens the copy_failed snackbar and leaves copied false when writeText rejects', async () => {
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn(() => Promise.reject(new Error('denied'))) }, configurable: true });
+      (document as unknown as Record<string, unknown>)['execCommand'] = vi.fn(() => false);
+      await create();
+      await mintAs('x');
+      buttonByText('dialog.connect_assistant.copy_prompt')!.click();
+      await flush();
+      expect(TestBed.inject(MatSnackBar).open).toHaveBeenCalledWith('ui.copy_failed', '', { duration: 3000 });
+      expect(text()).not.toContain('dialog.connect_assistant.copied');
+      expect(buttonByText('dialog.connect_assistant.copy_prompt')).toBeDefined();
+    });
+
     it('says nothing when both copy routes fail', async () => {
       Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
       (document as unknown as Record<string, unknown>)['execCommand'] = vi.fn(() => false);
@@ -531,6 +543,31 @@ describe('ConnectAssistantDialogComponent', () => {
       vi.useRealTimers();
     });
 
+    it('cancels overlapping reads on close and never restarts polling from late results', async () => {
+      vi.useFakeTimers();
+      await create();
+      const pending: Subject<{ tokens: McpTokenItem[] }>[] = [];
+      listMcpTokens.mockImplementation(() => {
+        const response = new Subject<{ tokens: McpTokenItem[] }>();
+        pending.push(response);
+        return response;
+      });
+      await vi.advanceTimersByTimeAsync(TOKENS_POLL_MS * 6);
+      expect(pending).toHaveLength(6);
+      fixture.destroy();
+      expect(pending.every(response => !response.observed)).toBe(true);
+      for (let i = 0; i < 5; i++) pending[i].error(new HttpErrorResponse({ status: 503 }));
+      await vi.advanceTimersByTimeAsync(0);
+      pending[5].next({ tokens: [TOKEN_ROW] });
+      await vi.advanceTimersByTimeAsync(0);
+      const callsAfterClose = listMcpTokens.mock.calls.length;
+      listMcpTokens.mockReturnValue(of({ tokens: [TOKEN_ROW] }));
+      await vi.advanceTimersByTimeAsync(TOKENS_POLL_MS);
+      expect(listMcpTokens.mock.calls.length).toBe(callsAfterClose);
+      expect(pending.every(response => !response.observed)).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
     it('starts when the dialog opens, keeps its cadence, and stops for good once it is destroyed', async () => {
       vi.useFakeTimers();
       await create();
@@ -554,6 +591,86 @@ describe('ConnectAssistantDialogComponent', () => {
       await vi.advanceTimersByTimeAsync(TOKENS_POLL_MS);
       fixture.detectChanges();
       expect(query('[role="alert"]')).toBeNull();
+    });
+
+    it('five consecutive quiet failures stop the blind poll and surface the error', async () => {
+      vi.useFakeTimers();
+      await create();
+      listMcpTokens.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 503 })));
+      await vi.advanceTimersByTimeAsync(TOKENS_POLL_MS * 5);
+      fixture.detectChanges();
+      const calls = listMcpTokens.mock.calls.length;
+      expect(query('[role="alert"]')).not.toBeNull();
+      // The blind poll is stopped: no further calls ever fire.
+      await vi.advanceTimersByTimeAsync(TOKENS_POLL_MS * 5);
+      expect(listMcpTokens.mock.calls.length).toBe(calls);
+      fixture.destroy();
+    });
+
+    it('a good read after the cap clears the error and restarts the poll', async () => {
+      vi.useFakeTimers();
+      await create();
+      listMcpTokens.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 503 })));
+      await vi.advanceTimersByTimeAsync(TOKENS_POLL_MS * 5);
+      fixture.detectChanges();
+      expect(query('[role="alert"]')).not.toBeNull();
+      // The server is back; a mint's own refresh is the next read.
+      listMcpTokens.mockReturnValue(of({ tokens: [TOKEN_ROW] }));
+      const input = query<HTMLInputElement>('input[name="token-name"]');
+      input!.value = 'back';
+      input!.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      buttonByText('dialog.connect_assistant.mint')!.click();
+      await vi.advanceTimersByTimeAsync(0);
+      fixture.detectChanges();
+      expect(query('[role="alert"]')).toBeNull();
+      const calls = listMcpTokens.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(TOKENS_POLL_MS);
+      expect(listMcpTokens.mock.calls.length).toBe(calls + 1);
+      fixture.destroy();
+    });
+
+    it('a failed user-visible read shows the error but is not a poll strike', async () => {
+      vi.useFakeTimers();
+      await create();
+      listMcpTokens.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 503 })));
+      // Four quiet strikes, then a failing mint refresh: still four strikes,
+      // so the fifth poll is the one that stops the polling.
+      await vi.advanceTimersByTimeAsync(TOKENS_POLL_MS * 4);
+      const input = query<HTMLInputElement>('input[name="token-name"]');
+      input!.value = 'x';
+      input!.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      buttonByText('dialog.connect_assistant.mint')!.click();
+      await vi.advanceTimersByTimeAsync(0);
+      const afterMint = listMcpTokens.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(TOKENS_POLL_MS);
+      expect(listMcpTokens.mock.calls.length).toBe(afterMint + 1);
+      await vi.advanceTimersByTimeAsync(TOKENS_POLL_MS * 2);
+      expect(listMcpTokens.mock.calls.length).toBe(afterMint + 1);
+      fixture.destroy();
+    });
+
+    it('a good poll re-arms the failure counter', async () => {
+      vi.useFakeTimers();
+      await create();
+      // Four quiet failures (below the cap), a good poll re-arming the
+      // counter, four more: never five CONSECUTIVE failures, so the poll
+      // stays alive and no error surfaces.
+      for (let i = 0; i < 4; i++) {
+        listMcpTokens.mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 503 })));
+      }
+      listMcpTokens.mockReturnValueOnce(of({ tokens: [TOKEN_ROW] }));
+      for (let i = 0; i < 4; i++) {
+        listMcpTokens.mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 503 })));
+      }
+      await vi.advanceTimersByTimeAsync(TOKENS_POLL_MS * 9);
+      fixture.detectChanges();
+      expect(query('[role="alert"]')).toBeNull();
+      const calls = listMcpTokens.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(TOKENS_POLL_MS);
+      expect(listMcpTokens.mock.calls.length).toBe(calls + 1);
+      fixture.destroy();
     });
   });
 });

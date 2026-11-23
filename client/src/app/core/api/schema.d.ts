@@ -2190,7 +2190,7 @@ export interface paths {
         };
         /**
          * Cameras
-         * @description Lazy-load camera options with counts.
+         * @description Lazy-load camera options with counts. `query` narrows to camera models containing it.
          */
         get: operations["cameras_api_filter_options_cameras_get"];
         put?: never;
@@ -2210,7 +2210,7 @@ export interface paths {
         };
         /**
          * Categories
-         * @description Lazy-load category options with counts.
+         * @description Lazy-load category options with counts. `query` narrows to categories containing it.
          */
         get: operations["categories_api_filter_options_categories_get"];
         put?: never;
@@ -2300,7 +2300,7 @@ export interface paths {
         };
         /**
          * Lenses
-         * @description Lazy-load lens options with counts.
+         * @description Lazy-load lens options with counts. `query` narrows to lens models containing it.
          */
         get: operations["lenses_api_filter_options_lenses_get"];
         put?: never;
@@ -2364,7 +2364,7 @@ export interface paths {
         };
         /**
          * Narrative Moments
-         * @description Lazy-load narrative-moment options with counts.
+         * @description Lazy-load narrative-moment options with counts. `query` narrows to moments containing it.
          */
         get: operations["narrative_moments_api_filter_options_narrative_moments_get"];
         put?: never;
@@ -2384,7 +2384,7 @@ export interface paths {
         };
         /**
          * Patterns
-         * @description Lazy-load composition pattern options with counts.
+         * @description Lazy-load composition pattern options with counts. `query` narrows to patterns containing it.
          */
         get: operations["patterns_api_filter_options_patterns_get"];
         put?: never;
@@ -2405,6 +2405,10 @@ export interface paths {
         /**
          * Persons
          * @description Lazy-load person options with photo counts. `ids` forces specific persons to be included.
+         *
+         *     `ids` is a comma list of person IDs (deduplicated, at most
+         *     ``PERSON_FILTER_LIMIT`` of them); anything else is a 422. `query` narrows the
+         *     ranked list to names containing it — forced ids stay forced, whatever their name.
          */
         get: operations["persons_api_filter_options_persons_get"];
         put?: never;
@@ -2424,12 +2428,14 @@ export interface paths {
         };
         /**
          * Tags
-         * @description Lazy-load tag options with counts.
+         * @description Lazy-load tag options with counts. `query` narrows to tags containing it.
          *
          *     Owns a private cache branch instead of ``_cached_filter_query`` because the
          *     payload is trimmed to ``max_tags`` on the way out, but it is gated on the
          *     same rule: the cached list is whole-library, so a caller with a non-empty
-         *     ``vis`` fragment must miss it and run the clause.
+         *     ``vis`` fragment must miss it and run the clause. A `query`-filtered read
+         *     misses it too: the cached rows are already LIMIT-cut, so they cannot narrow
+         *     past the cut.
          */
         get: operations["tags_api_filter_options_tags_get"];
         put?: never;
@@ -3540,6 +3546,29 @@ export interface paths {
          * @description Import one AI edit of a library photo; see the module docstring for the rules.
          */
         post: operations["import_ai_edit_api_photo_ai_edits_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/photo/albums": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Photo Albums
+         * @description Albums (manual and smart) the caller may open that contain ``path``.
+         *
+         *     Registered before the ``/api/albums/{album_id}`` routes and under a distinct
+         *     prefix, so it cannot collide with them. Never reachable through a share token.
+         */
+        get: operations["photo_albums_api_photo_albums_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5538,7 +5567,7 @@ export interface paths {
          *
          *     Modes:
          *       - visual: scored on the features both photos carry -- pHash similarity
-         *         (70%) + CLIP/SigLIP cosine (30%) when both are shared, the one shared
+         *         (30%) + CLIP/SigLIP cosine (70%) when both are shared, the one shared
          *         feature at full weight otherwise; a photo sharing neither is never
          *         listed. ``total`` counts the complete thresholded set.
          *       - color: histogram intersection + saturation/luminance distance
@@ -9851,6 +9880,8 @@ export interface components {
              * @default []
              */
             album_tags?: string[];
+            /** Artist */
+            artist?: string | null;
             assessment_states?: components["schemas"]["PhotoAssessmentStates"] | null;
             /** Bg Separation */
             bg_separation?: number | null;
@@ -9882,6 +9913,10 @@ export interface components {
             composition_pattern?: string | null;
             /** Contrast Score */
             contrast_score?: number | null;
+            /** Copyright */
+            copyright?: string | null;
+            /** Date Added */
+            date_added?: string | null;
             /** Date Formatted */
             date_formatted?: string | null;
             /** Date Manually Set */
@@ -9898,6 +9933,8 @@ export interface components {
             dynamic_range_stops?: number | null;
             /** Embedding Similarity */
             embedding_similarity?: number | null;
+            /** Exposure Compensation */
+            exposure_compensation?: number | null;
             /** Exposure Score */
             exposure_score?: number | null;
             /** Eye Sharpness */
@@ -9916,10 +9953,16 @@ export interface components {
             face_ratio?: number | null;
             /** Face Sharpness */
             face_sharpness?: number | null;
+            /** File Size */
+            file_size?: number | null;
             /** Filename */
             filename?: string | null;
+            /** Flash */
+            flash?: number | null;
             /** Focal Length */
             focal_length?: number | null;
+            /** Focal Length 35Mm */
+            focal_length_35mm?: number | null;
             /** Form Balance */
             form_balance?: number | null;
             /** Form Edge Entropy */
@@ -9990,6 +10033,8 @@ export interface components {
             mean_luminance?: number | null;
             /** Mean Saturation */
             mean_saturation?: number | null;
+            /** Metering Mode */
+            metering_mode?: number | null;
             /** Narrative Moment */
             narrative_moment?: string | null;
             /** Narrative Moment Confidence */
@@ -10060,6 +10105,20 @@ export interface components {
             topiq_score?: number | null;
             /** Unassigned Faces */
             unassigned_faces?: number | null;
+            /** White Balance */
+            white_balance?: number | null;
+        };
+        /**
+         * PhotoAlbum
+         * @description One album a photo belongs to, as listed in the photo info panel.
+         */
+        PhotoAlbum: {
+            /** Id */
+            id: number;
+            /** Is Smart */
+            is_smart: boolean;
+            /** Name */
+            name: string;
         };
         /**
          * PhotoAnnotation
@@ -11380,6 +11439,8 @@ export interface components {
              * @default []
              */
             album_tags?: string[];
+            /** Artist */
+            artist?: string | null;
             /** Asset Id */
             asset_id: string;
             /** Bg Separation */
@@ -11412,6 +11473,10 @@ export interface components {
             composition_pattern?: string | null;
             /** Contrast Score */
             contrast_score?: number | null;
+            /** Copyright */
+            copyright?: string | null;
+            /** Date Added */
+            date_added?: string | null;
             /** Date Formatted */
             date_formatted?: string | null;
             /** Date Manually Set */
@@ -11428,6 +11493,8 @@ export interface components {
             dynamic_range_stops?: number | null;
             /** Embedding Similarity */
             embedding_similarity?: number | null;
+            /** Exposure Compensation */
+            exposure_compensation?: number | null;
             /** Exposure Score */
             exposure_score?: number | null;
             /** Eye Sharpness */
@@ -11446,10 +11513,16 @@ export interface components {
             face_ratio?: number | null;
             /** Face Sharpness */
             face_sharpness?: number | null;
+            /** File Size */
+            file_size?: number | null;
             /** Filename */
             filename?: string | null;
+            /** Flash */
+            flash?: number | null;
             /** Focal Length */
             focal_length?: number | null;
+            /** Focal Length 35Mm */
+            focal_length_35mm?: number | null;
             /** Form Balance */
             form_balance?: number | null;
             /** Form Edge Entropy */
@@ -11515,6 +11588,8 @@ export interface components {
             mean_luminance?: number | null;
             /** Mean Saturation */
             mean_saturation?: number | null;
+            /** Metering Mode */
+            metering_mode?: number | null;
             /** Narrative Moment */
             narrative_moment?: string | null;
             /** Narrative Moment Confidence */
@@ -11583,6 +11658,8 @@ export interface components {
             topiq_score?: number | null;
             /** Unassigned Faces */
             unassigned_faces?: number | null;
+            /** White Balance */
+            white_balance?: number | null;
         };
         /**
          * ShootTypeEvidence
@@ -12443,6 +12520,21 @@ export interface components {
             };
             /** Is Multi User */
             is_multi_user: boolean;
+            /**
+             * Map Tile Attribution
+             * @default
+             */
+            map_tile_attribution?: string;
+            /**
+             * Map Tile Max Zoom
+             * @default 19
+             */
+            map_tile_max_zoom?: number;
+            /**
+             * Map Tile Url
+             * @default
+             */
+            map_tile_url?: string;
             /** Moment Confidence Min */
             moment_confidence_min: unknown;
             /** Notification Duration Ms */
@@ -15870,7 +15962,9 @@ export interface operations {
     };
     cameras_api_filter_options_cameras_get: {
         parameters: {
-            query?: never;
+            query?: {
+                query?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -15886,11 +15980,22 @@ export interface operations {
                     "application/json": components["schemas"]["MediaFilterOptionCamerasResponse"];
                 };
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     categories_api_filter_options_categories_get: {
         parameters: {
-            query?: never;
+            query?: {
+                query?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -15904,6 +16009,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -15970,7 +16084,9 @@ export interface operations {
     };
     lenses_api_filter_options_lenses_get: {
         parameters: {
-            query?: never;
+            query?: {
+                query?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -15984,6 +16100,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MediaFilterOptionLensesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -16042,7 +16167,9 @@ export interface operations {
     };
     narrative_moments_api_filter_options_narrative_moments_get: {
         parameters: {
-            query?: never;
+            query?: {
+                query?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -16058,11 +16185,22 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     patterns_api_filter_options_patterns_get: {
         parameters: {
-            query?: never;
+            query?: {
+                query?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -16076,6 +16214,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -16083,7 +16230,8 @@ export interface operations {
     persons_api_filter_options_persons_get: {
         parameters: {
             query?: {
-                ids?: string | null;
+                ids?: string;
+                query?: string;
             };
             header?: never;
             path?: never;
@@ -16113,7 +16261,9 @@ export interface operations {
     };
     tags_api_filter_options_tags_get: {
         parameters: {
-            query?: never;
+            query?: {
+                query?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -16127,6 +16277,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MediaFilterOptionTagsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -17996,6 +18155,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiEditImportResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    photo_albums_api_photo_albums_get: {
+        parameters: {
+            query: {
+                path: string;
+                token?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoAlbum"][];
                 };
             };
             /** @description Validation Error */

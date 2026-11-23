@@ -47,6 +47,7 @@ import { UserActivityJournal, activityName } from '../../core/agent/user-activit
 import { GalleryStore } from '../gallery/gallery.store';
 import { I18N, i18nKeys } from '../../core/i18n/keys';
 import { COMPACT_PAGE_TABS, TabLabelComponent } from '../../shared/components/tab-label/tab-label.component';
+import { captureSession } from '../../shared/utils/auth-session';
 
 interface PersonsResponse {
   persons: Person[];
@@ -401,8 +402,10 @@ export type NamingSort = 'faces' | 'recent';
           <mat-spinner diameter="36" [attr.aria-label]="I18N.ui.labels.loading | translate" />
         </div>
       }
-      <!-- Ignored: hidden persons (staff, strangers), with Restore -->
-      @if (auth.isEdition() && ignored().length > 0) {
+      <!-- Ignored: hidden persons (staff, strangers), with Restore. A first
+           page that fails still shows the section, with its Retry, instead of
+           reading as "nobody is hidden". -->
+      @if (auth.isEdition() && (ignored().length > 0 || ignoredError())) {
         <div class="mt-6 rounded-xl border border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container)] overflow-hidden">
           <button
             class="flex items-center w-full px-4 py-2 gap-2 text-left hover:bg-[var(--mat-sys-surface-container-high)] transition-colors cursor-pointer"
@@ -412,7 +415,13 @@ export type NamingSort = 'faces' | 'recent';
             <mat-icon class="opacity-60">{{ ignoredExpanded() ? 'expand_more' : 'chevron_right' }}</mat-icon>
             <span class="font-medium flex-1" [matTooltip]="I18N.persons.ignored_help | translate">{{ I18N.persons.ignored_section | translate }} ({{ ignoredTotal() }})</span>
           </button>
-          @if (ignoredExpanded()) {
+          @if (ignored().length === 0 && ignoredError()) {
+            <div data-ignored-failed class="flex flex-col items-center py-16 text-[var(--mat-sys-on-surface-variant)]">
+              <mat-icon class="!text-5xl !w-12 !h-12 mb-4">person_off</mat-icon>
+              <p role="alert" class="m-0">{{ I18N.manage_persons.error_loading_persons | translate }}</p>
+              <button mat-button class="mt-2" (click)="loadIgnored()">{{ I18N.gallery.load_error.retry | translate }}</button>
+            </div>
+          } @else if (ignoredExpanded()) {
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 p-4">
               @for (p of ignored(); track p.id) {
                 <app-person-card
@@ -481,6 +490,12 @@ export type NamingSort = 'faces' | 'recent';
                       (hidden)="onHide($event)"
                     />
                   }
+                </div>
+              } @else if (needsNamingError()) {
+                <div data-needs-naming-failed class="flex flex-col items-center py-16 text-[var(--mat-sys-on-surface-variant)]">
+                  <mat-icon class="!text-5xl !w-12 !h-12 mb-4">how_to_reg</mat-icon>
+                  <p role="alert" class="m-0">{{ I18N.manage_persons.error_loading_persons | translate }}</p>
+                  <button mat-button class="mt-2" [disabled]="needsNamingLoading()" (click)="loadNeedsNaming()">{{ I18N.gallery.load_error.retry | translate }}</button>
                 </div>
               } @else {
                 <div data-needs-naming-empty class="text-center py-16 text-[var(--mat-sys-on-surface-variant)] max-w-md mx-auto">
@@ -564,12 +579,12 @@ export class ManagePersonsComponent implements OnInit {
 
   protected reviewUpdatedFaces(): void {
     if (!this.auth.isEdition() || this.router.currentNavigation()) return;
-    const owner = this.auth.identity(), token = this.auth.token, focused = document.activeElement;
+    const sameSession = captureSession(this.auth), focused = document.activeElement;
     if (this.tab() === 'matches') this.reviewQueue()?.reload();
     void this.selectTab('matches').then(completed => {
       if (!completed || this.destroyRef.destroyed) return;
       afterNextRender(() => {
-        if (!this.destroyRef.destroyed && owner === this.auth.identity() && token === this.auth.token && this.auth.isEdition()
+        if (!this.destroyRef.destroyed && sameSession() && this.auth.isEdition()
           && this.tab() === 'matches' && this.router.url.split('?')[0] === '/persons' && !this.router.currentNavigation()
           && (document.activeElement === focused || document.activeElement === document.body)) this.reviewQueue()?.focus();
       }, { injector: this.injector });
@@ -608,6 +623,10 @@ export class ManagePersonsComponent implements OnInit {
   readonly ignoredLoading = signal(false);
   /** A next page of the Ignored section failed; scrolling stops loading until Retry. */
   readonly ignoredError = signal(false);
+  readonly needsNamingError = signal(false);
+  readonly needsNamingLoading = signal(false);
+  /** A retry's slower response must not overwrite a newer retry's (double-click). */
+  private needsNamingGeneration = 0;
   readonly ignoredExpanded = signal(false);
   private readonly ignoredPerPage = 200;
 
@@ -733,8 +752,12 @@ export class ManagePersonsComponent implements OnInit {
       // ends the list instead of re-arming the scroll sentinel forever.
       this.ignoredTotal.set(append && !added.length ? this.ignored().length : res.total ?? page.length);
     } catch {
-      // A first page fails silently: the section just won't render.
-      if (append) this.ignoredError.set(true);
+      // A first-page failure must not leave nothing on screen either: the
+      // section renders an error with a Retry (mirroring Needs naming), and
+      // an appended page keeps its inline one. A failed refresh of a list
+      // already on screen keeps that list: its inline error reads "could not
+      // load more", and its Retry appends, so neither fits a refresh.
+      if (!this.destroyRef.destroyed && (append || !this.ignored().length)) this.ignoredError.set(true);
     } finally {
       this.ignoredLoading.set(false);
     }
@@ -742,13 +765,23 @@ export class ManagePersonsComponent implements OnInit {
 
   async loadNeedsNaming(): Promise<void> {
     if (!this.auth.isEdition()) return;
+    const generation = ++this.needsNamingGeneration;
+    this.needsNamingLoading.set(true);
     try {
       const res = await firstValueFrom(
         this.api.get<{ persons: Person[]; total: number }>('/persons/needs_naming'),
       );
+      if (generation !== this.needsNamingGeneration) return;
       this.needsNaming.set(res.persons ?? []);
+      this.needsNamingError.set(false);
     } catch {
-      // silent — the section just won't render
+      // A first-page failure must not read as "everyone is named": surface it
+      // with the section's Retry instead of silently not rendering. A stale
+      // retry's failure says nothing about the newest one.
+      if (generation !== this.needsNamingGeneration) return;
+      if (!this.destroyRef.destroyed) this.needsNamingError.set(true);
+    } finally {
+      if (generation === this.needsNamingGeneration) this.needsNamingLoading.set(false);
     }
   }
 
@@ -865,9 +898,8 @@ export class ManagePersonsComponent implements OnInit {
   async loadPersons(reset: boolean): Promise<void> {
     if (this.destroyRef.destroyed) return;
     const generation = ++this.personsLoadGeneration;
-    const owner = this.auth.identity(), token = this.auth.token;
-    const current = () => !this.destroyRef.destroyed && generation === this.personsLoadGeneration
-      && owner === this.auth.identity() && token === this.auth.token;
+    const sameSession = captureSession(this.auth);
+    const current = () => !this.destroyRef.destroyed && generation === this.personsLoadGeneration && sameSession();
     if (reset) {
       this.page = 1;
       this.persons.set([]);
@@ -898,6 +930,11 @@ export class ManagePersonsComponent implements OnInit {
       }
       this.total.set(res.total);
     } catch {
+      // A failed page must not be skipped forever: give the scroll another
+      // chance at the same page. loadPersons reports the failure itself and
+      // swallows the error, so the rollback has to live here — an outer
+      // .catch on this promise would never run.
+      if (current() && !reset) this.page--;
       if (current()) this.snackBar.open(this.i18n.t(I18N.persons.error_loading), '', { duration: 3000 });
     } finally {
       // An invalidated latest read still owns its spinner, but never a newer read's.
@@ -908,7 +945,9 @@ export class ManagePersonsComponent implements OnInit {
   onScrollReached(): void {
     if (this.hasMore() && !this.loading()) {
       this.page++;
-      this.loadPersons(false);
+      // The rollback lives in loadPersons' catch; the next scroll retries the
+      // same page.
+      void this.loadPersons(false);
     }
   }
 

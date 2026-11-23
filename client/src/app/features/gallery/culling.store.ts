@@ -630,7 +630,7 @@ export class CullingStore {
   });
   /** The scope as a whole (album, scene, else the date range): names the highlights album. */
   readonly scopeLabel = computed(() =>
-    this.albumScopeLabel() ?? (this.dateRangeActive() ? new CullDateRangePipe().transform(this.scopeFrom(), this.scopeTo()) : null));
+    this.albumScopeLabel() ?? (this.dateRangeActive() ? new CullDateRangePipe().transform(this.scopeFrom(), this.scopeTo(), this.i18n.locale()) : null));
 
   /** The darkroom lightbox's current photo, mirrored by the component for `ui_get_context`; null when no lightbox is open. */
 
@@ -1688,6 +1688,10 @@ export class CullingStore {
         for (const photo of response.photos) fresh.set(photo.path, photo);
       }
     } catch {
+      // One transient failure must not wedge the chain (the next batch still
+      // lands), but it cannot be silent either: the user keeps making
+      // decisions on rows an assistant write may have changed.
+      this.notice$.next({ key: 'culling.error_external_changes', duration: 4000 });
       return;
     }
     if (gen !== this.loadGenerationId) return;

@@ -30,7 +30,8 @@ FACET_E2E_PYTHON=../venv/bin/python npm run e2e
    it (`seed_library.py reset <folder>`), so the flows run in any order and survive `--repeat-each`.
    A photo a flow deletes goes to `e2e/.work/xdg-data/Trash`, never to your own Trash.
 3. `fixtures.ts` fails a flow on any page error, `console.error` or 4xx/5xx response, even when the
-   assertions pass (the 4xx/5xx half is the kit's `attachNetworkGate`, which names the URL).
+   assertions pass (the 4xx/5xx half is the kit's `attachNetworkGate`, which names the URL; a flow that
+   provokes a 4xx on purpose declares it with `expectFailedLoad`).
 4. Each flow calls `expectCleanUI` at its key states (see Helpers). After the run,
    `test-results/human-review.html` lists the (at most 3) screens a person has to judge.
 
@@ -60,11 +61,47 @@ FACET_E2E_PYTHON=../venv/bin/python npm run e2e
 | `03-reused-name-new-picture` | An edit imported under a deleted edit's name shows the new picture, not the cached thumbnail (fails without `apply_ai_edit_captions`' fresh `preview_revision`) |
 | `04-delete-burst-lead` | Deleting the AI edit that leads its burst keeps the burst in the gallery (fails without `_reassign_dead_burst_leads`) |
 | `05-album-switch` | Opening an album on a slow network (its config and album reads held 1.5 s each) never shows a card of the view shown before it, the plain gallery or another album (fails without the clear at the start of `GalleryComponent`'s fresh visit) |
+| `05-route-smoke` | Each top-level page (`/albums`, `/capsules`, `/compare`, `/culling`, `/folders`, `/junk`, `/map`, `/persons`, `/scenes`, `/stats`, `/timeline`) loads on its own URL with no page error, console error or 5xx |
 | `06-app-update` | A new app build is applied by itself; it waits behind the banner while a field has focus or holds unused text, and while an add-on panel is open (focus inside its frame), and lands once they are left. Build 2..5 are the served shell re-marked, with its hash updated in `ngsw.json` |
+| `06-photo-page` | A double click on a gallery card opens that photo's page; the Quality panel carries the seeded score, the Histogram tab swaps the panel, and Back returns to the gallery |
+| `07-album-lifecycle` | An album made through the API lists on `/albums`, opens to its photo, and leaves `/albums` once deleted while its photo stays in the library |
 | `07-layout-geometry` | Measured geometry, not classes: with Showing open (1280, 1600 px) the grid and the panel's list are the only scrollers (B44), also on the photo page; the floating hover card is at most 640 px, its tags and people each one line ending in `+N`, and no line (capture line, caption, tags, people) is wider than its picture (U5, B38/B43). Then the probe's page-wide checks on the album and the photo page at 1180x880, 1480x1100, 2950x1100, 390x844 and dark at 1480 and 390; content widths are recorded as `content-width` annotations, not asserted |
+| `08-edition-gate` | Without the edition password a delete and an album create are refused, a wrong password is refused, and no photo is deleted |
 | `08-showing-tab` | The rail's Showing panel names the album; Set -> lunch narrows the grid to its 3 photos and shows the chip; another album, entered inside the app, has no chip and Showing names it (U7, I8) |
+| `09-gallery-sort-filter` | The gallery orders by score, flips on Ascending, and narrows by camera and by a minimum score; removing the chip restores the folder |
 | `09-tag-kinds` | The photo page's Content panel lists Tags, People tags, Object tags (folded), Album tags (folded, last), in that order; album and object tags never sit among Tags; the hover card shows tags, people and object tags one line each and no album tags (U4, U6) |
+| `10-gallery-search` | A caption word narrows the grid to its photo, survives a reload, and clearing it restores the folder |
 | `10-narrow` | At 1024 (the rail), 1023 and 390 px: no gallery rail below lg, Filters opens and closes as a drawer, the photo page tabs are a column from lg and a row below, Content keeps its order, no sideways scroll (U13, I3). lg is Tailwind's 1024 px, so 1023 is the last width without the rail |
+| `11-gallery-select-and-rate` | Review > Favorite and Review > Rate 4 in the selection bar apply to both selected photos; the favourites filter and the photo page read them back |
+| `12-culling-confirm` | `/culling` proposes a keeper per burst; flipping a frame to kept and confirming rejects only the frame left out, and the gallery hides it |
+| `13-login-ui` | The Edition dialog refuses a wrong password in place and unlocks with the right one; unlocked state survives a reload |
+| `14-photo-page-review` | Rating, Favorite and Keep set on the photo page are read back after a reload |
+| `15-photo-compare` | Two selected photos open the compare workspace (Reference / Candidate), the candidate can be promoted, and the page redirects without a selection |
+| `16-timeline-and-folders` | The timeline month counts the day's photos and links to them; the Folders page filters the gallery to the clicked folder |
+| `17-photo-page-metadata` | A caption, a manual tag and a one-hour capture-date shift made on the photo page are still shown after a reload |
+| `18-add-to-new-album` | Add to Album > New Album from the selection bar creates the album with the selected photo only; deleting the album keeps the photo |
+| `19-delete-selection` | Delete… in the selection bar: Cancel keeps both photos, confirming removes only the selected one |
+| `20-persons` | The seeded person is listed, an in-place rename survives a reload, and View photos opens the gallery on that person's two photos |
+| `21-map` | The two GPS photos give two single-photo markers (the third has no GPS); a marker opens a popup that closes |
+| `22-shared-album` | A shared album opens by its link with no login, a wrong token is refused, and unsharing kills the old link |
+| `23-scan-launcher` | The scan launcher (behind `features.show_scan_button`) offers the library folder, already chosen; no scan is started |
+| `24-customize-shortcuts` | Rebinding Toggle favorite to G survives a reload; Reset all restores F |
+| `25-connect-assistant` | A named assistant token is created (its prompt shown once), listed under Manage tokens and revoked |
+| `26-download-selection` | Download saves each selected original; Copy filenames puts their names on the clipboard |
+| `27-display-settings` | The Fast scrolling switch in Display persists across a reload |
+| `28-portfolio-export` | Export portfolio waits for a target folder (allow-listed in the seed config) and writes the album's static site there |
+| `29-capsules-date-range` | Setting and clearing the last date filter reloads the capsule grid with page 1 and no stale date parameter |
+
+Not covered yet: merge suggestions and the other persons tabs (the unnamed seed cluster does not reach "Needs naming"),
+starting a scan (it would run the scoring models), the library export, and settings beyond the Display switches.
+
+The edition login route allows 5 attempts a minute per address, so flows reuse one token (`editionToken` caches it,
+`unlockEdition` hands it to the page) and only `13-login-ui` and `08-edition-gate` type or send a password. A flow that
+provokes a 4xx on purpose declares it with `expectFailedLoad`.
+
+CI runs the suite as the `Browser flows (Playwright)` job: the CI Python dependencies (no torch), the production build
+and Playwright's own Chromium (`FACET_E2E_CHANNEL=chromium`). It is not a required check; a failed run uploads
+`client/test-results` and `client/playwright-report` as the `e2e-failures` artifact.
 
 ## Helpers (`helpers/`)
 

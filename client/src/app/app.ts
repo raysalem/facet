@@ -2,6 +2,7 @@ import { pathOf } from './shared/utils/url-path';
 import { Component, inject, computed, signal, effect, untracked, OnInit, ChangeDetectionStrategy, DestroyRef, ElementRef, viewChild, afterRenderEffect } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpContext } from '@angular/common/http';
 import { Router, RouterOutlet, RouterLink, NavigationEnd } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map, firstValueFrom } from 'rxjs';
@@ -32,6 +33,7 @@ import { AppUpdateService } from './core/services/app-update.service';
 import { ThemeService } from './core/services/theme.service';
 import { PageHelpService } from './core/services/page-help.service';
 import { HeaderSlotService } from './core/services/header-slot.service';
+import { GeoPhotosService } from './core/services/geo-photos.service';
 import { GalleryStore } from './features/gallery/gallery.store';
 import { AlbumsFiltersService } from './features/albums/albums-filters.service';
 import { PersonsFiltersService } from './features/persons/persons-filters.service';
@@ -52,6 +54,7 @@ import { Photo, normalisePhotoFlagsAll } from './shared/models/photo.model';
 import { DateRangeFilterComponent } from './shared/components/date-range-filter/date-range-filter.component';
 import { I18N, i18nKeys } from './core/i18n/keys';
 import { I18nTitleStrategy } from './core/i18n-title.strategy';
+import { HANDLE_SERVER_ERROR_LOCALLY } from './core/utils/http-error-context';
 import { MOBILE_BAR_BUTTON, MOBILE_BAR_ROW } from './shared/utils/mobile-bar';
 
 /** When the "a newer Facet is out" notice was last shown, so it stays weekly. */
@@ -166,6 +169,7 @@ export class App implements OnInit {
   private readonly addonImports = inject(AddonImportNotifier);
   private readonly api = inject(ApiService);
   protected readonly auth = inject(AuthService);
+  private readonly geoPhotos = inject(GeoPhotosService);
   protected readonly i18n = inject(I18nService);
   protected readonly themeService = inject(ThemeService);
   protected readonly pageHelp = inject(PageHelpService);
@@ -206,7 +210,11 @@ export class App implements OnInit {
     if (!config?.version) return;
     const label = this.i18n.t(I18N.ui.version, { version: config.version });
     const text = config.build ? `${label} (${config.build})` : label;
-    if (await copyText(text)) this.snackBar.open(this.i18n.t(I18N.notifications.copied), '', { duration: 2000 });
+    if (await copyText(text)) {
+      this.snackBar.open(this.i18n.t(I18N.notifications.copied), '', { duration: 2000 });
+    } else {
+      this.snackBar.open(this.i18n.t(I18N.ui.copy_failed), '', { duration: 3000 });
+    }
   }
   private helpSections(): ShortcutSection[] {
     const url = this.url();
@@ -234,7 +242,7 @@ export class App implements OnInit {
       { path: '/timeline', icon: 'view_timeline', label: I18N.nav.timeline, tooltipKey: I18N.nav.tooltips.timeline, visible: features?.show_timeline },
       { path: '/folders', icon: 'folder', label: I18N.nav.folders, tooltipKey: I18N.nav.tooltips.folders, visible: features?.show_folders },
       { path: '/persons', icon: 'people', label: I18N.nav.persons, tooltipKey: I18N.nav.tooltips.persons, visible: true },
-      { path: '/map', icon: 'map', label: I18N.nav.map, tooltipKey: I18N.nav.tooltips.map, visible: features?.show_map && this.hasGeoPhotos() },
+      { path: '/map', icon: 'map', label: I18N.nav.map, tooltipKey: I18N.nav.tooltips.map, visible: features?.show_map && this.geoPhotos.available() },
       { path: '/culling', icon: 'burst_mode', label: I18N.nav.culling, tooltipKey: I18N.nav.tooltips.culling, visible: this.auth.isEdition() },
       { path: '/scenes', icon: 'movie_filter', label: I18N.nav.scenes, tooltipKey: I18N.nav.tooltips.scenes, visible: features?.show_scenes },
       { path: '/junk', icon: 'delete_sweep', label: I18N.nav.junk_sweep, tooltipKey: I18N.nav.tooltips.junk_sweep, visible: this.auth.isEdition() && features?.show_junk_sweep },
@@ -281,7 +289,6 @@ export class App implements OnInit {
   }
   protected readonly mobilePersonsSearchOpen = signal(false);
   protected readonly hasMemories = signal(false);
-  protected readonly hasGeoPhotos = signal(false);
 
   // "On This Day" diaporama (fullscreen slideshow over the shell).
   protected readonly memoriesActive = signal(false);
@@ -483,18 +490,12 @@ export class App implements OnInit {
       );
       promises.push(
         firstValueFrom(
-          this.api.get<{ has_memories: boolean }>('/memories/check'),
+          this.api.get<{ has_memories: boolean }>('/memories/check', undefined, new HttpContext().set(HANDLE_SERVER_ERROR_LOCALLY, true)),
         ).then(data => {
           this.hasMemories.set(data.has_memories);
         }).catch(() => { /* Non-critical */ }),
       );
-      promises.push(
-        firstValueFrom(
-          this.api.get<{ count: number }>('/photos/map/count'),
-        ).then(data => {
-          this.hasGeoPhotos.set(data.count > 0);
-        }).catch(() => { /* Non-critical */ }),
-      );
+      promises.push(this.geoPhotos.refresh());
       await Promise.all(promises);
     } catch {
       // Auth check failed — guard will redirect if needed
@@ -516,6 +517,12 @@ export class App implements OnInit {
 
   protected async openScanLauncher(): Promise<void> {
     if (await this.scan.openLauncher()) {
+      const saved = this.scan.status().progress?.saved;
+      if (typeof saved === 'number') {
+        const added = saved === 1 ? I18N.scan.added : I18N.scan.added_plural;
+        this.snackBar.open(saved > 0 ? this.i18n.t(added, { count: saved }) : this.i18n.t(I18N.scan.none_new),
+          '', { duration: 5000 });
+      }
       await this.store.loadTypeCounts();
       await this.store.reloadPhotos();
     }

@@ -733,6 +733,7 @@
             "properties": {
               "album_id": {
                 "description": "Gallery filter `album_id`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -743,6 +744,7 @@
               },
               "blinks_only": {
                 "description": "Gallery filter `blinks_only`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -753,6 +755,7 @@
               },
               "camera": {
                 "description": "Gallery filter `camera`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -763,6 +766,7 @@
               },
               "category": {
                 "description": "Gallery filter `category`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -773,6 +777,7 @@
               },
               "color_temp": {
                 "description": "Gallery filter `color_temp`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -783,6 +788,7 @@
               },
               "composition_pattern": {
                 "description": "Gallery filter `composition_pattern`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -793,6 +799,7 @@
               },
               "date_from": {
                 "description": "Gallery filter `date_from`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -803,6 +810,7 @@
               },
               "date_to": {
                 "description": "Gallery filter `date_to`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -813,6 +821,7 @@
               },
               "duplicates_only": {
                 "description": "Gallery filter `duplicates_only`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -823,6 +832,7 @@
               },
               "faces_need_names": {
                 "description": "Gallery filter `faces_need_names`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -833,6 +843,7 @@
               },
               "favorites_only": {
                 "description": "Gallery filter `favorites_only`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -843,6 +854,7 @@
               },
               "gps_lat": {
                 "description": "Gallery filter `gps_lat`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -853,6 +865,7 @@
               },
               "gps_lng": {
                 "description": "Gallery filter `gps_lng`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -863,6 +876,7 @@
               },
               "gps_radius_km": {
                 "description": "Gallery filter `gps_radius_km`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -873,6 +887,7 @@
               },
               "hide_blinks": {
                 "description": "Gallery filter `hide_blinks`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -883,6 +898,7 @@
               },
               "hide_brackets": {
                 "description": "Gallery filter `hide_brackets`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -893,6 +909,7 @@
               },
               "hide_bursts": {
                 "description": "Gallery filter `hide_bursts`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -903,6 +920,7 @@
               },
               "hide_duplicates": {
                 "description": "Gallery filter `hide_duplicates`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -913,6 +931,7 @@
               },
               "hide_panoramas": {
                 "description": "Gallery filter `hide_panoramas`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -923,6 +942,7 @@
               },
               "hide_rejected": {
                 "description": "Gallery filter `hide_rejected`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -933,6 +953,7 @@
               },
               "is_monochrome": {
                 "description": "Gallery filter `is_monochrome`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -951,6 +972,7 @@
               },
               "lens": {
                 "description": "Gallery filter `lens`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -961,6 +983,7 @@
               },
               "manual_faces_need_review": {
                 "description": "Gallery filter `manual_faces_need_review`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -971,6 +994,7 @@
               },
               "max_aesthetic": {
                 "description": "Gallery filter `max_aesthetic`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -981,6 +1005,7 @@
               },
               "max_aesthetic_iaa": {
                 "description": "Gallery filter `max_aesthetic_iaa`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -991,6 +1016,7 @@
               },
               "max_aperture": {
                 "description": "Gallery filter `max_aperture`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1001,6 +1027,7 @@
               },
               "max_bg_separation": {
                 "description": "Gallery filter `max_bg_separation`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1011,6 +1038,7 @@
               },
               "max_color": {
                 "description": "Gallery filter `max_color`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1021,6 +1049,7 @@
               },
               "max_composition": {
                 "description": "Gallery filter `max_composition`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1031,6 +1060,7 @@
               },
               "max_contrast": {
                 "description": "Gallery filter `max_contrast`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1041,6 +1071,7 @@
               },
               "max_dynamic_range": {
                 "description": "Gallery filter `max_dynamic_range`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1051,6 +1082,7 @@
               },
               "max_exposure": {
                 "description": "Gallery filter `max_exposure`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1061,6 +1093,7 @@
               },
               "max_eye_sharpness": {
                 "description": "Gallery filter `max_eye_sharpness`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1071,6 +1104,7 @@
               },
               "max_face_confidence": {
                 "description": "Gallery filter `max_face_confidence`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1081,6 +1115,7 @@
               },
               "max_face_count": {
                 "description": "Gallery filter `max_face_count`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1091,6 +1126,7 @@
               },
               "max_face_quality": {
                 "description": "Gallery filter `max_face_quality`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1101,6 +1137,7 @@
               },
               "max_face_quality_iqa": {
                 "description": "Gallery filter `max_face_quality_iqa`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1111,6 +1148,7 @@
               },
               "max_face_ratio": {
                 "description": "Gallery filter `max_face_ratio`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1121,6 +1159,7 @@
               },
               "max_face_sharpness": {
                 "description": "Gallery filter `max_face_sharpness`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1131,6 +1170,7 @@
               },
               "max_focal_length": {
                 "description": "Gallery filter `max_focal_length`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1141,6 +1181,7 @@
               },
               "max_iso": {
                 "description": "Gallery filter `max_iso`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1151,6 +1192,7 @@
               },
               "max_isolation": {
                 "description": "Gallery filter `max_isolation`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1161,6 +1203,7 @@
               },
               "max_liqe": {
                 "description": "Gallery filter `max_liqe`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1171,6 +1214,7 @@
               },
               "max_luminance": {
                 "description": "Gallery filter `max_luminance`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1181,6 +1225,7 @@
               },
               "max_noise": {
                 "description": "Gallery filter `max_noise`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1191,6 +1236,7 @@
               },
               "max_saturation": {
                 "description": "Gallery filter `max_saturation`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1201,6 +1247,7 @@
               },
               "max_score": {
                 "description": "Gallery filter `max_score`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1211,6 +1258,7 @@
               },
               "max_sharpness": {
                 "description": "Gallery filter `max_sharpness`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1221,6 +1269,7 @@
               },
               "max_star_rating": {
                 "description": "Gallery filter `max_star_rating`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1231,6 +1280,7 @@
               },
               "max_subject_prominence": {
                 "description": "Gallery filter `max_subject_prominence`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1241,6 +1291,7 @@
               },
               "max_subject_sharpness": {
                 "description": "Gallery filter `max_subject_sharpness`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1251,6 +1302,7 @@
               },
               "max_topiq": {
                 "description": "Gallery filter `max_topiq`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1261,6 +1313,7 @@
               },
               "min_aesthetic": {
                 "description": "Gallery filter `min_aesthetic`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1271,6 +1324,7 @@
               },
               "min_aesthetic_iaa": {
                 "description": "Gallery filter `min_aesthetic_iaa`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1281,6 +1335,7 @@
               },
               "min_aperture": {
                 "description": "Gallery filter `min_aperture`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1291,6 +1346,7 @@
               },
               "min_bg_separation": {
                 "description": "Gallery filter `min_bg_separation`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1301,6 +1357,7 @@
               },
               "min_color": {
                 "description": "Gallery filter `min_color`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1311,6 +1368,7 @@
               },
               "min_composition": {
                 "description": "Gallery filter `min_composition`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1321,6 +1379,7 @@
               },
               "min_contrast": {
                 "description": "Gallery filter `min_contrast`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1331,6 +1390,7 @@
               },
               "min_dynamic_range": {
                 "description": "Gallery filter `min_dynamic_range`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1341,6 +1401,7 @@
               },
               "min_exposure": {
                 "description": "Gallery filter `min_exposure`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1351,6 +1412,7 @@
               },
               "min_eye_sharpness": {
                 "description": "Gallery filter `min_eye_sharpness`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1361,6 +1423,7 @@
               },
               "min_face_confidence": {
                 "description": "Gallery filter `min_face_confidence`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1371,6 +1434,7 @@
               },
               "min_face_count": {
                 "description": "Gallery filter `min_face_count`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1381,6 +1445,7 @@
               },
               "min_face_quality": {
                 "description": "Gallery filter `min_face_quality`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1391,6 +1456,7 @@
               },
               "min_face_quality_iqa": {
                 "description": "Gallery filter `min_face_quality_iqa`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1401,6 +1467,7 @@
               },
               "min_face_ratio": {
                 "description": "Gallery filter `min_face_ratio`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1411,6 +1478,7 @@
               },
               "min_face_sharpness": {
                 "description": "Gallery filter `min_face_sharpness`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1421,6 +1489,7 @@
               },
               "min_focal_length": {
                 "description": "Gallery filter `min_focal_length`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1431,6 +1500,7 @@
               },
               "min_iso": {
                 "description": "Gallery filter `min_iso`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1441,6 +1511,7 @@
               },
               "min_isolation": {
                 "description": "Gallery filter `min_isolation`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1451,6 +1522,7 @@
               },
               "min_liqe": {
                 "description": "Gallery filter `min_liqe`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1461,6 +1533,7 @@
               },
               "min_luminance": {
                 "description": "Gallery filter `min_luminance`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1471,6 +1544,7 @@
               },
               "min_noise": {
                 "description": "Gallery filter `min_noise`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1481,6 +1555,7 @@
               },
               "min_saturation": {
                 "description": "Gallery filter `min_saturation`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1491,6 +1566,7 @@
               },
               "min_score": {
                 "description": "Gallery filter `min_score`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1501,6 +1577,7 @@
               },
               "min_sharpness": {
                 "description": "Gallery filter `min_sharpness`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1518,6 +1595,7 @@
               },
               "min_star_rating": {
                 "description": "Gallery filter `min_star_rating`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1528,6 +1606,7 @@
               },
               "min_subject_prominence": {
                 "description": "Gallery filter `min_subject_prominence`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1538,6 +1617,7 @@
               },
               "min_subject_sharpness": {
                 "description": "Gallery filter `min_subject_sharpness`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1548,6 +1628,7 @@
               },
               "min_topiq": {
                 "description": "Gallery filter `min_topiq`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1558,6 +1639,7 @@
               },
               "no_capture_date": {
                 "description": "Gallery filter `no_capture_date`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1568,6 +1650,7 @@
               },
               "no_gps": {
                 "description": "Gallery filter `no_gps`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1578,6 +1661,7 @@
               },
               "path_prefix": {
                 "description": "Gallery filter `path_prefix`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1588,6 +1672,7 @@
               },
               "person": {
                 "description": "Gallery filter `person`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1610,6 +1695,7 @@
               },
               "quality_tier": {
                 "description": "Gallery filter `quality_tier`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1642,6 +1728,7 @@
               },
               "search": {
                 "description": "Gallery filter `search`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1666,6 +1753,7 @@
               },
               "show_rejected": {
                 "description": "Gallery filter `show_rejected`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1712,6 +1800,7 @@
                   "learned_score",
                   "star_rating",
                   "filename",
+                  "date_added",
                   null
                 ],
                 "type": [
@@ -1733,6 +1822,7 @@
               },
               "tag": {
                 "description": "Gallery filter `tag`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1751,6 +1841,7 @@
               },
               "type": {
                 "description": "Gallery filter `type`.",
+                "maxLength": 4096,
                 "type": [
                   "string",
                   "integer",
@@ -1927,6 +2018,8 @@
           "paths": {
             "description": "Photo paths to select. Exactly one of `paths` and `select_view`.",
             "items": {
+              "maxLength": 4096,
+              "minLength": 1,
               "type": "string"
             },
             "maxItems": 1000,
@@ -2270,5 +2363,5 @@
       "name": "ui_show_comparison"
     }
   ],
-  "version": "e7d6bbe8ae66aa9b"
+  "version": "d7056c1a92142bbf"
 }

@@ -33,9 +33,11 @@
 
 **`--resume`** 还能恢复因崩溃、内存耗尽或断电而被终止的扫描：即状态仍为 `running`、且心跳早于 `processing.scan_stale_seconds`（默认 120）的运行。它沿用该次运行的目录。配合 `--force` 时，会跳过自该次运行开始后已重新评分的文件。若另一次扫描看起来仍在运行，则拒绝启动。
 
+**供监控程序使用的退出码。** `0` 表示扫描已运行（或没有发现新内容）；`4` 表示有照片需要处理但一张也没有保存；`5` 表示它根本没有看到照片库——每个扫描根目录都缺失或无法读取（例如失效的网络挂载），因此定时扫描会明确失败，而不是报告“没有新文件”；`1` 也涵盖打分线程（scoring worker）中途崩溃——它未处理到的照片已记入扫描失败，用 `--retry-failed` 即可补完；`75` 表示照片库锁被另一个任务持有。`--watch` 既不把 `4` 视为成功，也不视为失败，除 `75` 外的其他所有非零退出码都会计入其连续失败后放弃的次数。 由文件变更触发的扫描若超过宽限的 6 小时超时，会被终止并计为一次失败，挂死的子进程不会让 watch 永远不放弃；初始扫描不受此限，因为首次监视大型图库（或初始 `--force`）本就可能耗时更久。`--watch` 会把 `--force-since`、`--single-pass` 和 `--pass` 转发给它启动的每一次扫描，而 `--force` 只转发给初始扫描（对每次由变更触发的扫描都强制执行，会每次都重新评分整个照片库）；一次性的工作清单 `--retry-failed` 和 `--retry-plan` 与 `--watch` 一起使用时会被拒绝，并且 `--watch` 还至少需要一个要监视的路径。 路径解析或权限错误只会将受影响的根目录标记为不可用。watch 的初次扫描遇到照片库忙锁时，会在 debounce 间隔后重试，无需等待文件事件，并保留包括 `--force` 在内的初始参数；后续文件事件触发的扫描仍为增量扫描。
+
 ### 扫描记录
 
-Facet 会记录每次扫描（状态、模式、目录、计数器）以及每个文件的错误。Ctrl+C 会把该次运行标记为 `interrupted`，以便 `--resume` 接续。被中断的扫描以退出码 130 结束。失败的文件会被列出，且只有 `--retry-failed` 才会重试。查看器根据命令行的 `@FACET_PROGRESS` 行显示扫描进度。若一次扫描没有保存任何照片，则以退出码 4 结束（所有文件均失败，例如必需的模型未能加载）；无事可做的扫描以 0 结束，`--watch` 在退出码 4 之后仍会继续监视。若另一个任务持有照片库锁，扫描会被跳过并以退出码 75 结束；`--watch` 不将其计为失败，并在下一个静默期后重试该批文件。连续 3 次扫描失败（含初始扫描）后，`--watch` 停止并以退出码 1 结束。
+Facet 会记录每次扫描（状态、模式、目录、计数器）以及每个文件的错误。Ctrl+C 会把该次运行标记为 `interrupted`，以便 `--resume` 接续。被中断的扫描以退出码 130 结束。失败的文件会被列出，且只有 `--retry-failed` 才会重试。查看器根据命令行的 `@FACET_PROGRESS` 行显示扫描进度。若一次扫描没有保存任何照片，则以退出码 4 结束（所有文件均失败，例如必需的模型未能加载）；无事可做的扫描以 0 结束，除非每个扫描根目录都缺失或无法读取（退出码 5，见上文），`--watch` 在退出码 4 之后仍会继续监视。若另一个任务持有照片库锁，扫描会被跳过并以退出码 75 结束；`--watch` 不将其计为失败，并在下一个静默期后重试该批文件。连续 3 次扫描失败（含初始扫描）后，`--watch` 停止并以退出码 1 结束。
 
 ### 处理模式
 
@@ -173,7 +175,7 @@ Facet 会记录每次扫描（状态、模式、目录、计数器）以及每�
 | `python facet.py --discover-moments` | 根据你的照片描述提出一份时刻词表，写入 `scoring_config.discovered.json` |
 | `python facet.py --detect-junk` | 标出截图、文档、收据、表情包和幻灯片（每次扫描后运行） |
 | `python facet.py --recompute-junk` | 为整个照片库重新评估 `junk_kind` |
-| `python facet.py --recompute-saliency` | `[GPU]` 从已存储的缩略图重新计算主体显著性；`--force` 全部重做 |
+| `python facet.py --recompute-saliency [路径]` | `[GPU]` 从已存储的缩略图重新计算主体显著性；`--force` 全部重做。给出路径（文件或文件夹）时，只重算存放在这些路径下的照片 |
 | `python facet.py --recompute-composition-cpu` | 用基于规则的方法重新计算构图（CPU，任意档位） |
 | `python facet.py --recompute-composition-gpu` | `[GPU]` 用 SAMP-Net 重新计算构图 |
 | `python facet.py --recompute-iqa` | `[GPU]` 从已存储的缩略图补齐缺失的 TOPIQ IAA、NR-Face 和 LIQE 评分。所有档位都可运行；在 CPU 上（`legacy`）慢得多。按批次流式处理，因此在大型图库上内存保持平稳；可安全中断并重新运行。 |
@@ -198,6 +200,7 @@ Facet 会记录每次扫描（状态、模式、目录、计数器）以及每�
 | `python facet.py --rescan-gps` | 为全部照片重新提取 EXIF GPS（覆盖）；跳过在查看器中设置过的位置 |
 | `python facet.py --recompute-embeddings` | 为全部照片重新计算 CLIP/SigLIP 特征向量（更换模型后必须执行） |
 | `python facet.py --score-topiq` | `[GPU]` 对每张带缩略图的照片重新计算 `topiq_score`（覆盖） |
+| `python facet.py --backfill-exif-meta` | 用 exiftool 为文件大小仍为空的照片重新读取文件大小、曝光补偿、闪光灯、白平衡、测光模式、作者和版权，不重新评分。需要 exiftool；可续跑（每 500 张照片提交一次）；exiftool 无法读取的文件保持为空并被计数（参见 `python database.py --cleanup-missing-photos`） |
 | `python facet.py --backfill-focal-35mm` | 为缺少等效 35mm 焦距的照片从 EXIF 回填该值 |
 | `python facet.py --backfill-clipping` | 从已存储的直方图推导各通道的溢出百分比（可续跑） |
 | `python facet.py --recompute-silhouette` | 用基于人脸的规则重新推导 `is_silhouette`（见说明） |
@@ -208,7 +211,7 @@ Facet 会记录每次扫描（状态、模式、目录、计数器）以及每�
 | `python facet.py --compute-recommendations --apply-recommendations` | 自动应用评分修正 |
 | `python facet.py --compute-recommendations --simulate` | 预览预计产生的变化 |
 
-**`--dry-run`** 对以下改写数据库的命令没有预览，因此它们会以退出码 2 拒绝该选项，而不是照样写入：`--backfill-clipping`, `--backfill-focal-35mm`, `--cluster-faces-force`, `--generate-captions`, `--recompute-average`, `--recompute-colors`, `--recompute-distortions`, `--recompute-form`, `--recompute-skin-tone`, `--recompute-tags`, `--recompute-text`, `--repair-int-columns`, `--repair-neutral-iqa`, `--upgrade-db`。
+**`--dry-run`** 对以下改写数据库的命令没有预览，因此它们会以退出码 2 拒绝该选项，而不是照样写入：`--backfill-clipping`, `--backfill-exif-meta`, `--backfill-focal-35mm`, `--cluster-faces-force`, `--generate-captions`, `--recompute-average`, `--recompute-colors`, `--recompute-distortions`, `--recompute-form`, `--recompute-skin-tone`, `--recompute-tags`, `--recompute-text`, `--repair-int-columns`, `--repair-neutral-iqa`, `--upgrade-db`。
 
 **`--recompute-average`** 不保留快照：如需回退，请恢复某个权重快照并重新计算。从 1.20 或更早版本升级后，先运行 `--recompute-silhouette`，再把本命令运行两次。第一遍会存储新的百分位，所以第二遍仍会改动一些行。
 
@@ -488,7 +491,7 @@ python /opt/facet/viewer.py      # 仍然读取 /opt/facet/scoring_config.json�
 
 检查项：评分范围、人脸指标、BLOB 损坏、特征向量长度、孤立人脸、外键指向不存在行的记录、统计离群值。查看器数据库导出会拒绝含有此类记录的数据库。此检查逐行列出这些记录，不删除任何一行；只有孤立人脸（孤立人脸检查同样涵盖）会被 `--auto-fix` 删除。其中多数表保存评分、比较或相册，修正路径即可重新关联，删除则会丢失。
 
-交互式修复和 `--auto-fix` 都会获取照片库锁，并在写入前重新检查问题。交互模式会先等待你的初次确认，再获取锁。照片库被占用时以 75 退出；锁无法使用时以 1 退出。`--report-only` 和拒绝修复不需要修复锁。
+交互式修复和 `--auto-fix` 都会获取照片库锁，并在写入前重新检查问题。交互模式会先等待你的初次确认，再获取锁。照片库被占用时以 75 退出；锁无法使用时以 1 退出。`--report-only` 和拒绝修复不需要修复锁。否则，只有在没有发现需要处理的问题或所有问题都已修复时，`validate_db.py` 才以 0 退出；仍有问题需要人工处理（仅报告、拒绝或跳过修复、无法修复的问题）时以 3 退出；`--auto-fix` 修复失败时以 2 退出。 退出码 1 仍保留给运行时错误。 一批修复成功完成后，会在仍持有照片库锁的情况下重新校验。新的检查结果决定退出 0 或 3，包括修复后暴露的新问题，以及被其他修复一并消除的问题。
 
 ## 数据库维护
 
@@ -517,7 +520,7 @@ python /opt/facet/viewer.py      # 仍然读取 /opt/facet/scoring_config.json�
 | `python database.py --migrate-storage-db` | 把缩略图和特征向量从文件系统移回数据库 |
 | `python database.py --add-user alice --role admin` | 添加用户（会提示输入密码） |
 | `python database.py --add-user alice --role user --display-name "Alice"` | 添加带显示名称的用户 |
-| `python database.py --migrate-user-preferences --user alice` | 把评分从 photos 复制到 user_preferences |
+| `python database.py --migrate-user-preferences --user alice` | 把评分从 photos 复制到 user_preferences（`user_preferences` 表缺失时以 1 退出） |
 
 **`python database.py`** 还会构建缺失的图库索引（参见 [VIEWER.md](VIEWER.md#图库索引与计数缓存)）。在大型照片库上，请在启动查看器之前运行一次；可能需要约一分钟。否则查看器会在后台构建它们，并在此期间拒绝保存。
 

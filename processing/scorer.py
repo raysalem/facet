@@ -37,14 +37,24 @@ from db.schema import FACES_UPSERT_SQL, IQA_SCAN_FINGERPRINT_SQL, face_upsert_ro
 from db.scoring_overrides import get_photo_scoring_overrides
 from db.tags import sync_photo_tags
 from db.vec import sync_vec_batch
+from exiftool.exiftool_batch import EXIF_META_COLUMNS, clamp_exif_domains, clean_exif_text
 from processing.progress import emit_progress
 from utils.histogram import unpack_histogram
 from utils.image_bounds import LIQE_MIN_SHORT_SIDE, liqe_input_too_small
 from utils.selection import LEAD_SCORE_COLUMNS_SQL
 
 
+# A row that predates date_added inherits its old scanned_at: SET reads the stored row.
+DATE_ADDED_NOW_SQL = "strftime('%Y-%m-%dT%H:%M:%SZ', 'now')"
+DATE_ADDED_KEEP_SET = ("date_added=COALESCE(photos.date_added, "
+                       "replace(photos.scanned_at, ' ', 'T') || 'Z', excluded.date_added)")
+
+
 def _manual_override_set(c):
-    """``SET`` fragment for column ``c``: a hand-set GPS or capture date survives a rescan."""
+    """``SET`` fragment for column ``c``: a hand-set GPS or capture date survives a rescan,
+    and ``date_added`` is only ever filled."""
+    if c == 'date_added':
+        return DATE_ADDED_KEEP_SET
     if c in ('gps_latitude', 'gps_longitude'):
         return f"{c}=CASE WHEN photos.gps_manually_set=1 THEN photos.{c} ELSE excluded.{c} END"
     if c in ('date_taken', 'date_manually_set'):
@@ -82,6 +92,8 @@ _PARTIAL_CORE_COLUMNS = (
     'path', 'filename', 'image_width', 'image_height', 'date_taken',
     'camera_model', 'lens_model', 'iso', 'f_stop', 'shutter_speed',
     'focal_length', 'focal_length_35mm', 'gps_latitude', 'gps_longitude',
+    'file_size', 'exposure_compensation', 'flash', 'white_balance', 'metering_mode',
+    'artist', 'copyright',
     'phash', 'config_version', 'thumbnail',
 )
 
@@ -96,12 +108,13 @@ def _photos_partial_upsert(computed_columns):
     conflict update, so an existing row keeps everything the pass did not touch —
     no reset of ``scanned_at`` (``--force-since`` reads it), no thumbnail
     re-encode, no NULLing of another pass's data, and no stamp claiming a
-    thumbnail this pass never rebuilt.
+    thumbnail this pass never rebuilt. ``date_added`` is only ever filled, never
+    replaced (``DATE_ADDED_KEEP_SET``).
     """
     insert_cols = list(_PARTIAL_CORE_COLUMNS) + list(computed_columns)
-    placeholders = [f":{c}" for c in insert_cols] + ["datetime('now')", str(DISPLAY_RENDER_VERSION)]
-    all_cols = insert_cols + ['scanned_at', 'render_version']
-    updates = ', '.join(_manual_override_set(c) for c in computed_columns)
+    placeholders = [f":{c}" for c in insert_cols] + ["datetime('now')", str(DISPLAY_RENDER_VERSION), DATE_ADDED_NOW_SQL]
+    all_cols = insert_cols + ['scanned_at', 'render_version', 'date_added']
+    updates = ', '.join([*(_manual_override_set(c) for c in computed_columns), DATE_ADDED_KEEP_SET])
     return (
         f"INSERT INTO photos ({', '.join(all_cols)}) "
         f"VALUES ({', '.join(placeholders)}) "
@@ -130,6 +143,7 @@ from config.category_filter import _to_float, with_face_defaults
 logger = logging.getLogger("facet.scorer")
 
 # Import shared utilities (lightweight, no cv2/torch dependency)
+from utils.path_cache import cached_resolve
 from utils import (
     get_tag_params, detect_silhouette, tags_to_string,
     load_image_from_path, thumbnail_source,
@@ -297,10 +311,20 @@ def _apply_exif_rotation(img, orientation):
 
 _EXIF_NUMERIC_FIELDS = (
     'iso', 'f_stop', 'focal_length', 'focal_length_35mm',
-    'gps_latitude', 'gps_longitude',
+    'gps_latitude', 'gps_longitude', 'file_size', 'exposure_compensation',
+    'flash', 'white_balance', 'metering_mode',
 )
 
-_EXIF_INT_FIELDS = ('iso',)
+_EXIF_INT_FIELDS = ('iso', 'flash', 'white_balance', 'metering_mode', 'file_size')
+
+
+def _stat_size(image_path):
+    """File size in bytes for the exifread / Pillow fallbacks (exiftool reports its own)."""
+    try:
+        size = os.stat(image_path).st_size
+    except OSError:
+        return None
+    return size if size > 0 else None
 
 
 def _sanitize_exif_numeric(exif_data):
@@ -1758,7 +1782,7 @@ class Facet:
             # 6. Get EXIF data first so we can use it in scoring
             exif_data = self.get_exif_data(metadata_source)
 
-            resolved_path = str(Path(metadata_source).resolve())
+            resolved_path = cached_resolve(metadata_source)
             photo_override = get_photo_scoring_overrides(self.db_path, paths=[resolved_path]).get(resolved_path, {})
 
             # 7. Generate semantic tags from CLIP embedding
@@ -2796,7 +2820,9 @@ class Facet:
         exif_data = {
             'date_taken': None, 'camera_model': None, 'lens_model': None,
             'iso': None, 'f_stop': None, 'shutter_speed': None, 'focal_length': None,
-            'focal_length_35mm': None, 'gps_latitude': None, 'gps_longitude': None
+            'focal_length_35mm': None, 'gps_latitude': None, 'gps_longitude': None,
+            'file_size': None, 'exposure_compensation': None, 'flash': None,
+            'white_balance': None, 'metering_mode': None, 'artist': None, 'copyright': None,
         }
 
         # 1. Try persistent ExifTool (fastest - no subprocess spawn)
@@ -2817,18 +2843,8 @@ class Facet:
                 ['exiftool', '-j', '-n', str(image_path)],
                 capture_output=True, text=True, check=True, timeout=30
             )
-            data = json.loads(result.stdout)[0]
-            exif_data['date_taken'] = data.get('DateTimeOriginal') or data.get('CreateDate')
-            exif_data['camera_model'] = data.get('Model')
-            exif_data['lens_model'] = data.get('LensModel') or data.get('LensID')
-            exif_data['iso'] = data.get('ISO')
-            exif_data['f_stop'] = data.get('Aperture')
-            exposure = data.get('ExposureTime')
-            exif_data['shutter_speed'] = str(exposure) if exposure else None
-            exif_data['focal_length'] = data.get('FocalLength')
-            exif_data['focal_length_35mm'] = data.get('FocalLengthIn35mmFilm')
-            exif_data['gps_latitude'] = data.get('GPSLatitude')
-            exif_data['gps_longitude'] = data.get('GPSLongitude')
+            from exiftool import parse_exif_data
+            exif_data.update(parse_exif_data(json.loads(result.stdout)[0]))
 
             if exif_data['camera_model']:
                 return _sanitize_exif_numeric(exif_data)
@@ -2871,6 +2887,23 @@ class Facet:
                         exif_data['focal_length_35mm'] = float(tags['EXIF FocalLengthIn35mmFilm'].values[0])
                 except (ValueError, IndexError, ZeroDivisionError):
                     pass
+                try:
+                    if 'EXIF ExposureBiasValue' in tags:
+                        exif_data['exposure_compensation'] = float(tags['EXIF ExposureBiasValue'].values[0])
+                except (ValueError, IndexError, ZeroDivisionError):
+                    pass
+                for column, tag in (('flash', 'EXIF Flash'), ('white_balance', 'EXIF WhiteBalance'),
+                                    ('metering_mode', 'EXIF MeteringMode')):
+                    try:
+                        if tag in tags:
+                            exif_data[column] = int(tags[tag].values[0])
+                    except (ValueError, IndexError, TypeError):
+                        pass
+                for column, tag in (('artist', 'Image Artist'), ('copyright', 'Image Copyright')):
+                    if tag in tags:
+                        exif_data[column] = clean_exif_text(str(tags[tag]))
+                exif_data['file_size'] = _stat_size(image_path)
+                clamp_exif_domains(exif_data)
                 if exif_data['camera_model']:
                     return _sanitize_exif_numeric(exif_data)
         except Exception:
@@ -2904,8 +2937,21 @@ class Facet:
                         exif_data['focal_length'] = float(value)
                     elif decoded == 'FocalLengthIn35mmFilm':
                         exif_data['focal_length_35mm'] = float(value)
+                    elif decoded in ('ExposureBiasValue', 'Flash', 'WhiteBalance', 'MeteringMode'):
+                        # Guarded per field: a malformed value must not stop the loop
+                        # before the tags that follow it (focal length, lens).
+                        key, cast = {'ExposureBiasValue': ('exposure_compensation', float), 'Flash': ('flash', int),
+                                     'WhiteBalance': ('white_balance', int), 'MeteringMode': ('metering_mode', int)}[decoded]
+                        try:
+                            exif_data[key] = cast(value)
+                        except (TypeError, ValueError, ZeroDivisionError):
+                            pass
+                    elif decoded in ('Artist', 'Copyright'):
+                        exif_data[decoded.lower()] = clean_exif_text(str(value))
         except Exception as e:
             logger.warning("EXIF extraction failed for %s: %s", image_path, e)
+        exif_data['file_size'] = _stat_size(image_path)
+        clamp_exif_domains(exif_data)
         return _sanitize_exif_numeric(exif_data)
 
     def save_photos_batch(self, results):
@@ -2957,6 +3003,8 @@ class Facet:
                 res.setdefault('subject_bbox', None)
                 res.setdefault('channel_clip_shadow_pct', None)
                 res.setdefault('channel_clip_highlight_pct', None)
+                for exif_col in EXIF_META_COLUMNS:
+                    res.setdefault(exif_col, None)
                 for form_col in FORM_METRIC_COLUMNS:
                     res.setdefault(form_col, None)
                 conn.execute(_photos_upsert(f'''
@@ -2979,7 +3027,9 @@ class Facet:
                         qrealign_score, aesthetic_v25, deqa_score,
                         subject_sharpness, subject_prominence, subject_placement, bg_separation, subject_bbox,
                         form_symmetry, form_balance, form_edge_entropy, form_fractal, color_harmony,
-                        gps_latitude, gps_longitude, scanned_at, render_version
+                        gps_latitude, gps_longitude,
+                        file_size, exposure_compensation, flash, white_balance, metering_mode,
+                        artist, copyright, scanned_at, render_version, date_added
                     )
                     VALUES (
                         :path, :filename, :category, :image_width, :image_height,
@@ -3000,7 +3050,9 @@ class Facet:
                         :qrealign_score, :aesthetic_v25, :deqa_score,
                         :subject_sharpness, :subject_prominence, :subject_placement, :bg_separation, :subject_bbox,
                         :form_symmetry, :form_balance, :form_edge_entropy, :form_fractal, :color_harmony,
-                        :gps_latitude, :gps_longitude, datetime('now'), {DISPLAY_RENDER_VERSION}
+                        :gps_latitude, :gps_longitude,
+                        :file_size, :exposure_compensation, :flash, :white_balance, :metering_mode,
+                        :artist, :copyright, datetime('now'), {DISPLAY_RENDER_VERSION}, {DATE_ADDED_NOW_SQL}
                     )
                 '''), res)
                 # A full save replaces the observation even when two scans land
@@ -3091,7 +3143,9 @@ class Facet:
         with get_connection(self.db_path, row_factory=False) as conn:
             apply_review_states(conn, review_states)
             for res, _, computed_columns in batch:
-                conn.execute(_photos_partial_upsert(computed_columns), res)
+                # A caller that never read the file metadata binds NULL for it.
+                conn.execute(_photos_partial_upsert(computed_columns),
+                             {**dict.fromkeys(EXIF_META_COLUMNS), **res})
 
             if refresh_faces:
                 replace_photo_faces(
@@ -3224,12 +3278,17 @@ def process_bursts(db_path, config_path=None):
     similarity_percent = burst_config.get('similarity_threshold_percent', 88)
     time_window_minutes = burst_config.get('time_window_minutes', 60)
     rapid_burst_seconds = burst_config.get('rapid_burst_seconds', 5)
+    embedding_cosine_threshold = float(burst_config.get('embedding_cosine_threshold', 0.0) or 0.0)
 
     # Convert percentage to hamming distance (64-bit phash)
     # 100% = 0 distance, 0% = 64 distance
     max_hamming_distance = int(64 * (1 - similarity_percent / 100))
 
-    logger.info("Processing burst groups (rapid<=%ss, similarity>=%s%%, window=%smin)...", rapid_burst_seconds, similarity_percent, time_window_minutes)
+    logger.info(
+        "Processing burst groups (rapid<=%ss, similarity>=%s%%, window=%smin%s)...",
+        rapid_burst_seconds, similarity_percent, time_window_minutes,
+        f", cosine>={embedding_cosine_threshold:.2f}" if embedding_cosine_threshold > 0 else "",
+    )
 
     from utils.date_utils import parse_date
     from utils.selection import pick_lead
@@ -3273,6 +3332,20 @@ def process_bursts(db_path, config_path=None):
             for row in face_data:
                 photo_persons.setdefault(row['photo_path'], set()).add(row['person_id'])
 
+        # Load normalized embeddings only when an embedding cosine gate is configured.
+        # Streamed row by row: a fetchall would hold every raw BLOB next to its decoded
+        # vector, doubling the peak (about 4 * dim bytes per photo is the floor).
+        photo_embeddings = {}
+        if embedding_cosine_threshold > 0:
+            from utils.embedding import bytes_to_normalized_embedding
+            for er in conn.execute(
+                "SELECT path, clip_embedding FROM photos "
+                "WHERE phash IS NOT NULL AND clip_embedding IS NOT NULL"
+            ):
+                vec = bytes_to_normalized_embedding(er['clip_embedding'])
+                if vec is not None:
+                    photo_embeddings[er['path']] = vec
+
         def phash_distance(hash1, hash2):
             """Compute hamming distance between two hex phash strings."""
             if not hash1 or not hash2:
@@ -3288,6 +3361,16 @@ def process_bursts(db_path, config_path=None):
                 return True
             # Otherwise require at least one shared person
             return bool(persons1 & persons2)
+
+        def embedding_consistent(path1, path2):
+            """Require semantic similarity when both photos carry compatible embeddings."""
+            if embedding_cosine_threshold <= 0:
+                return True
+            e1 = photo_embeddings.get(path1)
+            e2 = photo_embeddings.get(path2)
+            if e1 is None or e2 is None or e1.shape != e2.shape:
+                return True
+            return float(np.dot(e1, e2)) >= embedding_cosine_threshold
 
         def is_similar_to_burst(photo, burst, threshold, time_limit, rapid_seconds):
             """Check if photo belongs to burst - rapid shots require face consistency."""
@@ -3307,12 +3390,14 @@ def process_bursts(db_path, config_path=None):
                 if time_diff <= rapid_seconds:
                     if shares_person(photo['path'], b['path']):
                         if phash_distance(photo['phash'], b['phash']) <= threshold * 2:
-                            return True
+                            if embedding_consistent(photo['path'], b['path']):
+                                return True
 
                 # Slow burst: within time window AND visually similar
                 if time_diff <= time_limit * 60:
                     if phash_distance(photo['phash'], b['phash']) <= threshold:
-                        return True
+                        if embedding_consistent(photo['path'], b['path']):
+                            return True
 
             return False
 

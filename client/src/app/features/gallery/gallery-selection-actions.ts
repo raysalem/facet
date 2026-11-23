@@ -6,6 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import { AlbumService, Album } from '../../core/services/album.service';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
+import { DownloadProgressService } from '../../core/services/download-progress.service';
 import { I18nService } from '../../core/services/i18n.service';
 import { MAX_REFRESH_PATHS, PhotoActionsService } from '../../core/services/photo-actions.service';
 import { SequenceOverrideService, SequenceKind } from '../../core/services/sequence-override.service';
@@ -17,7 +18,6 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
 import { Photo } from '../../shared/models/photo.model';
 import { SEQUENCE_KINDS_KEPT_WHOLE } from '../../shared/pipes/sequence-kind.pipe';
 import { basename, copyLines } from '../../shared/utils/clipboard';
-import { downloadAll } from '../../shared/utils/download';
 import { isBracketLadderRejection } from '../../shared/utils/sequence-ladder';
 import { CreateAlbumDialogComponent } from '../albums/create-album-dialog.component';
 import { ExportEditorDialogComponent } from './export-editor-dialog.component';
@@ -50,6 +50,7 @@ export class GallerySelectionActions {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly api = inject(ApiService);
+  private readonly downloadProgress = inject(DownloadProgressService);
   private readonly albumService = inject(AlbumService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
@@ -92,7 +93,12 @@ export class GallerySelectionActions {
     const paths = explicitPaths
       ?? await this.resolveSelectionPaths(I18N.gallery.selection.view_scope_copy_message);
     if (!paths?.length) return;
-    await copyLines(paths.map(basename));
+    try {
+      await copyLines(paths.map(basename));
+    } catch {
+      this.snackBar.open(this.i18n.t(I18N.ui.copy_failed), '', { duration: 3000 });
+      return;
+    }
     this.snackBar.open(this.i18n.t(I18N.gallery.selection.copied), '', { duration: 2000 });
   }
 
@@ -343,11 +349,10 @@ export class GallerySelectionActions {
     }
     this.downloading.set(true);
     try {
-      await downloadAll(
-        paths,
-        path => this.api.downloadUrl(path, type, profile),
-        url => this.api.getRaw(url),
-      );
+      await this.downloadProgress.run(paths.map(path => ({
+        url: this.api.downloadUrl(path, type, profile),
+        filename: basename(path),
+      })));
     } finally {
       this.downloading.set(false);
     }
