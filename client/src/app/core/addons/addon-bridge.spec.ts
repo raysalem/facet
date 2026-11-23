@@ -93,5 +93,8 @@ describe('add-on bridge v1', () => {
     expect(context).toMatchObject({ type: 'context', v: 1, nonce: 'n', route: '/photo', album_id: null,
       photo: '/p/1.jpg', scope: { kind: 'import', run_id: 'abc' } });
     expect(context.selection).toHaveLength(MAX_CONTEXT_PATHS);
+    // theme is optional and additive: absent unless given.
+    expect('theme' in context).toBe(false);
+    expect(buildContext('n', '/', [], { kind: 'view' }, 'dark').theme).toBe('dark');
   });
 });

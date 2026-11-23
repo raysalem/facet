@@ -31,7 +31,11 @@ export interface PanelContext {
   photo: string | null;
   selection: string[];
   scope: PanelScope;
+  /** Facet's colour scheme, so the panel can match it; sent again when it changes. Optional (additive in v1). */
+  theme?: PanelTheme;
 }
+
+export type PanelTheme = 'dark' | 'light';
 
 export type PanelRequest =
   | { type: 'ready' }
@@ -158,7 +162,8 @@ export function photoOf(url: string): string | null {
 }
 
 /** The `context` message for the tab as it stands. Only what the tab shows; never more than 500 paths. */
-export function buildContext(nonce: string, url: string, selection: Iterable<string>, scope: PanelScope): PanelContext {
+export function buildContext(nonce: string, url: string, selection: Iterable<string>, scope: PanelScope,
+  theme?: PanelTheme): PanelContext {
   const paths: string[] = [];
   for (const path of selection) {
     if (paths.length >= MAX_CONTEXT_PATHS) break;
@@ -168,5 +173,6 @@ export function buildContext(nonce: string, url: string, selection: Iterable<str
     type: 'context', v: BRIDGE_VERSION, nonce,
     route: routeOf(url), album_id: albumIdOf(url), photo: photoOf(url),
     selection: paths, scope,
+    ...(theme ? { theme } : {}),
   };
 }

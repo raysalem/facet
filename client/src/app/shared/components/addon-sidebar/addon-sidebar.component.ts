@@ -16,6 +16,7 @@ import { WebMcpToolRegistry } from '../../../core/agent/webmcp-registry.service'
 import { AssistantChangesService } from '../../../core/agent/assistant-changes.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { i18nKeys } from '../../../core/i18n/keys';
+import { ThemeService } from '../../../core/services/theme.service';
 
 /** Below sm: over the page from the right, leaving a strip of the page in view; no resize handle. */
 export const DRAWER_CLASSES = 'max-sm:absolute max-sm:inset-y-0 max-sm:right-0 max-sm:z-40 max-sm:!w-[calc(100vw-3rem)] max-sm:!max-w-none max-sm:shadow-2xl';
@@ -80,6 +81,7 @@ export class AddonSidebarComponent {
   private readonly tools = inject(WebMcpToolRegistry);
   private readonly changes = inject(AssistantChangesService);
   private readonly annotationViews = inject(AnnotationViewService);
+  private readonly themes = inject(ThemeService);
   private readonly frame = viewChild<ElementRef<HTMLIFrameElement>>('frame');
 
   protected readonly panel = this.service.panel;
@@ -112,13 +114,14 @@ export class AddonSidebarComponent {
       const id = this.panel()?.addon.id;
       if (id) onCleanup(() => this.annotationViews.clear(id));
     });
-    // Context on open (after `ready`) and on every change of route or selection.
+    // Context on open (after `ready`) and on every change of route, selection or Facet's light/dark theme.
     effect(() => {
       const open = this.panel();
       const url = this.url();
       const selection = this.selection();
+      const theme = this.themes.darkMode() ? 'dark' : 'light';
       if (!open || this.handshake() === 0) return;
-      untracked(() => this.post(buildContext(open.nonce, url, selection, open.scope)));
+      untracked(() => this.post(buildContext(open.nonce, url, selection, open.scope, theme)));
     });
   }
 

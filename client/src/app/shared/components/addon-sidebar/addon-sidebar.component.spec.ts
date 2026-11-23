@@ -9,6 +9,7 @@ import { GalleryStore } from '../../../features/gallery/gallery.store';
 import { WebMcpToolRegistry } from '../../../core/agent/webmcp-registry.service';
 import { AssistantChangesService } from '../../../core/agent/assistant-changes.service';
 import { I18nService } from '../../../core/services/i18n.service';
+import { ThemeService } from '../../../core/services/theme.service';
 
 describe('add-on sidebar host', () => {
   let fixture: ComponentFixture<AddonSidebarComponent>;
@@ -20,6 +21,7 @@ describe('add-on sidebar host', () => {
   const execute = vi.fn(async () => ({ ok: true }));
   const report = vi.fn();
   const pinNextBy = vi.fn();
+  const darkMode = signal(false);
   const events = new Subject<unknown>();
 
   beforeEach(() => {
@@ -34,7 +36,9 @@ describe('add-on sidebar host', () => {
       { provide: AssistantChangesService, useValue: { report } },
       { provide: Router, useValue: { url: '/album/7', events } },
       { provide: I18nService, useValue: { t: (key: string) => key, translations: signal({}), currentLang: signal('en') } },
+      { provide: ThemeService, useValue: { darkMode } },
     ] });
+    darkMode.set(false);
     fixture = TestBed.createComponent(AddonSidebarComponent);
     fixture.detectChanges();
     root = fixture.nativeElement;
@@ -90,6 +94,16 @@ describe('add-on sidebar host', () => {
     selectedPaths.set(new Set(['/p/b.jpg']));
     fixture.detectChanges();
     expect(posted).toHaveBeenLastCalledWith(expect.objectContaining({ selection: ['/p/b.jpg'] }), '*');
+  });
+
+  it("tells the panel Facet's theme and sends the context again when it changes (#393)", () => {
+    const posted = vi.spyOn(frame().contentWindow!, 'postMessage');
+    send({ type: 'ready', v: 1, nonce: 'nonce-1' });
+    fixture.detectChanges();
+    expect(posted).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'context', theme: 'light' }), '*');
+    darkMode.set(true);
+    fixture.detectChanges();
+    expect(posted).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'context', theme: 'dark' }), '*');
   });
 
   it("keeps the handshake through the frame's load event (ready arrives first)", () => {

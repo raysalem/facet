@@ -2163,7 +2163,8 @@ Rules for the panel's author: the document URL is `/addons/<id><ui.path>?nonce=�
 
 ```text
 Facet → panel  {type: "context", v: 1, nonce, route, album_id, photo, selection: [≤ 500 paths],
-                scope: {kind: "view", query} | {kind: "selection"} | {kind: "import", run_id}}
+                scope: {kind: "view", query} | {kind: "selection"} | {kind: "import", run_id},
+                theme?: "dark" | "light"}
 panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | "refresh" {paths} | "open_map" {site: "earth" | "maps"} | "annotation_view" {view} | "close", v: 1, nonce}
 ```
 
@@ -2171,7 +2172,7 @@ Facet accepts a message only from the panel's own window with its nonce, and onl
 
 `open_map` opens Google Earth or Google Maps in a new tab (the panel cannot open popups); Facet opens only those two fixed addresses, never a URL from the panel.
 
-`annotation_view` controls the sky-label overlay Facet draws on the photo page for this add-on's stored annotations (`photo_annotations`): `view` is `{visible: bool, groups?: {id: bool}, score?: number | null (minimum score shown), metrics?: {key: number} (maximum value shown), show_scores?: bool, show_members?: bool}`; a missing key means the payload's default, and `visible: false` (or no view) draws nothing. The overlay belongs to the add-on whose panel sent it (its id, never a field of the message), and closing the panel removes it. Objects take at most 200 keys, values must be booleans or finite numbers, unknown keys are dropped, and a malformed view is ignored. The `context` message's `photo` is the path of the open photo page, else `null`.
+`annotation_view` controls the sky-label overlay Facet draws on the photo page for this add-on's stored annotations (`photo_annotations`): `view` is `{visible: bool, groups?: {id: bool}, score?: number | null (minimum score shown), metrics?: {key: number} (maximum value shown), show_scores?: bool, show_members?: bool}`; a missing key means the payload's default, and `visible: false` (or no view) draws nothing. The overlay belongs to the add-on whose panel sent it (its id, never a field of the message), and closing the panel removes it. Objects take at most 200 keys, values must be booleans or finite numbers, unknown keys are dropped, and a malformed view is ignored. The `context` message's `photo` is the path of the open photo page, else `null`. Its optional `theme` is Facet's colour scheme (`"dark"` or `"light"`); Facet sends the context again when the user switches it, so the panel can follow. A panel that finds no `theme` (an older Facet) can fall back to `prefers-color-scheme`.
 
 ### After import
 
