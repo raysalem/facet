@@ -470,9 +470,12 @@ function inDetectedSet(photo: Photo): boolean {
           </div>
           <!-- Grade, "do I keep it": the decision first, then the scores that inform it, then the set to compare with. -->
           <section id="photo-panel-grade" data-photo-panel="grade" role="tabpanel" aria-labelledby="photo-rail-grade" [hidden]="rail.shownPage() !== 'grade'" class="space-y-4">
-            <!-- Account review controls -->
+            <!-- Account review controls. From lg up the strip sticks flush to the panel's top edge (-top-4 = the
+                 panel's p-4). It starts below the panel header (mt-2 cancels the header's -mb-2), never over it: pulled
+                 up over the header it hid the lower half of the title, previous / next and the X, and took their
+                 clicks (B52). pt-1 keeps the Favorite button's 48 px touch target inside the strip. -->
             @if (canReview()) {
-              <section data-photo-review aria-labelledby="photo-review-title" class="space-y-1 bg-[var(--mat-sys-surface-container-lowest)] lg:sticky lg:-top-4 lg:z-10 lg:-mx-4 lg:-mt-4 lg:px-4 lg:pt-4 lg:pb-2">
+              <section data-photo-review aria-labelledby="photo-review-title" class="space-y-1 bg-[var(--mat-sys-surface-container-lowest)] lg:sticky lg:-top-4 lg:z-10 lg:-mx-4 lg:mt-2 lg:px-4 lg:pt-1 lg:pb-2">
                 <h2 id="photo-review-title" class="sr-only">{{ I18N.gallery.sidebar.tabs.review | translate }}</h2>
                 <!-- Like the gallery rail: no title or rule above the review controls, the favourite beside the stars. -->
                 <div data-photo-rating-row class="flex items-center gap-2">

@@ -75,7 +75,7 @@ FACET_E2E_PYTHON=../venv/bin/python npm run e2e
 | `11-gallery-select-and-rate` | Review > Favorite and Review > Rate 4 in the selection bar apply to both selected photos; the favourites filter and the photo page read them back |
 | `12-culling-confirm` | `/culling` proposes a keeper per burst; flipping a frame to kept and confirming rejects only the frame left out, and the gallery hides it |
 | `13-login-ui` | The Edition dialog refuses a wrong password in place and unlocks with the right one; unlocked state survives a reload |
-| `14-photo-page-review` | Rating, Favorite and Keep set on the photo page are read back after a reload |
+| `14-photo-page-review` | Rating, Favorite and Keep set on the photo page are read back after a reload; unlocked on the Grade panel at 1180, 1480 and 2950 px, the header's Previous, Next and Close take their own clicks (centre and lower edge), the review strip starts below the header, and Next steps to the next photo (fails with the strip pulled up over the header, B52) |
 | `15-photo-compare` | Two selected photos open the compare workspace (Reference / Candidate), the candidate can be promoted, and the page redirects without a selection |
 | `16-timeline-and-folders` | The timeline month counts the day's photos and links to them; the Folders page filters the gallery to the clicked folder |
 | `17-photo-page-metadata` | A caption, a manual tag and a one-hour capture-date shift made on the photo page are still shown after a reload |
