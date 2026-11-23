@@ -43,6 +43,7 @@ describe('AlbumTagFiltersComponent', () => {
     currentAlbum: ReturnType<typeof signal<{ id: number } | null>>;
     filters: ReturnType<typeof signal<{ album_set: string; photographer: string }>>;
     tagsRevision: ReturnType<typeof signal<number>>;
+    filterControlsShown: ReturnType<typeof signal<boolean>>;
     filterPayload: Mock;
     updateFilter: Mock;
   };
@@ -73,10 +74,11 @@ describe('AlbumTagFiltersComponent', () => {
       currentAlbum: signal<{ id: number } | null>({ id: 3 }),
       filters: signal({ album_set: '', photographer: '' }),
       tagsRevision: signal(0),
+      filterControlsShown: signal(true),
       filterPayload: vi.fn(() => {
         const { album_set, photographer } = store.filters();
         const albumTags = [album_set, photographer].filter(Boolean).join(',');
-        return { album_id: '3', page: '1', ...(albumTags ? { album_tags: albumTags } : {}) };
+        return { album_id: String(store.currentAlbum()?.id ?? 0), page: '1', ...(albumTags ? { album_tags: albumTags } : {}) };
       }),
       updateFilter: vi.fn(async (k: 'album_set' | 'photographer', v: string) =>
         store.filters.update(f => ({ ...f, [k]: v }))),
@@ -126,6 +128,50 @@ describe('AlbumTagFiltersComponent', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     expect(mockApi.get).toHaveBeenCalledTimes(2);
+  });
+
+  // Flow 18: the body is built on idle with the panel shut, and its late read of an album deleted meanwhile answered 404.
+  it('asks nothing while the controls are shut, and asks once they open', async () => {
+    store.filterControlsShown.set(false);
+    await render();
+    expect(mockApi.get).not.toHaveBeenCalled();
+    expect(field('album-set-filter')).toBeNull();
+
+    store.filterControlsShown.set(true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(mockApi.get).toHaveBeenCalledExactlyOnceWith('/album_tags/facets', { album_id: '3' });
+    expect(field('album-set-filter')).not.toBeNull();
+  });
+
+  it('does not ask again on reopening an unchanged view', async () => {
+    await render();
+    store.filterControlsShown.set(false);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    store.filterControlsShown.set(true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(mockApi.get).toHaveBeenCalledTimes(1);
+    expect(field('album-set-filter')).not.toBeNull();
+  });
+
+  it('drops the options of a view changed while shut and asks for the new one only on opening', async () => {
+    await render();
+    store.filterControlsShown.set(false);
+    store.currentAlbum.set({ id: 4 });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(mockApi.get).toHaveBeenCalledTimes(1);
+    expect(field('album-set-filter')).toBeNull();
+
+    store.filterControlsShown.set(true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(mockApi.get).toHaveBeenCalledTimes(2);
+    expect(mockApi.get).toHaveBeenLastCalledWith('/album_tags/facets', { album_id: '4' });
   });
 
   it('renders nothing outside an album', async () => {

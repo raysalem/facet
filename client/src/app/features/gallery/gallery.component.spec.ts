@@ -169,6 +169,7 @@ describe('GalleryComponent', () => {
       tags: signal([]),
       albumTags: signal([]),
       tagsRevision: signal(0),
+      filterControlsShown: signal(false),
       persons: signal([]),
       config: signal(null),
       activeFilterCount: signal(0),

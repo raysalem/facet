@@ -1283,6 +1283,14 @@ export class GalleryComponent implements OnInit, OnDestroy {
       else if (!open && this.rail.tab() === 'filter') this.rail.closePage();
     });
   });
+  /** Tells the filter controls when they are on screen: the Showing panel from lg, the drawer below. */
+  private readonly filterControlsShownFollows = (() => {
+    effect(() => {
+      const shown = this.lgDesktop.isDesktop() ? this.filterPanelOpen() && !this.pinned() : this.store.filterDrawerOpen();
+      untracked(() => this.store.filterControlsShown.set(shown));
+    });
+    inject(DestroyRef).onDestroy(() => this.store.filterControlsShown.set(false));
+  })();
   private readonly flagFollowsRail = (() => {
     let previous: string | null | undefined;
     return effect(() => {
