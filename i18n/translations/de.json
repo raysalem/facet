@@ -4355,7 +4355,9 @@
     "refresh": "Aktualisieren",
     "panel": {
       "close": "Add-on-Bereich schließen",
-      "resize": "Größe des Add-on-Bereichs ändern"
+      "resize": "Größe des Add-on-Bereichs ändern",
+      "locked": "Bearbeitung im Benutzermenü freischalten, um {name} zu verwenden",
+      "admin_only": "Nur ein Administrator kann {name} verwenden"
     },
     "open": "Öffnen",
     "launcher": "Ein Add-on für diese Ansicht öffnen",

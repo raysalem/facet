@@ -84,6 +84,8 @@ describe('AddonRail', () => {
   });
 
   it('opens an add-on that is not open yet rather than picking an empty tab', () => {
+    TestBed.overrideProvider(AuthService, { useValue: { hasFeature: (key: string) => key === 'addons' } });
+    TestBed.overrideProvider(AddonsService, { useValue: { available: signal(true), list: signal(null), names: signal(null), sync: vi.fn() } });
     const rail = create('view');
     TestBed.tick();
     rail.selectAddon(astro);
@@ -157,7 +159,7 @@ describe('AddonRail', () => {
     const item = { ...astro, slots: ['sidebar'], mode: 'supervised' } as unknown as AddonList['addons'][number];
     const sync = vi.fn(() => list.set(available() ? { addons: [item], refused: [], addons_dir: '' } as AddonList : null));
     TestBed.overrideProvider(AuthService, { useValue: { hasFeature: (key: string) => key === 'addons' } });
-    TestBed.overrideProvider(AddonsService, { useValue: { available, list, sync } });
+    TestBed.overrideProvider(AddonsService, { useValue: { available, list, names: signal(null), sync } });
     const rail = create('view');
     TestBed.tick();
     expect(rail.addons()).toEqual([]);
@@ -175,7 +177,7 @@ describe('AddonRail', () => {
     const restore = vi.fn(async () => { panel.set({ addon: astro, nonce: 'n9', src: '/addons/astro/', scope: { kind: 'view' } }); return true; });
     const restorable = () => ({ addonId: 'astro', scope: { kind: 'view' } });
     TestBed.overrideProvider(AuthService, { useValue: { hasFeature: (key: string) => key === 'addons' } });
-    TestBed.overrideProvider(AddonsService, { useValue: { available, list, sync: vi.fn() } });
+    TestBed.overrideProvider(AddonsService, { useValue: { available, list, names: signal(null), sync: vi.fn() } });
     TestBed.overrideProvider(AddonPanelService, { useValue: { panel, dockHidden, addonShown, openForCurrentView, restore, restorable } });
     localStorage.setItem(KEY, 'addon:astro');
     const rail = create('view');

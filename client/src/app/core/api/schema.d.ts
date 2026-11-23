@@ -24,6 +24,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/addons/names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Addon Names
+         * @description The installed add-ons' display names and icons, for any signed-in viewer.
+         *
+         *     A viewer without scan access sees what an add-on stored (its object tags) and the add-on's tab, shown
+         *     off with the reason; it needs the name for both. Nothing else of the manifest (no version, permissions,
+         *     state or path) is in this answer.
+         */
+        get: operations["list_addon_names_api_addons_names_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/addons/runs/{job_id}": {
         parameters: {
             query?: never;
@@ -6402,6 +6426,25 @@ export interface components {
             lines: string[];
         };
         /**
+         * AddonName
+         * @description What any signed-in viewer may know of an installed add-on: how Facet names it and where it shows.
+         */
+        AddonName: {
+            /** Icon */
+            icon: string;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Slots */
+            slots: string[];
+        };
+        /** AddonNames */
+        AddonNames: {
+            /** Addons */
+            addons: components["schemas"]["AddonName"][];
+        };
+        /**
          * AddonOpenRequest
          * @description ``scope``: ``{"kind": "view", "query": "..."}`` | ``{"kind": "selection"}`` | ``{"kind": "import", "run_id": "..."}``.
          */
@@ -12660,6 +12703,33 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Add-ons are disabled (addons.enabled). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_addon_names_api_addons_names_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddonNames"];
+                };
             };
             /** @description Add-ons are disabled (addons.enabled). */
             404: {

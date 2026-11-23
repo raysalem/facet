@@ -57,7 +57,7 @@ describe('PhotoDetailComponent', () => {
   let mockRouter: { url: string; navigate: Mock; currentNavigation: () => Navigation | null; events: Observable<unknown> };
   let mockLocation: { back: Mock; path: Mock; getState: Mock; replaceState: Mock };
   let mockRoute: { snapshot: { queryParamMap: { get: Mock } }; queryParamMap: BehaviorSubject<ParamMap> };
-  let mockAuth: { status: ReturnType<typeof signal>; identity: () => string; session: () => string | null; isEdition: ReturnType<typeof signal>; downloadProfiles: ReturnType<typeof signal>; hasFeature: (key: string) => boolean };
+  let mockAuth: { status: ReturnType<typeof signal>; identity: () => string; session: () => string | null; isEdition: ReturnType<typeof signal>; downloadProfiles: ReturnType<typeof signal>; hasFeature: (key: string) => boolean; isMultiUser: () => boolean };
   let mockDialog: { open: Mock; openDialogs: unknown[] };
 
   const samplePhoto = {
@@ -170,7 +170,7 @@ describe('PhotoDetailComponent', () => {
       queryParamMap: new BehaviorSubject(convertToParamMap({ path: '/photos/test.jpg' })),
     };
     const status = signal({ user_id: 'test' });
-    mockAuth = { status, identity: () => status().user_id, session: computed(() => status()?.user_id ?? null), isEdition: signal(true), downloadProfiles: signal([]), hasFeature: () => false };
+    mockAuth = { status, identity: () => status().user_id, session: computed(() => status()?.user_id ?? null), isEdition: signal(true), downloadProfiles: signal([]), hasFeature: () => false, isMultiUser: () => false };
     mockDialog = { open: vi.fn(() => ({ afterClosed: () => of(undefined) })), openDialogs: [] };
   });
 
@@ -3579,7 +3579,7 @@ describe('PhotoDetailComponent', () => {
       // The service's own sync rule: read the list once the session may.
       const addonsFake = (available: boolean, load = vi.fn()) => {
         const list = signal<unknown>(null);
-        return { list, available: () => available, load, sync: () => { if (available && list() === null) void Promise.resolve(load()).then((read: unknown) => { if (read) list.set(read); }); } };
+        return { list, names: signal<unknown>(null), available: () => available, load, sync: () => { if (available && list() === null) void Promise.resolve(load()).then((read: unknown) => { if (read) list.set(read); }); } };
       };
       const addonsMock = (load = vi.fn()) => ({ provide: AddonsService, useValue: addonsFake(true, load) });
       const chipTexts = (el: HTMLElement) => [...el.querySelectorAll('[data-testid="manual-tag-chip"]')].map(chip => chip.querySelector('button span:last-child')!.textContent!.trim());
@@ -3605,6 +3605,14 @@ describe('PhotoDetailComponent', () => {
         expect(el.querySelectorAll('[data-testid="manual-tag-remove"]').length).toBe(3);
         group.click(); await settle();
         expect(chipTexts(el)).toEqual(['trip']);
+      });
+
+      it('names the group after the add-on for a viewer who may not open add-ons (B50)', async () => {
+        const fake = addonsFake(false);
+        fake.names.set([{ id: 'astro-id', name: 'Astro', icon: 'star', slots: ['sidebar'] }] as never);
+        await render(astro, false, [{ provide: AddonsService, useValue: fake }]);
+        await settle();
+        expect(groupNames()).toEqual(['Astro']);
       });
 
       it('names the group by the add-on id while the registry is unavailable, and folds again on the next photo', async () => {

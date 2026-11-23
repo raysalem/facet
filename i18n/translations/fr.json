@@ -4355,7 +4355,9 @@
     "refresh": "Actualiser",
     "panel": {
       "close": "Fermer le panneau du module",
-      "resize": "Redimensionner le panneau du module"
+      "resize": "Redimensionner le panneau du module",
+      "locked": "Déverrouillez l'édition dans le menu utilisateur pour utiliser {name}",
+      "admin_only": "Seul un administrateur peut utiliser {name}"
     },
     "open": "Ouvrir",
     "launcher": "Ouvrir un module pour cette vue",

@@ -3,6 +3,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import type { AddonRail } from '../../../core/addons/addon-rail';
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import { i18nKeys } from '../../../core/i18n/keys';
 import { LG_BREAKPOINT_PX, useDesktopSignal } from '../../utils/media-query';
 
 /** One of the page's own panels on the rail; `label` is an i18n key. */
@@ -44,12 +45,15 @@ const TAB = 'inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-ce
       <span aria-hidden="true" class="shrink-0 bg-[var(--mat-sys-outline-variant)] max-lg:mx-1 max-lg:h-6 max-lg:w-px lg:my-1 lg:h-px lg:w-6"></span>
       @for (addon of rail().addons(); track addon.id) {
         @let picked = rail().tab() === 'addon:' + addon.id;
+        @let usable = rail().usable(addon.id);
+        @let tip = usable ? addon.name : ((rail().lockedReason() === 'locked' ? I18N.addons.panel.locked : I18N.addons.panel.admin_only) | translate: { name: addon.name });
         <button type="button" [attr.role]="isWide() ? 'tab' : null" [attr.data-rail-addon]="addon.id"
+          [attr.aria-disabled]="usable ? null : 'true'" [attr.data-rail-addon-locked]="usable ? null : ''"
           [attr.aria-selected]="isWide() ? picked : null" [attr.aria-pressed]="isWide() ? null : picked"
           [attr.aria-controls]="isWide() && picked && rail().addonActive() ? ADDON_DOCK_ID : null"
           [attr.tabindex]="isWide() ? (tabStop() === 'addon:' + addon.id ? 0 : -1) : null"
-          [matTooltip]="addon.name" matTooltipPosition="left" [attr.aria-label]="addon.name" (click)="rail().selectAddon(addon)"
-          [class]="TAB" [class.!bg-[var(--mat-sys-secondary-container)]]="picked" [class.!text-[var(--mat-sys-on-secondary-container)]]="picked">
+          [matTooltip]="tip" matTooltipPosition="left" [attr.aria-label]="tip" (click)="rail().selectAddon(addon)"
+          [class]="TAB" [class.opacity-40]="!usable" [class.!cursor-not-allowed]="!usable" [class.!bg-[var(--mat-sys-secondary-container)]]="picked" [class.!text-[var(--mat-sys-on-secondary-container)]]="picked">
           <mat-icon aria-hidden="true">{{ addon.icon }}</mat-icon>
         </button>
       }
@@ -58,6 +62,7 @@ const TAB = 'inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-ce
 })
 export class PanelRailComponent {
   protected readonly TAB = TAB;
+  protected readonly I18N = i18nKeys();
   protected readonly ADDON_DOCK_ID = ADDON_DOCK_ID;
   readonly rail = input.required<AddonRail<string>>();
   readonly tabs = input.required<readonly RailTab[]>();

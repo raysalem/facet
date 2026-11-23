@@ -4355,7 +4355,9 @@
     "refresh": "Refresh",
     "panel": {
       "close": "Close add-on panel",
-      "resize": "Resize add-on panel"
+      "resize": "Resize add-on panel",
+      "locked": "Unlock editing in the user menu to use {name}",
+      "admin_only": "Only an administrator can use {name}"
     },
     "open": "Open",
     "launcher": "Open an add-on for this view",

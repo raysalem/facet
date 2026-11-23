@@ -4370,6 +4370,8 @@ export const I18N = {
     panel: {
       close: "addons.panel.close",
       resize: "addons.panel.resize",
+      locked: "addons.panel.locked",
+      admin_only: "addons.panel.admin_only",
     },
     open: "addons.open",
     launcher: "addons.launcher",

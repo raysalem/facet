@@ -21,7 +21,7 @@ from api.auth import (
 )
 from api.config import is_multi_user_enabled
 from api.models.addons import (
-    AddonClosed, AddonCloseRequest, AddonList, AddonLog, AddonRun, AddonStarted, AddonStartRequest, AddonStopped, AddonOpened, AddonOpenRequest, AddonTokenCreated,
+    AddonClosed, AddonCloseRequest, AddonList, AddonLog, AddonNames, AddonRun, AddonStarted, AddonStartRequest, AddonStopped, AddonOpened, AddonOpenRequest, AddonTokenCreated,
     AddonTokensRevoked,
 )
 
@@ -82,6 +82,22 @@ def list_addons(_user: CurrentUser = Depends(require_addon_operator)):
     for extra in LIST_EXTRAS:
         body.update(extra())
     return body
+
+
+@router.get(
+    "/names",
+    response_model=AddonNames,
+    responses={404: {"description": "Add-ons are disabled (addons.enabled)."}},
+)
+def list_addon_names(_user: CurrentUser = Depends(require_authenticated)):
+    """The installed add-ons' display names and icons, for any signed-in viewer.
+
+    A viewer without scan access sees what an add-on stored (its object tags) and the add-on's tab, shown
+    off with the reason; it needs the name for both. Nothing else of the manifest (no version, permissions,
+    state or path) is in this answer.
+    """
+    return {"addons": [{"id": a.id, "name": a.name, "icon": a.icon, "slots": list(a.slots)}
+                       for a in manifest.registry().addons.values()]}
 
 
 @router.post(

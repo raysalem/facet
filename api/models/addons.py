@@ -24,6 +24,19 @@ class AddonItem(BaseModel):
     log_tail: Optional[list[str]] = None
 
 
+class AddonName(BaseModel):
+    """What any signed-in viewer may know of an installed add-on: how Facet names it and where it shows."""
+
+    id: str
+    name: str
+    icon: str
+    slots: list[str]
+
+
+class AddonNames(BaseModel):
+    addons: list[AddonName]
+
+
 class RefusedManifest(BaseModel):
     directory: str
     reason: str

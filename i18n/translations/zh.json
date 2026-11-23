@@ -4355,7 +4355,9 @@
     "refresh": "刷新",
     "panel": {
       "close": "关闭附加组件面板",
-      "resize": "调整附加组件面板大小"
+      "resize": "调整附加组件面板大小",
+      "locked": "在用户菜单中解锁编辑后即可使用 {name}",
+      "admin_only": "只有管理员可以使用 {name}"
     },
     "open": "打开",
     "launcher": "为此视图打开附加组件",

@@ -9,6 +9,8 @@ export type AddonList = components['schemas']['AddonList'];
 export type Addon = components['schemas']['AddonItem'];
 export type AddonTokenCreated = components['schemas']['AddonTokenCreated'];
 export type AddonLog = components['schemas']['AddonLog'];
+/** What any signed-in viewer may know of an add-on: its name, icon and slots. */
+export type AddonName = components['schemas']['AddonName'];
 
 /**
  * The client side of the add-on boundary (docs/CONFIGURATION.md, Add-ons): the installed manifests as the server
@@ -25,7 +27,10 @@ export class AddonsService {
   readonly list = signal<AddonList | null>(null);
   readonly loadError = signal(false);
   readonly available = computed(() => this.auth.hasFeature('addons') && this.scan.canLaunch());
+  /** The installed add-ons' names for a viewer who may not read `list` (B50): object tags and a tab shown off. */
+  readonly names = signal<readonly AddonName[] | null>(null);
   private loading: Promise<AddonList | null> | null = null;
+  private loadingNames = false;
 
   /**
    * Keep `list` in step with the right to read it: read once this session may (an edition unlock, a sign-in),
@@ -34,6 +39,7 @@ export class AddonsService {
   sync(): void {
     if (!this.available()) {
       if (this.list() !== null) this.list.set(null);
+      if (this.names() === null) void this.loadNames();
       return;
     }
     if (this.list() === null && !this.loading) {
@@ -55,6 +61,19 @@ export class AddonsService {
       this.loadError.set(true);
       return null;
     }
+  }
+
+  /** The add-ons' names, readable by any signed-in viewer; kept once read (they change only with a manifest). */
+  async loadNames(): Promise<readonly AddonName[] | null> {
+    if (this.loadingNames || !this.auth.hasFeature('addons')) return this.names();
+    this.loadingNames = true;
+    try {
+      const read = await firstValueFrom(this.api.get<{ addons: AddonName[] }>('/addons/names'));
+      this.names.set(read.addons);
+    } catch { /* No names: the ids stand in. */ } finally {
+      this.loadingNames = false;
+    }
+    return this.names();
   }
 
   async mintToken(id: string): Promise<AddonTokenCreated> {
