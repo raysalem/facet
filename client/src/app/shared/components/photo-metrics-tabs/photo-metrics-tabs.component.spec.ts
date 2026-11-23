@@ -58,7 +58,7 @@ describe('PhotoMetricsTabsComponent', () => {
     localStorage.setItem(`${TAB_KEY}_camera`, 'histogram');
     TestBed.configureTestingModule({
       imports: [PhotoMetricsTabsComponent],
-      providers: [{ provide: I18nService, useValue: { t: (key: string) => key, translations: () => ({}) } }],
+      providers: [{ provide: I18nService, useValue: { t: (key: string) => key, translations: () => ({}), locale: signal('en') } }],
     });
     fixture = TestBed.createComponent(PhotoMetricsTabsComponent);
     fixture.componentRef.setInput('photo', makePhoto({ camera_model: 'X100V' }));

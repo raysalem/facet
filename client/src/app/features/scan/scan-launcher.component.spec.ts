@@ -81,7 +81,7 @@ describe('ScanLauncherComponent', () => {
     await component.ngOnInit();
     expect(read<string | null>('selectedDir')).toBe('/photos/only');
     await component.start();
-    expect(mockScan.startScan).toHaveBeenCalledWith(['/photos/only']);
+    expect(mockScan.startScan).toHaveBeenCalledWith(['/photos/only'], null);
   });
 
   it('starts a scan with the selected directory', async () => {
