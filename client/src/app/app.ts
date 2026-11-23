@@ -467,9 +467,15 @@ export class App implements OnInit {
     this.setupUpdateNotifications();
     // The strings are loaded before the first render, by the app initializer in app.config.ts.
     this.store.loadTypeCounts();
-    void this.store.loadConfig(() => this.store.galleryMounts() === 0);
+    // The config load waits for the auth status (B51). loadConfig drops an answer whose identity changed
+    // while it was in flight, and a direct load's first status always changes it (none -> the visitor),
+    // so a load started before the status lands is thrown away. The gallery loads its own config; every
+    // other page (Add-ons, Statistics, Persons, Albums, Timeline) then kept only the tabs that need no
+    // `features`. The auth effect below skips the first status, so nothing loaded it again.
+    const status = Promise.resolve(this.auth.checkStatus());
+    void status.catch(() => undefined).then(() => this.store.loadConfig(() => this.store.galleryMounts() === 0));
     try {
-      await this.auth.checkStatus();
+      await status;
       const promises: Promise<void>[] = [];
       if (this.auth.isEdition()) {
         // A page load that starts already in edition mode is not a transition,
