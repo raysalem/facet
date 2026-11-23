@@ -1,7 +1,9 @@
 import {
   ApplicationConfig,
   ErrorHandler,
+  inject,
   isDevMode,
+  provideAppInitializer,
   provideBrowserGlobalErrorListeners,
   provideZonelessChangeDetection,
 } from '@angular/core';
@@ -20,6 +22,7 @@ import { errorInterceptor } from './core/interceptors/error.interceptor';
 import { retryInterceptor } from './core/interceptors/retry.interceptor';
 import { provideAgentTools } from './core/agent/agent-tools.bootstrap';
 import { GlobalErrorHandler } from './core/services/global-error-handler.service';
+import { I18nService } from './core/services/i18n.service';
 import { SNACKBAR_LIFT_CLASS } from './shared/utils/mobile-bar';
 
 export const appConfig: ApplicationConfig = {
@@ -36,6 +39,14 @@ export const appConfig: ApplicationConfig = {
     provideNativeDateAdapter(),
     { provide: ErrorHandler, useClass: GlobalErrorHandler },
     provideAgentTools(),
+    // The strings before the first render (B49): rendered before them, every label shows its key
+    // ("gallery.selection.select"), the gallery header wraps to two rows and jumps back to one when they
+    // land (CLS 0.14-0.36 on an album reload). Both loads swallow their own errors, so this never blocks.
+    provideAppInitializer(async () => {
+      const i18n = inject(I18nService);
+      await i18n.loadLanguages();
+      await i18n.load();
+    }),
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),
       // Immediately: AppUpdateService checks for a newer build at startup, and the

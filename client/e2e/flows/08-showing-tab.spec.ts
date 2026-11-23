@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '../fixtures';
 import { captureForHuman } from '../helpers/human-review-reporter';
-import { expectCleanUI } from '../helpers/ui-probe.helpers';
+import { expectCleanUI, flowMetrics, installFlowMetrics } from '../helpers/ui-probe.helpers';
 import { openAlbum, openShowing, showingPanel, showingStatement, showingTab, signInAsEditor, WIDTHS } from '../helpers/nav';
 
 // The rail's Showing panel names what the grid holds, and the album's Set pull-down narrows it
@@ -62,5 +62,23 @@ test('Showing names the album, the Set chip narrows it, and a new album starts c
     const panel = (await showingPanel(page).boundingBox())!;
     expect(box.x + box.width, 'the chip ends inside the Showing panel').toBeLessThanOrEqual(panel.x + panel.width);
     await expectCleanUI(page, { label: '08 long folder chip', panes: [PANEL] });
+  });
+
+  // B49: a reload drew the first frame with raw i18n keys and without the rail's panel (the header wrapped to
+  // two rows, then folded), and the album's bar and Showing rules arrived after the grid: CLS 0.14-0.36.
+  await test.step('5. Reloading the album with Showing open does not jump (CLS < 0.05) at 1180 and 1480', async () => {
+    await installFlowMetrics(page);
+    await openAlbum(page, 'E2E Tagged');
+    if ((await showingTab(page).getAttribute('aria-selected')) !== 'true') await openShowing(page);
+    for (const size of [WIDTHS.window, WIDTHS.half]) {
+      await page.setViewportSize(size);
+      await page.reload();
+      await expect(cards(page, /^TAG_0\d\.jpg$/)).toHaveCount(6);
+      await expect(showingPanel(page).getByRole('combobox', { name: 'Set' })).toBeVisible();
+      await page.waitForLoadState('networkidle');
+      const { cls } = await flowMetrics(page);
+      test.info().annotations.push({ type: 'cls', description: `album reload, Showing open, ${size.width}: ${cls.toFixed(4)}` });
+      expect(cls, `layout shift on reload at ${size.width}`).toBeLessThan(0.05);
+    }
   });
 });
