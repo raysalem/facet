@@ -169,7 +169,8 @@
 
   <!-- Main content -->
   <!-- The add-on sidebar docks to the right of every page, so it survives navigation. -->
-  <div class="flex flex-1 min-h-0 min-w-0">
+  <!-- relative: below sm the sidebar is a drawer over the page, placed against this box. -->
+  <div class="relative flex flex-1 min-h-0 min-w-0">
     <main class="relative flex-1 min-h-0 min-w-0 overflow-auto lg:pb-0" [class.pb-15]="isAlbumsRoute() || isPersonsRoute() || isCapsuleRoute() || isTimelineRoute()">
       <router-outlet />
     </main>

@@ -21,6 +21,11 @@ export interface OpenPanel {
 }
 
 const WIDTH_KEY = 'facet_addon_panel_width';
+/** The open panel's add-on and scope, kept for this tab only, so a reload (F5) can open it again. */
+export const OPEN_PANEL_KEY = 'facet_addon_panel_open';
+
+/** What a reload needs to open the panel again. */
+export interface RestorablePanel { addonId: string; scope: PanelScope }
 export const MIN_PANEL_WIDTH = 280;
 export const DEFAULT_PANEL_WIDTH = 380;
 
@@ -56,6 +61,38 @@ export class AddonPanelService {
    * that picks one of its own panels, or closes them all, clears it.
    */
   readonly addonShown = signal(false);
+
+  private restoring = false;
+
+  /** The panel that was open in this tab before a reload, if any. */
+  restorable(): RestorablePanel | null {
+    try {
+      const raw = JSON.parse(sessionStorage.getItem(OPEN_PANEL_KEY) ?? 'null') as RestorablePanel | null;
+      return raw && typeof raw.addonId === 'string' && raw.scope && typeof raw.scope.kind === 'string' ? raw : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Open again the panel this tab had open before a reload, with the scope it had (the server checks it again).
+   * Once only, and quietly: a refusal (rights changed, add-on gone) forgets it instead of showing an error.
+   */
+  async restore(addon: PanelAddon): Promise<boolean> {
+    const saved = this.restorable();
+    if (this.restoring || this.panel() || !saved || saved.addonId !== addon.id) return false;
+    this.restoring = true;
+    try {
+      const opened = await this.open(addon, saved.scope);
+      if (!opened) {
+        this.openError.set(null);
+        this.forget();
+      }
+      return opened;
+    } finally {
+      this.restoring = false;
+    }
+  }
 
   async open(addon: PanelAddon, scope: PanelScope): Promise<boolean> {
     this.openError.set(null);
@@ -114,12 +151,20 @@ export class AddonPanelService {
     this.closeQuietly();
     this.addonShown.set(true);
     this.panel.set({ addon, nonce: opened.nonce, src: opened.src, scope: opened.scope as PanelScope });
+    try {
+      sessionStorage.setItem(OPEN_PANEL_KEY, JSON.stringify({ addonId: addon.id, scope: opened.scope as PanelScope } satisfies RestorablePanel));
+    } catch { /* Storage blocked: a reload leaves the panel closed. */ }
   }
 
   close(): void {
     this.closeQuietly();
     this.addonShown.set(false);
     this.panel.set(null);
+    this.forget();
+  }
+
+  private forget(): void {
+    try { sessionStorage.removeItem(OPEN_PANEL_KEY); } catch { /* nothing kept */ }
   }
 
   setWidth(width: number, viewport: number): void {

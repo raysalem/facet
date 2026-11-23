@@ -188,6 +188,8 @@ export const I18N = {
       inpage_hint: "dialog.connect_assistant.inpage_hint",
       inpage_changed: "dialog.connect_assistant.inpage_changed",
       inpage_changed_plural: "dialog.connect_assistant.inpage_changed_plural",
+      addon_changed: "dialog.connect_assistant.addon_changed",
+      addon_changed_plural: "dialog.connect_assistant.addon_changed_plural",
     },
     ok: "dialog.ok",
   },
@@ -1226,6 +1228,8 @@ export const I18N = {
     pinned: {
       chip: "gallery.pinned.chip",
       chip_plural: "gallery.pinned.chip_plural",
+      chip_by: "gallery.pinned.chip_by",
+      chip_by_plural: "gallery.pinned.chip_by_plural",
       clear: "gallery.pinned.clear",
     },
     all_photos: "gallery.all_photos",
@@ -4366,6 +4370,8 @@ export const I18N = {
     panel: {
       close: "addons.panel.close",
       resize: "addons.panel.resize",
+      locked: "addons.panel.locked",
+      admin_only: "addons.panel.admin_only",
     },
     open: "addons.open",
     launcher: "addons.launcher",

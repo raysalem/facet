@@ -2125,7 +2125,7 @@ An add-on is a separate program (its own repository and virtual environment) tha
 |-----|---------|-------------|
 | `enabled` | `false` | Master switch. When false, `/api/addons` answers 404, add-on tokens are refused and no add-on is listed or started |
 
-**Installing.** An add-on's installer writes one file, `<facet data>/addons/<id>/addon.json`, and nothing else. *Facet data* is the folder that holds the database (`dirname(DB_PATH)`): `%LOCALAPPDATA%\Facet\data` on Windows, `/app/data` in Docker. Manifests are read at startup and whenever the configuration is reloaded. To uninstall, delete the folder. Placing the manifest is the approval; there is no in-browser approval step.
+**Installing.** An add-on's installer writes one file, `<facet data>/addons/<id>/addon.json`, and nothing else. *Facet data* is the folder that holds the database (`dirname(DB_PATH)`): `%LOCALAPPDATA%\Facet\data` on Windows, `/app/data` in Docker. Manifests are read at startup and whenever the configuration is reloaded; a supervised add-on's own manifest is also read again each time it is started while stopped, so after editing `addon.json`, **Stop** then **Start** (or **Open**) picks it up. A running add-on keeps the manifest it started with. To uninstall, delete the folder. Placing the manifest is the approval; there is no in-browser approval step.
 
 ```json
 {"id": "astro-id", "name": "Astro", "version": "0.3.0", "icon": "star", "facet_api": 1,
@@ -2137,6 +2137,8 @@ An add-on is a separate program (its own repository and virtual environment) tha
 ```
 
 A manifest is refused as a whole, with the reason shown on the **Add-ons** page (user menu → Add-ons), when: `id` does not match `^[a-z0-9][a-z0-9._-]{0,63}$` or differs from its folder name; a key, permission or slot is unknown; `start` and `ui.url` are both present (or neither); `start.argv[0]` is not an absolute path to an existing file; `health` or `ui.path` is not a plain path; or `facet_api` is not an integer this server speaks (currently `1`). An add-on without `start` runs elsewhere (for example a Docker service) and sets `"ui": {"url": "http://astro:5100/"}` instead.
+
+The Add-ons page and the panels need scan access (edition, or the administrator in multi-user mode). Any signed-in viewer may read `GET /api/addons/names` (each add-on's `id`, `name`, `icon` and `slots`, nothing else), so the photo page names an add-on's object tags ("Astro") and a page rail shows the add-on's tab, switched off with the reason, until the viewer unlocks editing.
 
 **Permissions and tokens.** An add-on authenticates with an `fct_` token of kind `addon` (stored as a SHA-256 hash in the same table as agent tokens). The token acts as the account that minted it, at most at that account's live level, so a changed password or a demoted account cuts it off on the next call. The add-on reads and writes Facet data over Facet's MCP endpoint (`POST /mcp`, see [AI agents (MCP)](AGENTS.md)), like an assistant, but `tools/list` shows it only the tools its permissions grant (below) and any other tool answers `forbidden_level`. Each tool's own level still applies, and no destructive tool is ever granted, whatever `viewer.mcp.allow_destructive` says. On `/api` an add-on token opens only the three reads in the table; any other route answers 403. For an add-on without `start`, the Add-ons page mints the token once (**Create access token**) and shows it once; **Revoke tokens** revokes it.
 
@@ -2161,7 +2163,8 @@ Rules for the panel's author: the document URL is `/addons/<id><ui.path>?nonce=�
 
 ```text
 Facet → panel  {type: "context", v: 1, nonce, route, album_id, photo, selection: [≤ 500 paths],
-                scope: {kind: "view", query} | {kind: "selection"} | {kind: "import", run_id}}
+                scope: {kind: "view", query} | {kind: "selection"} | {kind: "import", run_id},
+                theme?: "dark" | "light"}
 panel → Facet  {type: "ready" | "show_photos" {paths} | "open_photo" {path} | "refresh" {paths} | "open_map" {site: "earth" | "maps"} | "annotation_view" {view} | "close", v: 1, nonce}
 ```
 
@@ -2169,7 +2172,7 @@ Facet accepts a message only from the panel's own window with its nonce, and onl
 
 `open_map` opens Google Earth or Google Maps in a new tab (the panel cannot open popups); Facet opens only those two fixed addresses, never a URL from the panel.
 
-`annotation_view` controls the sky-label overlay Facet draws on the photo page for this add-on's stored annotations (`photo_annotations`): `view` is `{visible: bool, groups?: {id: bool}, score?: number | null (minimum score shown), metrics?: {key: number} (maximum value shown), show_scores?: bool, show_members?: bool}`; a missing key means the payload's default, and `visible: false` (or no view) draws nothing. The overlay belongs to the add-on whose panel sent it (its id, never a field of the message), and closing the panel removes it. Objects take at most 200 keys, values must be booleans or finite numbers, unknown keys are dropped, and a malformed view is ignored. The `context` message's `photo` is the path of the open photo page, else `null`.
+`annotation_view` controls the sky-label overlay Facet draws on the photo page for this add-on's stored annotations (`photo_annotations`): `view` is `{visible: bool, groups?: {id: bool}, score?: number | null (minimum score shown), metrics?: {key: number} (maximum value shown), show_scores?: bool, show_members?: bool}`; a missing key means the payload's default, and `visible: false` (or no view) draws nothing. The overlay belongs to the add-on whose panel sent it (its id, never a field of the message), and closing the panel removes it. Objects take at most 200 keys, values must be booleans or finite numbers, unknown keys are dropped, and a malformed view is ignored. The `context` message's `photo` is the path of the open photo page, else `null`. Its optional `theme` is Facet's colour scheme (`"dark"` or `"light"`); Facet sends the context again when the user switches it, so the panel can follow. A panel that finds no `theme` (an older Facet) can fall back to `prefers-color-scheme`.
 
 ### After import
 

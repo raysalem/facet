@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
-import { AddonPanelService } from './addon-panel.service';
+import { AddonPanelService, OPEN_PANEL_KEY } from './addon-panel.service';
 import { ApiService } from '../services/api.service';
 import { GalleryStore } from '../../features/gallery/gallery.store';
 
@@ -11,6 +11,8 @@ describe('add-on panel service', () => {
   let service: AddonPanelService;
   const selectedPaths = signal(new Set<string>());
   const opened = { addon_id: 'astro', nonce: 'n1', src: '/addons/astro/ui/?nonce=n1', scope: { kind: 'view', query: 'type=astro' } };
+
+  afterEach(() => sessionStorage.removeItem(OPEN_PANEL_KEY));
 
   beforeEach(() => {
     selectedPaths.set(new Set());
@@ -53,5 +55,34 @@ describe('add-on panel service', () => {
     expect(service.width()).toBe(280);
     service.setWidth(5000, 1000);
     expect(service.width()).toBe(800);
+  });
+
+  it('remembers the open panel for this tab and reopens it after a reload with the same scope (#390)', async () => {
+    const astro = { id: 'astro', name: 'Astro', icon: 'star', mode: 'external' as const };
+    await service.openForCurrentView(astro);
+    expect(service.restorable()).toEqual({ addonId: 'astro', scope: opened.scope });
+    // A reload: a fresh service in the same tab.
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: ApiService, useValue: { post } },
+      { provide: GalleryStore, useValue: { selectionScope: signal('paths'), selectedPaths, filterPayload: () => ({}) } },
+    ] });
+    const reloaded = TestBed.inject(AddonPanelService);
+    post.mockClear();
+    expect(await reloaded.restore({ ...astro, id: 'other' })).toBe(false);
+    expect(await reloaded.restore(astro)).toBe(true);
+    expect(post).toHaveBeenCalledWith('/addons/astro/open', { scope: opened.scope });
+    expect(reloaded.panel()?.nonce).toBe('n1');
+    // Closed by the user: nothing to reopen.
+    reloaded.close();
+    expect(reloaded.restorable()).toBeNull();
+  });
+
+  it('forgets a panel that cannot be reopened, without an error line', async () => {
+    sessionStorage.setItem(OPEN_PANEL_KEY, JSON.stringify({ addonId: 'astro', scope: { kind: 'view' } }));
+    post.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 403, error: { detail: 'Scan access required.' } })));
+    expect(await service.restore({ id: 'astro', name: 'Astro', icon: 'star', mode: 'external' })).toBe(false);
+    expect(service.openError()).toBeNull();
+    expect(service.restorable()).toBeNull();
   });
 });

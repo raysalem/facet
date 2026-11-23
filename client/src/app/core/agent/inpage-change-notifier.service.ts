@@ -17,6 +17,8 @@ export class InpageChangeNotifier {
   private readonly auth = inject(AuthService);
   private ref: MatSnackBarRef<TextOnlySnackBar> | null = null;
   private count = 0;
+  /** The add-on behind every write of the open burst, else null (the assistant, or a mix). */
+  private actor: string | null = null;
 
   constructor() {
     let first = true;
@@ -29,13 +31,17 @@ export class InpageChangeNotifier {
     });
   }
 
-  /** Record a write that changed `changed` photos. */
-  notify(changed: number): void {
+  /** Record a write that changed `changed` photos; `actor` names the add-on that made it ("Astro changed 2 photos"). */
+  notify(changed: number, actor?: string): void {
     if (changed <= 0) return;
+    this.actor = this.count === 0 || this.actor === (actor ?? null) ? actor ?? null : null;
     this.count += changed;
     const keys = I18N.dialog.connect_assistant;
     const close = I18N.dialog.close;
-    const message = this.i18n.t(this.count === 1 ? keys.inpage_changed : keys.inpage_changed_plural, { count: String(this.count) });
+    const one = this.count === 1;
+    const message = this.actor
+      ? this.i18n.t(one ? keys.addon_changed : keys.addon_changed_plural, { count: String(this.count), name: this.actor })
+      : this.i18n.t(one ? keys.inpage_changed : keys.inpage_changed_plural, { count: String(this.count) });
     const ref = this.snackBar.open(message, this.i18n.t(close), { duration: SNACKBAR_MS });
     this.ref = ref;
     ref.afterDismissed().subscribe(() => {
@@ -43,6 +49,7 @@ export class InpageChangeNotifier {
       if (this.ref !== ref) return;
       this.ref = null;
       this.count = 0;
+      this.actor = null;
     });
   }
 
@@ -50,6 +57,7 @@ export class InpageChangeNotifier {
     const ref = this.ref;
     this.ref = null;
     this.count = 0;
+    this.actor = null;
     ref?.dismiss();
   }
 }

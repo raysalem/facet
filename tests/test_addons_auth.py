@@ -427,6 +427,20 @@ class TestAddonsRoutes:
         viewer_only = env.login(edition=False)
         assert env.client.get("/api/addons", headers=viewer_only).status_code == 403
 
+    def test_names_are_open_to_any_viewer_and_carry_nothing_else(self, addons, monkeypatch):
+        """B50: a viewer without edition sees the add-on's name (object tags, the tab shown off)."""
+        env, _ = addons()
+        viewer_only = env.login(edition=False)
+        resp = env.client.get("/api/addons/names", headers=viewer_only)
+        assert resp.status_code == 200, resp.text
+        names = {a["id"]: a for a in resp.json()["addons"]}
+        assert names["astro"] == {"id": "astro", "name": "Astro", "icon": names["astro"]["icon"], "slots": ["sidebar"]}
+        assert set(names) == {"astro", "reader", "supervised"}
+        assert "argv" not in resp.text and "permissions" not in resp.text and sys.executable not in resp.text
+        assert env.client.get("/api/addons/names").status_code == 401
+        monkeypatch.setitem(api_config._FULL_CONFIG, "addons", {"enabled": False})
+        assert env.client.get("/api/addons/names", headers=viewer_only).status_code == 404
+
     def test_supervised_addon_cannot_mint_once(self, addons):
         env, headers = addons()
         assert env.client.post("/api/addons/supervised/token", headers=headers).status_code == 409

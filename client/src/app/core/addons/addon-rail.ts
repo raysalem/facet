@@ -1,10 +1,12 @@
 import { DestroyRef, Injector, computed, effect, inject, signal, untracked } from '@angular/core';
 import { AuthService } from '../services/auth.service';
-import { AddonsService, type Addon } from '../services/addons.service';
+import { AddonsService, type Addon, type AddonName } from '../services/addons.service';
 import { AddonPanelService } from './addon-panel.service';
 
 /** An add-on as a rail and the panel service know it. */
 export type RailAddon = Pick<Addon, 'id' | 'name' | 'icon'> & Partial<Pick<Addon, 'mode'>>;
+/** An installed add-on as a rail lists it: the full entry for an operator, the name only for anyone else. */
+export type RegistryAddon = AddonName & Partial<Addon>;
 
 export interface AddonRailOptions<T extends string> {
   /** localStorage key the picked tab is remembered under. */
@@ -37,8 +39,21 @@ export class AddonRail<T extends string> {
   readonly pageTab = signal<T | null>(null);
   /** The page panel on screen: none while everything is closed. */
   readonly shownPage = computed(() => this.tab() === null ? null : this.pageTab());
-  /** The installed add-ons, read once when this account has add-ons (or `needsRegistry` asks). */
-  readonly registry = signal<readonly Addon[]>([]);
+  /** The add-on service, resolved only once this page needs it (a page with no add-on never starts it). */
+  private readonly service = signal<AddonsService | null>(null);
+  /** The installed add-ons this session may read; follows an edition unlock or lock without a reload. */
+  readonly registry = computed<readonly RegistryAddon[]>(() => this.service()?.list()?.addons ?? this.service()?.names() ?? []);
+  /**
+   * Whether this session may open an add-on. A viewer who may not still sees the add-on's tab, shown off with
+   * the reason (B50), so the tab does not appear from nowhere after an unlock.
+   */
+  readonly addonsUsable = computed(() => this.service()?.available() ?? false);
+  /** Whether this add-on's tab works: the session may open add-ons, or its panel is open already. */
+  usable(id: string): boolean {
+    return this.addonsUsable() || this.panels.panel()?.addon.id === id;
+  }
+  /** Why the add-on tabs are off: unlock editing, or (multi-user) an administrator's right. */
+  readonly lockedReason = computed(() => this.auth.isMultiUser() ? 'admin_only' as const : 'locked' as const);
   /** Add-ons with a sidebar panel, plus the open panel's add-on when the registry has not been read. */
   readonly addons = computed<RailAddon[]>(() => {
     const listed: RailAddon[] = this.registry().filter(addon => addon.slots.includes('sidebar'));
@@ -53,7 +68,6 @@ export class AddonRail<T extends string> {
   /** False while the host page is parked (detached by route reuse): another page owns the dock then. */
   private active = true;
   private lastPanel: string | null | undefined = undefined;
-  private registryRequested = false;
 
   constructor(options: AddonRailOptions<T>) {
     this.options = options;
@@ -61,18 +75,29 @@ export class AddonRail<T extends string> {
     const isPageTab = (value: string | null): value is T => value !== null && (options.tabs as readonly string[]).includes(value);
     this.tab.set(stored === '' ? null : isPageTab(stored) || stored?.startsWith(ADDON_PREFIX) ? stored : options.defaultTab);
     this.pageTab.set(isPageTab(stored) ? stored : options.defaultTab);
+    // The add-on tab this page was on before a reload (F5): its panel opens again once the add-on is readable.
+    const reopen = stored?.startsWith(ADDON_PREFIX) && !this.panels.panel() ? stored.slice(ADDON_PREFIX.length) : null;
     this.adoptPanel();
 
     effect(() => {
-      if (this.registryRequested || (!this.auth.hasFeature('addons') && !options.needsRegistry?.())) return;
-      this.registryRequested = true;
-      // Resolved only now: a page that needs no add-on never starts the add-on service.
-      const addons = this.injector.get(AddonsService);
-      untracked(async () => {
-        const list = addons.list() ?? (addons.available() ? await addons.load() : null);
-        if (list) this.registry.set(list.addons);
-      });
+      if (this.service() || (!this.auth.hasFeature('addons') && !options.needsRegistry?.())) return;
+      untracked(() => this.service.set(this.injector.get(AddonsService)));
     });
+    // Read again whenever the right to read changes: the unlocked rail gets its add-on tab at once.
+    effect(() => {
+      const addons = this.service();
+      if (!addons) return;
+      addons.available();
+      untracked(() => addons.sync());
+    });
+    if (reopen) {
+      const restore = effect(() => {
+        const addon = this.service()?.available() ? this.addons().find(entry => entry.id === reopen) : undefined;
+        if (!addon) return;
+        restore.destroy();
+        if (this.panels.restorable()?.addonId === reopen) untracked(() => void this.panels.restore(addon));
+      });
+    }
     effect(() => {
       const open = this.panels.panel();
       const key = open ? `${open.addon.id}|${open.nonce}` : null;
@@ -141,6 +166,7 @@ export class AddonRail<T extends string> {
 
   /** Show an add-on's panel; opening it (when another or none is open) selects its tab once it is there. */
   selectAddon(addon: RailAddon): void {
+    if (!this.usable(addon.id)) return;
     const tab = ADDON_PREFIX + addon.id;
     if (this.panels.panel()?.addon.id !== addon.id) void this.panels.openForCurrentView(addon);
     else if (this.options.defaultTab === null && this.tab() === tab) this.tab.set(this.pageTab());

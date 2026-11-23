@@ -31,7 +31,7 @@ describe('InpageChangeNotifier', () => {
       providers: [
         { provide: MatSnackBar, useValue: { open } },
         { provide: AuthService, useValue: { identity: computed(() => `${authStatus()?.authenticated ? 1 : 0}|${authStatus()?.user_id ?? ''}`) } },
-        { provide: I18nService, useValue: { t: (key: string, vars?: Record<string, string>) => `${key} ${vars?.['count'] ?? ''}`.trim() } },
+        { provide: I18nService, useValue: { t: (key: string, vars?: Record<string, string>) => `${key} ${vars?.['name'] ? vars['name'] + ' ' : ''}${vars?.['count'] ?? ''}`.trim() } },
       ],
     });
     notifier = TestBed.inject(InpageChangeNotifier);
@@ -45,6 +45,17 @@ describe('InpageChangeNotifier', () => {
       'dialog.connect_assistant.inpage_changed_plural 2',
       'dialog.connect_assistant.inpage_changed_plural 5',
       'dialog.connect_assistant.inpage_changed_plural 6',
+    ]);
+  });
+
+  it('names the add-on that made the change instead of the assistant, and falls back for a mixed burst (#392)', () => {
+    notifier.notify(1, 'Astro');
+    notifier.notify(1, 'Astro');
+    notifier.notify(1);
+    expect(open.mock.calls.map(c => c[0])).toEqual([
+      'dialog.connect_assistant.addon_changed Astro 1',
+      'dialog.connect_assistant.addon_changed_plural Astro 2',
+      'dialog.connect_assistant.inpage_changed_plural 3',
     ]);
   });
 

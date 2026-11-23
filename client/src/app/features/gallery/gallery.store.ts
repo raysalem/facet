@@ -573,6 +573,9 @@ export class GalleryStore {
    * raised `pinnedLoad`, so every filter writer that reloads also drops the pin.
    */
   readonly pinnedPaths = signal<string[] | null>(null);
+  /** Who chose the pinned list when it is not the assistant: an add-on's name ("Astro"), else null. */
+  readonly pinnedBy = signal<string | null>(null);
+  private nextPinActor: string | null = null;
   /** Requested paths the server did not return for the current pin (invisible, unknown). */
   readonly pinnedMissing = signal<string[]>([]);
   private pinnedLoad = false;
@@ -1348,12 +1351,17 @@ export class GalleryStore {
   async showPaths(paths: string[]): Promise<string[]> {
     // The previous view's selection names photos this list may not hold.
     this.clearSelection();
+    this.pinnedBy.set(this.nextPinActor);
+    this.nextPinActor = null;
     this.pinnedPaths.set(paths);
     this.pinnedMissing.set([]);
     this.pinnedLoad = true;
     await this.loadPhotos();
     return this.pinnedMissing();
   }
+
+  /** The next `showPaths` comes from this add-on (its panel's "Show in Facet"), so the chip names it. */
+  pinNextBy(actor: string): void { this.nextPinActor = actor; }
 
   notifyOrganizationRestored(): void { this.organizationRestoredSubject.next(); }
 

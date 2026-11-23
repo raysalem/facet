@@ -373,7 +373,11 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
           <div data-pinned-summary role="status" class="mx-2 md:mx-4 mt-2 md:mt-4 px-3 py-2 rounded-md bg-[var(--mat-sys-surface-container-high)] border border-[var(--mat-sys-outline-variant)] flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
             <mat-icon class="opacity-70 !text-base !w-5 !h-5">auto_awesome</mat-icon>
             <span class="min-w-[12rem] flex-1">
-              {{ store.total() | pluralKey:I18N.gallery.pinned.chip:I18N.gallery.pinned.chip_plural | translate:{ count: store.total() } }}
+              @if (store.pinnedBy(); as by) {
+                {{ store.total() | pluralKey:I18N.gallery.pinned.chip_by:I18N.gallery.pinned.chip_by_plural | translate:{ count: store.total(), name: by } }}
+              } @else {
+                {{ store.total() | pluralKey:I18N.gallery.pinned.chip:I18N.gallery.pinned.chip_plural | translate:{ count: store.total() } }}
+              }
             </span>
             <button mat-button class="!min-w-0" (click)="store.clearPinned()">
               {{ I18N.gallery.pinned.clear | translate }}

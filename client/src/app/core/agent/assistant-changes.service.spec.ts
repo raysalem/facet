@@ -31,6 +31,20 @@ describe('AssistantChangesService', () => {
     TestBed.resetTestingModule();
   });
 
+  it('carries the add-on that made a burst to the notice and the batch, and drops it for a mixed burst (#392)', () => {
+    const batches: unknown[] = [];
+    service.batch$.subscribe(batch => batches.push(batch));
+    service.report({ tool: 'addon:astro', paths: ['/a.jpg'], count: 1, actor: 'Astro' });
+    service.report({ tool: 'addon:astro', paths: ['/b.jpg'], count: 1, actor: 'Astro' });
+    vi.advanceTimersByTime(400);
+    expect(notify).toHaveBeenLastCalledWith(2, 'Astro');
+    expect(batches.at(-1)).toEqual({ paths: ['/a.jpg', '/b.jpg'], count: 2, actor: 'Astro' });
+    service.report({ tool: 'addon:astro', paths: ['/a.jpg'], count: 1, actor: 'Astro' });
+    service.report({ tool: 'toggle_rejected', paths: ['/c.jpg'], count: 1 });
+    vi.advanceTimersByTime(400);
+    expect(notify).toHaveBeenLastCalledWith(2);
+  });
+
   it('coalesces 4 single-path reports within the window into one batch and one notify(4)', () => {
     for (const p of ['/a', '/b', '/c', '/d']) {
       service.report({ paths: [p], count: 1 });

@@ -317,6 +317,14 @@ def stop_all() -> None:
             logger.warning("Could not stop add-on %s", addon_id, exc_info=True)
 
 
+def is_live(addon_id: str) -> bool:
+    """Whether a process of this add-on is starting or running now."""
+    with _lock:
+        inst = _instances.get(addon_id)
+        return (inst is not None and inst.proc is not None and inst.status in ("running", "starting")
+                and inst.proc.poll() is None)
+
+
 def instance(addon_id: str) -> Optional[Instance]:
     return _instances.get(addon_id)
 

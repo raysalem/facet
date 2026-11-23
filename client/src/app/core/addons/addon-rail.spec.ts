@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { AddonRail } from './addon-rail';
 import { AddonPanelService, type OpenPanel } from './addon-panel.service';
 import { AuthService } from '../services/auth.service';
+import { AddonsService, type AddonList } from '../services/addons.service';
 
 describe('AddonRail', () => {
   const KEY = 'addon_rail_spec';
@@ -83,6 +84,8 @@ describe('AddonRail', () => {
   });
 
   it('opens an add-on that is not open yet rather than picking an empty tab', () => {
+    TestBed.overrideProvider(AuthService, { useValue: { hasFeature: (key: string) => key === 'addons' } });
+    TestBed.overrideProvider(AddonsService, { useValue: { available: signal(true), list: signal(null), names: signal(null), sync: vi.fn() } });
     const rail = create('view');
     TestBed.tick();
     rail.selectAddon(astro);
@@ -148,5 +151,45 @@ describe('AddonRail', () => {
     expect(dockHidden()).toBe(false);
     rail.resume();
     expect(dockHidden()).toBe(true);
+  });
+
+  it('shows the add-on tab as soon as an edition unlock lets the session read add-ons, and drops it on lock (#389)', () => {
+    const available = signal(false);
+    const list = signal<AddonList | null>(null);
+    const item = { ...astro, slots: ['sidebar'], mode: 'supervised' } as unknown as AddonList['addons'][number];
+    const sync = vi.fn(() => list.set(available() ? { addons: [item], refused: [], addons_dir: '' } as AddonList : null));
+    TestBed.overrideProvider(AuthService, { useValue: { hasFeature: (key: string) => key === 'addons' } });
+    TestBed.overrideProvider(AddonsService, { useValue: { available, list, names: signal(null), sync } });
+    const rail = create('view');
+    TestBed.tick();
+    expect(rail.addons()).toEqual([]);
+    available.set(true); TestBed.tick();
+    expect(rail.addons().map(addon => addon.id)).toEqual(['astro']);
+    available.set(false); TestBed.tick();
+    expect(rail.addons()).toEqual([]);
+    expect(sync).toHaveBeenCalledTimes(3);
+  });
+
+  it('opens again, after a reload, the add-on panel this page had open (#390)', async () => {
+    const available = signal(true);
+    const item = { ...astro, slots: ['sidebar'], mode: 'supervised' } as unknown as AddonList['addons'][number];
+    const list = signal<AddonList | null>({ addons: [item], refused: [], addons_dir: '' } as AddonList);
+    const restore = vi.fn(async () => { panel.set({ addon: astro, nonce: 'n9', src: '/addons/astro/', scope: { kind: 'view' } }); return true; });
+    const restorable = () => ({ addonId: 'astro', scope: { kind: 'view' } });
+    TestBed.overrideProvider(AuthService, { useValue: { hasFeature: (key: string) => key === 'addons' } });
+    TestBed.overrideProvider(AddonsService, { useValue: { available, list, names: signal(null), sync: vi.fn() } });
+    TestBed.overrideProvider(AddonPanelService, { useValue: { panel, dockHidden, addonShown, openForCurrentView, restore, restorable } });
+    localStorage.setItem(KEY, 'addon:astro');
+    const rail = create('view');
+    TestBed.tick();
+    expect(restore).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: 'astro', mode: 'supervised' }));
+    await Promise.resolve(); TestBed.tick();
+    expect(rail.tab()).toBe('addon:astro');
+    expect(dockHidden()).toBe(false);
+    // A page remembered on its own panel reopens nothing.
+    restore.mockClear(); panel.set(null);
+    localStorage.setItem(KEY, 'view');
+    create('view'); TestBed.tick();
+    expect(restore).not.toHaveBeenCalled();
   });
 });

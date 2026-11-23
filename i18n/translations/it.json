@@ -148,7 +148,9 @@
       "inpage_toggle": "Consenti agli agenti di questo browser di usare gli strumenti di Facet",
       "inpage_hint": "Se attivo, un assistente in esecuzione in questo browser può cercare e, se la sessione lo consente, modificare la libreria tramite la pagina. Disattivato per impostazione predefinita; vale solo per questo browser.",
       "inpage_changed": "L’assistente ha modificato {count} foto",
-      "inpage_changed_plural": "L’assistente ha modificato {count} foto"
+      "inpage_changed_plural": "L’assistente ha modificato {count} foto",
+      "addon_changed": "{name} ha modificato {count} foto",
+      "addon_changed_plural": "{name} ha modificato {count} foto"
     },
     "ok": "OK"
   },
@@ -1187,6 +1189,8 @@
     "pinned": {
       "chip": "{count} foto scelta dal tuo assistente",
       "chip_plural": "{count} foto scelte dal tuo assistente",
+      "chip_by": "{count} foto scelta da {name}",
+      "chip_by_plural": "{count} foto scelte da {name}",
       "clear": "Torna alla vista abituale"
     },
     "all_photos": "Tutte le foto",
@@ -4351,7 +4355,9 @@
     "refresh": "Aggiorna",
     "panel": {
       "close": "Chiudi il pannello del componente",
-      "resize": "Ridimensiona il pannello del componente"
+      "resize": "Ridimensiona il pannello del componente",
+      "locked": "Sblocca la modifica nel menu utente per usare {name}",
+      "admin_only": "Solo un amministratore può usare {name}"
     },
     "open": "Apri",
     "launcher": "Apri un componente per questa vista",

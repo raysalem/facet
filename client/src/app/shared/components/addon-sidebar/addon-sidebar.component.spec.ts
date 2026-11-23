@@ -9,6 +9,7 @@ import { GalleryStore } from '../../../features/gallery/gallery.store';
 import { WebMcpToolRegistry } from '../../../core/agent/webmcp-registry.service';
 import { AssistantChangesService } from '../../../core/agent/assistant-changes.service';
 import { I18nService } from '../../../core/services/i18n.service';
+import { ThemeService } from '../../../core/services/theme.service';
 
 describe('add-on sidebar host', () => {
   let fixture: ComponentFixture<AddonSidebarComponent>;
@@ -19,6 +20,8 @@ describe('add-on sidebar host', () => {
   const close = vi.fn();
   const execute = vi.fn(async () => ({ ok: true }));
   const report = vi.fn();
+  const pinNextBy = vi.fn();
+  const darkMode = signal(false);
   const events = new Subject<unknown>();
 
   beforeEach(() => {
@@ -28,12 +31,14 @@ describe('add-on sidebar host', () => {
     selectedPaths.set(new Set(['/p/a.jpg']));
     TestBed.configureTestingModule({ imports: [AddonSidebarComponent], providers: [
       { provide: AddonPanelService, useValue: { panel, width: signal(380), dockHidden, close, setWidth: vi.fn() } },
-      { provide: GalleryStore, useValue: { selectionScope: signal('paths'), selectedPaths } },
+      { provide: GalleryStore, useValue: { selectionScope: signal('paths'), selectedPaths, pinNextBy } },
       { provide: WebMcpToolRegistry, useValue: { load: vi.fn(async () => undefined), execute } },
       { provide: AssistantChangesService, useValue: { report } },
       { provide: Router, useValue: { url: '/album/7', events } },
       { provide: I18nService, useValue: { t: (key: string) => key, translations: signal({}), currentLang: signal('en') } },
+      { provide: ThemeService, useValue: { darkMode } },
     ] });
+    darkMode.set(false);
     fixture = TestBed.createComponent(AddonSidebarComponent);
     fixture.detectChanges();
     root = fixture.nativeElement;
@@ -49,6 +54,13 @@ describe('add-on sidebar host', () => {
     dockHidden.set(false); fixture.detectChanges();
     expect(root.classList).not.toContain('lg:!hidden');
     expect(frame()).toBe(first);
+  });
+  it('is a drawer over the page below sm, not a column that squeezes it (#391)', () => {
+    for (const cls of ['max-sm:absolute', 'max-sm:inset-y-0', 'max-sm:right-0', 'max-sm:!w-[calc(100vw-3rem)]', 'max-sm:!max-w-none']) {
+      expect(root.classList).toContain(cls);
+    }
+    // The column's own resize handle has no use in a drawer.
+    expect(root.querySelector('[data-addon-resize]')!.classList).toContain('max-sm:hidden');
   });
   function send(data: unknown, source: unknown = frame().contentWindow): void {
     window.dispatchEvent(new MessageEvent('message', { data, source: source as Window }));
@@ -84,6 +96,16 @@ describe('add-on sidebar host', () => {
     expect(posted).toHaveBeenLastCalledWith(expect.objectContaining({ selection: ['/p/b.jpg'] }), '*');
   });
 
+  it("tells the panel Facet's theme and sends the context again when it changes (#393)", () => {
+    const posted = vi.spyOn(frame().contentWindow!, 'postMessage');
+    send({ type: 'ready', v: 1, nonce: 'nonce-1' });
+    fixture.detectChanges();
+    expect(posted).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'context', theme: 'light' }), '*');
+    darkMode.set(true);
+    fixture.detectChanges();
+    expect(posted).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'context', theme: 'dark' }), '*');
+  });
+
   it("keeps the handshake through the frame's load event (ready arrives first)", () => {
     // A page sends ready while loading; the iframe's load event fires afterwards. Resetting there dropped
     // every later request, so Google Earth / Maps and Show in Facet did nothing.
@@ -112,7 +134,9 @@ describe('add-on sidebar host', () => {
     await vi.waitFor(() => expect(execute).toHaveBeenCalledTimes(2));
     expect(execute).toHaveBeenCalledWith('ui_show_photos', { paths: ['/p/a.jpg'] });
     expect(execute).toHaveBeenCalledWith('ui_open_photo', { path: '/p/a.jpg' });
-    expect(report).toHaveBeenCalledWith({ tool: 'addon:astro', paths: ['/p/a.jpg'], count: 1 });
+    // The grid chip and the change notice name the add-on (#392).
+    expect(pinNextBy).toHaveBeenCalledWith('Astro');
+    expect(report).toHaveBeenCalledWith({ tool: 'addon:astro', paths: ['/p/a.jpg'], count: 1, actor: 'Astro' });
     send({ type: 'close', v: 1, nonce: 'nonce-1' });
     expect(close).toHaveBeenCalled();
   });

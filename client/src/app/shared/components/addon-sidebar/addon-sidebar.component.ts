@@ -16,6 +16,10 @@ import { WebMcpToolRegistry } from '../../../core/agent/webmcp-registry.service'
 import { AssistantChangesService } from '../../../core/agent/assistant-changes.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { i18nKeys } from '../../../core/i18n/keys';
+import { ThemeService } from '../../../core/services/theme.service';
+
+/** Below sm: over the page from the right, leaving a strip of the page in view; no resize handle. */
+export const DRAWER_CLASSES = 'max-sm:absolute max-sm:inset-y-0 max-sm:right-0 max-sm:z-40 max-sm:!w-[calc(100vw-3rem)] max-sm:!max-w-none max-sm:shadow-2xl';
 
 /**
  * The add-on sidebar: the right-hand rail of the shell, so it survives navigation between the
@@ -30,7 +34,9 @@ import { i18nKeys } from '../../../core/i18n/keys';
   host: {
     // A page rail's add-on tab points here (aria-controls).
     id: 'addon-dock',
-    class: 'relative flex shrink-0 flex-col border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-low)] max-w-[80vw]',
+    // From sm up a column beside the page; below sm a drawer over the page, so a phone keeps its full width
+    // for the page behind (a 311 px column left the album 78 px at 390).
+    class: `relative flex shrink-0 flex-col border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-low)] max-w-[80vw] ${DRAWER_CLASSES}`,
     '[style.width.px]': 'service.width()',
     '[class.lg:!hidden]': 'service.dockHidden()',
     '[attr.data-addon-sidebar]': 'panel()?.addon?.id ?? null',
@@ -41,7 +47,7 @@ import { i18nKeys } from '../../../core/i18n/keys';
       <!-- Drag to resize; arrow keys for keyboard users. -->
       <div role="separator" aria-orientation="vertical" tabindex="0" data-addon-resize
            [attr.aria-label]="I18N.addons.panel.resize | translate"
-           class="absolute left-0 top-0 bottom-0 w-1.5 -ml-0.5 cursor-col-resize z-10 hover:bg-[var(--mat-sys-primary)] focus:bg-[var(--mat-sys-primary)]"
+           class="max-sm:hidden absolute left-0 top-0 bottom-0 w-1.5 -ml-0.5 cursor-col-resize z-10 hover:bg-[var(--mat-sys-primary)] focus:bg-[var(--mat-sys-primary)]"
            (pointerdown)="startResize($event)" (keydown.arrowleft)="nudge(24)" (keydown.arrowright)="nudge(-24)"></div>
       <header class="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--mat-sys-outline-variant)] shrink-0">
         <mat-icon class="shrink-0">{{ open.addon.icon }}</mat-icon>
@@ -75,6 +81,7 @@ export class AddonSidebarComponent {
   private readonly tools = inject(WebMcpToolRegistry);
   private readonly changes = inject(AssistantChangesService);
   private readonly annotationViews = inject(AnnotationViewService);
+  private readonly themes = inject(ThemeService);
   private readonly frame = viewChild<ElementRef<HTMLIFrameElement>>('frame');
 
   protected readonly panel = this.service.panel;
@@ -107,13 +114,14 @@ export class AddonSidebarComponent {
       const id = this.panel()?.addon.id;
       if (id) onCleanup(() => this.annotationViews.clear(id));
     });
-    // Context on open (after `ready`) and on every change of route or selection.
+    // Context on open (after `ready`) and on every change of route, selection or Facet's light/dark theme.
     effect(() => {
       const open = this.panel();
       const url = this.url();
       const selection = this.selection();
+      const theme = this.themes.darkMode() ? 'dark' : 'light';
       if (!open || this.handshake() === 0) return;
-      untracked(() => this.post(buildContext(open.nonce, url, selection, open.scope)));
+      untracked(() => this.post(buildContext(open.nonce, url, selection, open.scope, theme)));
     });
   }
 
@@ -128,10 +136,10 @@ export class AddonSidebarComponent {
       return;
     }
     if (this.handshake() === 0) return;
-    void this.handle(request, open.addon.id);
+    void this.handle(request, open.addon.id, open.addon.name);
   }
 
-  private async handle(request: PanelRequest, addonId: string): Promise<void> {
+  private async handle(request: PanelRequest, addonId: string, addonName: string): Promise<void> {
     switch (request.type) {
       case 'ready':
         return;
@@ -139,10 +147,12 @@ export class AddonSidebarComponent {
         this.service.close();
         return;
       case 'refresh':
-        this.changes.report({ tool: `addon:${addonId}`, paths: request.paths, count: request.paths.length });
+        this.changes.report({ tool: `addon:${addonId}`, paths: request.paths, count: request.paths.length, actor: addonName });
         return;
       case 'show_photos':
         await this.tools.load();
+        // The grid's chip names the add-on, not "your assistant".
+        this.gallery.pinNextBy(addonName);
         await this.tools.execute('ui_show_photos', { paths: request.paths });
         return;
       case 'open_photo':

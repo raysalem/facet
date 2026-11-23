@@ -21,7 +21,7 @@ from api.auth import (
 )
 from api.config import is_multi_user_enabled
 from api.models.addons import (
-    AddonClosed, AddonCloseRequest, AddonList, AddonLog, AddonRun, AddonStarted, AddonStartRequest, AddonStopped, AddonOpened, AddonOpenRequest, AddonTokenCreated,
+    AddonClosed, AddonCloseRequest, AddonList, AddonLog, AddonNames, AddonRun, AddonStarted, AddonStartRequest, AddonStopped, AddonOpened, AddonOpenRequest, AddonTokenCreated,
     AddonTokensRevoked,
 )
 
@@ -82,6 +82,22 @@ def list_addons(_user: CurrentUser = Depends(require_addon_operator)):
     for extra in LIST_EXTRAS:
         body.update(extra())
     return body
+
+
+@router.get(
+    "/names",
+    response_model=AddonNames,
+    responses={404: {"description": "Add-ons are disabled (addons.enabled)."}},
+)
+def list_addon_names(_user: CurrentUser = Depends(require_authenticated)):
+    """The installed add-ons' display names and icons, for any signed-in viewer.
+
+    A viewer without scan access sees what an add-on stored (its object tags) and the add-on's tab, shown
+    off with the reason; it needs the name for both. Nothing else of the manifest (no version, permissions,
+    state or path) is in this answer.
+    """
+    return {"addons": [{"id": a.id, "name": a.name, "icon": a.icon, "slots": list(a.slots)}
+                       for a in manifest.registry().addons.values()]}
 
 
 @router.post(
@@ -190,7 +206,7 @@ def supervised_or_409(addon_id: str) -> manifest.Addon:
     "/{addon_id}/start",
     response_model=AddonStarted,
     responses={404: {"description": "Unknown add-on, or add-ons are disabled."},
-               409: {"description": "Not a supervised add-on."},
+               409: {"description": "Not a supervised add-on, or its edited addon.json was refused."},
                422: {"description": "The scope failed validation."},
                502: {"description": "The add-on did not start; the body carries the reason and the log tail."}},
 )
@@ -199,8 +215,13 @@ def start_addon(addon_id: str, body: AddonStartRequest, request: Request,
     """Start a supervised add-on (or keep the running one) and, with ``scope``, open its panel.
 
     Takes ``{scope}`` only: the program, its arguments and its environment come from the manifest
-    on disk and from Facet, never from the request.
+    on disk and from Facet, never from the request. A start of a stopped add-on reads its ``addon.json``
+    again first, so Stop then Start picks up an edited manifest (a running one keeps the manifest it began with).
     """
+    if not supervisor.is_live(addon_id) and manifest.reread(addon_id) is None:
+        refused = next((r["reason"] for r in manifest.registry().refused if r["directory"] == addon_id), None)
+        if refused is not None:
+            raise HTTPException(status_code=409, detail=f"addon.json was refused: {refused}")
     addon = supervised_or_409(addon_id)
     scope = panels.validate_scope(addon.id, body.scope) if body.scope is not None else None
     inst = supervisor.start(addon, user, facet_url(request))

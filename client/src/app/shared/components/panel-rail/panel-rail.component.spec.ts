@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { AddonRail } from '../../../core/addons/addon-rail';
 import { AddonPanelService, type OpenPanel } from '../../../core/addons/addon-panel.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { AddonsService } from '../../../core/services/addons.service';
 import { I18nService } from '../../../core/services/i18n.service';
 import { PanelRailComponent } from './panel-rail.component';
 
@@ -63,5 +64,20 @@ describe('PanelRailComponent', () => {
     expect(addon.getAttribute('aria-selected')).toBeNull();
     expect(addon.getAttribute('aria-pressed')).toBe('true');
     expect(addon.getAttribute('tabindex')).toBeNull();
+  });
+
+  it('shows a viewer who may not open add-ons the add-on tab by name, off, with the reason (B50)', () => {
+    panel.set(null);
+    const openForCurrentView = vi.fn();
+    TestBed.overrideProvider(AddonPanelService, { useValue: { panel, dockHidden: signal(false), addonShown: signal(false), openForCurrentView } });
+    TestBed.overrideProvider(AuthService, { useValue: { hasFeature: (key: string) => key === 'addons', isMultiUser: () => false } });
+    TestBed.overrideProvider(AddonsService, { useValue: {
+      available: signal(false), list: signal(null), names: signal([{ ...astro, slots: ['sidebar'] }]), sync: vi.fn() } });
+    const { addon } = render(true);
+    expect(addon).not.toBeNull();
+    expect(addon.getAttribute('aria-disabled')).toBe('true');
+    expect(addon.getAttribute('aria-label')).toBe('addons.panel.locked');
+    addon.click();
+    expect(openForCurrentView).not.toHaveBeenCalled();
   });
 });

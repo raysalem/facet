@@ -102,6 +102,38 @@ class TestLifecycle:
         listed = {a["id"]: a for a in env.client.get("/api/addons", headers=env.headers).json()["addons"]}
         assert listed["good"]["status"] == "stopped"
 
+    def test_stop_then_start_rereads_an_edited_manifest(self, env):
+        """#394: Stop + Start on the Add-ons page picks up a changed addon.json, without a restart."""
+        manifest_path = env.folders["good"] / "addon.json"
+        assert _start(env, "good").json()["status"] == "running"
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        data.update(name="Good Two", version="2")
+        manifest_path.write_text(json.dumps(data), encoding="utf-8")
+        # Running: a start keeps the running process and the manifest it began with.
+        assert _start(env, "good").json()["status"] == "running"
+        listed = {a["id"]: a for a in env.client.get("/api/addons", headers=env.headers).json()["addons"]}
+        assert listed["good"]["version"] == "1"
+        env.client.post("/api/addons/good/stop", headers=env.headers)
+        assert _start(env, "good").json()["status"] == "running"
+        listed = {a["id"]: a for a in env.client.get("/api/addons", headers=env.headers).json()["addons"]}
+        assert (listed["good"]["name"], listed["good"]["version"]) == ("Good Two", "2")
+        assert "starting good 2" in (env.logs / "good.log").read_text(encoding="utf-8", errors="replace")
+        # An edit that breaks the manifest: the start says why, and the Add-ons page lists it as refused.
+        env.client.post("/api/addons/good/stop", headers=env.headers)
+        data["permissions"] = ["photos.read", "everything"]
+        manifest_path.write_text(json.dumps(data), encoding="utf-8")
+        refused = _start(env, "good")
+        assert refused.status_code == 409 and "unknown permissions: everything" in refused.json()["detail"]
+        body = env.client.get("/api/addons", headers=env.headers).json()
+        assert "good" not in {a["id"] for a in body["addons"]}
+        assert any(r["directory"] == "good" and "everything" in r["reason"] for r in body["refused"])
+        # Fixed again: the next start reads it back.
+        data["permissions"] = ["photos.read"]
+        manifest_path.write_text(json.dumps(data), encoding="utf-8")
+        assert _start(env, "good").json()["status"] == "running"
+        # The request never names a path: an id that was never installed is not read.
+        assert _start(env, "nothere").status_code == 404
+
     def test_clean_env_cwd_and_loopback(self, env):
         opened = _start(env, "good", {"kind": "view"}).json()["opened"]
         seen = env.client.get("/addons/good/env", headers={"X-Addon-Nonce": opened["nonce"]}).json()
