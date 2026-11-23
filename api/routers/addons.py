@@ -206,7 +206,7 @@ def supervised_or_409(addon_id: str) -> manifest.Addon:
     "/{addon_id}/start",
     response_model=AddonStarted,
     responses={404: {"description": "Unknown add-on, or add-ons are disabled."},
-               409: {"description": "Not a supervised add-on."},
+               409: {"description": "Not a supervised add-on, or its edited addon.json was refused."},
                422: {"description": "The scope failed validation."},
                502: {"description": "The add-on did not start; the body carries the reason and the log tail."}},
 )
@@ -215,8 +215,13 @@ def start_addon(addon_id: str, body: AddonStartRequest, request: Request,
     """Start a supervised add-on (or keep the running one) and, with ``scope``, open its panel.
 
     Takes ``{scope}`` only: the program, its arguments and its environment come from the manifest
-    on disk and from Facet, never from the request.
+    on disk and from Facet, never from the request. A start of a stopped add-on reads its ``addon.json``
+    again first, so Stop then Start picks up an edited manifest (a running one keeps the manifest it began with).
     """
+    if not supervisor.is_live(addon_id) and manifest.reread(addon_id) is None:
+        refused = next((r["reason"] for r in manifest.registry().refused if r["directory"] == addon_id), None)
+        if refused is not None:
+            raise HTTPException(status_code=409, detail=f"addon.json was refused: {refused}")
     addon = supervised_or_409(addon_id)
     scope = panels.validate_scope(addon.id, body.scope) if body.scope is not None else None
     inst = supervisor.start(addon, user, facet_url(request))

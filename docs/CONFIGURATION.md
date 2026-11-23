@@ -2125,7 +2125,7 @@ An add-on is a separate program (its own repository and virtual environment) tha
 |-----|---------|-------------|
 | `enabled` | `false` | Master switch. When false, `/api/addons` answers 404, add-on tokens are refused and no add-on is listed or started |
 
-**Installing.** An add-on's installer writes one file, `<facet data>/addons/<id>/addon.json`, and nothing else. *Facet data* is the folder that holds the database (`dirname(DB_PATH)`): `%LOCALAPPDATA%\Facet\data` on Windows, `/app/data` in Docker. Manifests are read at startup and whenever the configuration is reloaded. To uninstall, delete the folder. Placing the manifest is the approval; there is no in-browser approval step.
+**Installing.** An add-on's installer writes one file, `<facet data>/addons/<id>/addon.json`, and nothing else. *Facet data* is the folder that holds the database (`dirname(DB_PATH)`): `%LOCALAPPDATA%\Facet\data` on Windows, `/app/data` in Docker. Manifests are read at startup and whenever the configuration is reloaded; a supervised add-on's own manifest is also read again each time it is started while stopped, so after editing `addon.json`, **Stop** then **Start** (or **Open**) picks it up. A running add-on keeps the manifest it started with. To uninstall, delete the folder. Placing the manifest is the approval; there is no in-browser approval step.
 
 ```json
 {"id": "astro-id", "name": "Astro", "version": "0.3.0", "icon": "star", "facet_api": 1,

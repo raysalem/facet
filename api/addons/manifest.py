@@ -187,6 +187,25 @@ def parse_manifest(data: object, directory: str) -> Addon:
                  directory=os.path.abspath(directory), slots=slots, permissions=permissions, **fields)
 
 
+def read_manifest(directory: str) -> Addon:
+    """Read and validate ``<directory>/addon.json``; every failure is a :class:`ManifestError` with its reason."""
+    path = os.path.join(directory, MANIFEST_NAME)
+    try:
+        with open(path, "rb") as handle:
+            raw = handle.read(MAX_MANIFEST_BYTES + 1)
+    except FileNotFoundError as exc:
+        raise ManifestError(f"no {MANIFEST_NAME}") from exc
+    except OSError as exc:
+        raise ManifestError(f"cannot read {MANIFEST_NAME}: {exc.strerror}") from exc
+    if len(raw) > MAX_MANIFEST_BYTES:
+        raise ManifestError(f"{MANIFEST_NAME} is larger than {MAX_MANIFEST_BYTES // 1024} KB")
+    try:
+        data = json.loads(raw.decode("utf-8-sig"))
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise ManifestError(f"{MANIFEST_NAME} is not valid JSON: {exc}") from exc
+    return parse_manifest(data, directory)
+
+
 def load_registry(root: Optional[str] = None) -> Registry:
     """Read every ``<root>/<dir>/addon.json``; a bad one is refused with its reason, never raised."""
     root = root or addons_dir()
@@ -201,23 +220,8 @@ def load_registry(root: Optional[str] = None) -> Registry:
     for entry in entries:
         if not entry.is_dir(follow_symlinks=True):
             continue
-        path = os.path.join(entry.path, MANIFEST_NAME)
         try:
-            with open(path, "rb") as handle:
-                raw = handle.read(MAX_MANIFEST_BYTES + 1)
-            if len(raw) > MAX_MANIFEST_BYTES:
-                raise ManifestError(f"{MANIFEST_NAME} is larger than {MAX_MANIFEST_BYTES // 1024} KB")
-            try:
-                data = json.loads(raw.decode("utf-8-sig"))
-            except (UnicodeDecodeError, ValueError) as exc:
-                raise ManifestError(f"{MANIFEST_NAME} is not valid JSON: {exc}") from exc
-            addon = parse_manifest(data, entry.path)
-        except FileNotFoundError:
-            registry.refused.append({"directory": entry.name, "reason": f"no {MANIFEST_NAME}"})
-            continue
-        except OSError as exc:
-            registry.refused.append({"directory": entry.name, "reason": f"cannot read {MANIFEST_NAME}: {exc.strerror}"})
-            continue
+            addon = read_manifest(entry.path)
         except ManifestError as exc:
             registry.refused.append({"directory": entry.name, "reason": str(exc)})
             continue
@@ -239,6 +243,36 @@ def reload() -> Registry:
         _registry = fresh
     if fresh.addons:
         logger.info("Add-ons discovered: %s", ", ".join(sorted(fresh.addons)))
+    return fresh
+
+
+def reread(addon_id: str) -> Optional[Addon]:
+    """Re-read one installed add-on's manifest (a start after a stop picks up an edited ``addon.json``).
+
+    Only a name already in the registry or among the refused folders is read, so the request can never name a
+    path. A manifest that is now invalid (or gone) moves to the refused list with its reason; None then.
+    """
+    global _registry
+    with _lock:
+        current = _registry
+    known = addon_id in current.addons or any(item["directory"] == addon_id for item in current.refused)
+    if not isinstance(addon_id, str) or not ID_RE.fullmatch(addon_id) or not known:
+        return current.addons.get(addon_id) if isinstance(addon_id, str) else None
+    directory = os.path.join(addons_dir(), addon_id)
+    try:
+        fresh: Optional[Addon] = read_manifest(directory)
+        reason = None
+    except ManifestError as exc:
+        fresh, reason = None, str(exc)
+        logger.warning("Add-on manifest refused (%s): %s", addon_id, reason)
+    with _lock:
+        addons = {k: v for k, v in _registry.addons.items() if k != addon_id}
+        refused = [item for item in _registry.refused if item["directory"] != addon_id]
+        if fresh is not None:
+            addons[addon_id] = fresh
+        else:
+            refused.append({"directory": addon_id, "reason": reason})
+        _registry = Registry(addons=dict(sorted(addons.items())), refused=refused)
     return fresh
 
 
