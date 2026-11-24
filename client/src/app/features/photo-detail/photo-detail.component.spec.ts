@@ -1000,7 +1000,10 @@ describe('PhotoDetailComponent', () => {
     localStorage.setItem('facet_photo_detail_tab_camera', 'technical');
     const view = renderDetail();
     const photo = makePhoto({ camera_model: 'X100V', iso: 200, persons: [{ id: 1, name: 'Alice' }], unassigned_faces: 2 });
-    mockApi.get.mockImplementation((url: string) => of(url === '/photo' ? photo : {}));
+    const related = { inventory_state: 'checked', indexed_images_only: false, multiple_raw_candidates: false, basename_sidecar_unverified: false,
+      files: [{ name: 'test.jpg', kind: 'photo', state: 'available', indexed: true, raw_download: false },
+        { name: 'test.RAF', kind: 'raw', state: 'available', indexed: false, raw_download: true }] };
+    mockApi.get.mockImplementation((url: string) => of(url === '/photo' ? photo : url === '/photo/related_files' ? related : {}));
     TestBed.inject(GalleryStore).config.set({ features: { show_critique: false } } as never);
     view.componentInstance.photo.set(photo);
     view.detectChanges(); await view.whenStable(); view.detectChanges();
@@ -1041,7 +1044,9 @@ describe('PhotoDetailComponent', () => {
     }
     expect(aside.querySelector('details[data-logical-asset]')).toBeNull();
     expect(mockApi.get.mock.calls.filter(([url]) => url === '/photo/provenance')).toHaveLength(0);
-    expect(mockApi.get.mock.calls.filter(([url]) => url === '/photo/related_files')).toHaveLength(0);
+    // Related files is read up front (again when the page swaps in a fresh copy of the photo), so a photo with
+    // nothing beside it shows no section at all.
+    expect(mockApi.get.mock.calls.filter(([url]) => url === '/photo/related_files').length).toBeGreaterThan(0);
   });
 
   it('orders each rail panel by priority and pins Review on wide screens', async () => {

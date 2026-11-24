@@ -14,14 +14,17 @@ import { makePhoto } from '../../../testing/photo.fixture';
 import { PhotoRelatedFilesComponent } from './photo-related-files.component';
 
 describe('PhotoRelatedFilesComponent', () => {
+  const primary = { name: 'shot.jpg', kind: 'photo', state: 'available', indexed: true, raw_download: false } as const;
   const response: RelatedFilesResponse = {
     inventory_state: 'checked', indexed_images_only: false, multiple_raw_candidates: false, basename_sidecar_unverified: true,
     files: [
-      { name: 'shot.jpg', kind: 'photo', state: 'available', indexed: true, raw_download: false },
+      primary,
       { name: 'shot.CR2', kind: 'raw', state: 'available', indexed: true, raw_download: true },
       { name: 'shot.xmp', kind: 'xmp_basename', state: 'available', indexed: false, raw_download: false },
     ],
   };
+  /** Only the photo itself on disk, and no notice to give. */
+  const alone: RelatedFilesResponse = { ...response, basename_sidecar_unverified: false, files: [primary] };
   let auth: { status: ReturnType<typeof signal<object | null>>; session: () => string | null; token: string };
   let events: Subject<NavigationStart | NavigationCancel>;
   let http: HttpTestingController;
@@ -40,69 +43,96 @@ describe('PhotoRelatedFilesComponent', () => {
   });
   // The inline RAW/JPEG list has its own spec; here its read is only acknowledged.
   afterEach(() => { try { http.match(request => request.url.startsWith('/api/logical_assets/by-photo')); http.verify(); } finally { TestBed.resetTestingModule(); } });
-  function render() {
+  function render(path = '/shot.jpg') {
     const fixture = TestBed.createComponent(PhotoRelatedFilesComponent);
-    fixture.componentRef.setInput('photo', makePhoto({ path: '/shot.jpg' })); fixture.detectChanges();
+    fixture.componentRef.setInput('photo', makePhoto({ path })); fixture.detectChanges();
     const root = fixture.nativeElement as HTMLElement;
-    return { fixture, root, trigger: root.querySelector<HTMLElement>('mat-expansion-panel-header')! };
+    return { fixture, root, trigger: () => root.querySelector<HTMLElement>('mat-expansion-panel-header')! };
   }
+  const related = (path = '/shot.jpg') => http.expectOne(`/api/photo/related_files?path=${path}`);
   const isOpen = (root: HTMLElement) => root.querySelector('mat-expansion-panel-header')!.getAttribute('aria-expanded') === 'true';
   /** The RAW/JPEG list renders inline in the open panel and reads its own state. */
   const logical = (path = '/shot.jpg') => http.expectOne(`/api/logical_assets/by-photo?path=${path}`);
 
-  it('shows an on-demand candidate inventory without file-changing controls and closes on Escape before page navigation', () => {
+  it('reads the inventory up front, lists the companions but never the photo itself, and closes on Escape', () => {
     const { fixture, root, trigger } = render(); document.body.appendChild(root);
-    http.expectNone(() => true);
-    trigger.click(); fixture.detectChanges();
-    const request = http.expectOne('/api/photo/related_files?path=/shot.jpg');
+    const request = related();
     expect(request.request.method).toBe('GET'); request.flush(response); fixture.detectChanges();
-    expect(root.querySelectorAll('li')).toHaveLength(3);
-    expect(root.textContent).toContain('shot.CR2'); expect(root.textContent).toContain('related_files.raw_download');
+    expect(isOpen(root)).toBe(false);
+    trigger().click(); fixture.detectChanges();
+    expect([...root.querySelectorAll('li bdi')].map(name => name.textContent)).toEqual(['shot.CR2', 'shot.xmp']);
+    expect(root.textContent).not.toContain('related_files.photo');
+    expect(root.textContent).toContain('related_files.raw_download');
     expect(root.textContent).toContain('related_files.basename_unverified');
     expect(root.querySelector('a')).toBeNull(); expect([...root.querySelectorAll('button')].filter(button => !button.closest('app-context-help'))).toHaveLength(0);
     const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
-    trigger.dispatchEvent(event); fixture.detectChanges();
+    trigger().dispatchEvent(event); fixture.detectChanges();
     expect(event.defaultPrevented).toBe(true); expect(isOpen(root)).toBe(false);
-    expect(document.activeElement).toBe(trigger); expect(root.textContent).not.toContain('shot.CR2');
+    expect(document.activeElement).toBe(trigger()); expect(root.textContent).not.toContain('shot.CR2');
+    http.expectNone('/api/photo/related_files?path=/shot.jpg');
     fixture.destroy(); root.remove();
+  });
+
+  it('leaves the section out when nothing but the photo itself is there', () => {
+    const { fixture, root } = render();
+    related().flush(alone); fixture.detectChanges();
+    expect(root.querySelector('mat-expansion-panel')).toBeNull();
+    logical().flush({ asset: null, can_group: false, candidates: [{ path: '/shot.jpg', name: 'shot.jpg', kind: 'jpeg' }] });
+    fixture.detectChanges();
+    expect(root.querySelector('mat-expansion-panel')).toBeNull();
+    expect(root.textContent!.trim()).toBe('');
+  });
+
+  it('keeps the section for a photo alone on disk that belongs to a version group', () => {
+    const { fixture, root, trigger } = render();
+    related().flush(alone); fixture.detectChanges();
+    logical().flush({ asset: { id: 'a'.repeat(32), primary_path: '/shot.jpg', members: [] }, can_group: false, candidates: [] });
+    fixture.detectChanges();
+    expect(root.querySelector('mat-expansion-panel[data-related-files]')).not.toBeNull();
+    trigger().click(); fixture.detectChanges();
+    expect(root.querySelectorAll('li')).toHaveLength(0);
+    expect(root.querySelector('[data-logical-asset]')).not.toBeNull();
   });
 
   it('cancels obsolete photo reads and offers a fresh retry for an offline result or HTTP failure', () => {
     const { fixture, root, trigger } = render();
-    trigger.click(); fixture.detectChanges();
-    const old = http.expectOne('/api/photo/related_files?path=/shot.jpg');
+    const old = related();
     fixture.componentRef.setInput('photo', makePhoto({ path: '/next.jpg' })); fixture.detectChanges();
     expect(old.cancelled).toBe(true);
-    trigger.click(); fixture.detectChanges();
-    http.expectOne('/api/photo/related_files?path=/next.jpg').flush({ ...response, inventory_state: 'unavailable', files: [{ ...response.files[0], state: 'missing' }] });
-    fixture.detectChanges(); expect(root.textContent).toContain('related_files.unchecked');
+    related('/next.jpg').flush({ ...response, inventory_state: 'unavailable', files: [{ ...primary, state: 'missing' }] });
+    fixture.detectChanges();
+    trigger().click(); fixture.detectChanges();
+    expect(root.textContent).toContain('related_files.unchecked');
     root.querySelector<HTMLButtonElement>('[data-related-retry]')!.click();
-    http.expectOne('/api/photo/related_files?path=/next.jpg').flush({}, { status: 503, statusText: 'Unavailable' });
+    related('/next.jpg').flush({}, { status: 503, statusText: 'Unavailable' });
     fixture.detectChanges(); expect(root.querySelector('[role="alert"]')).not.toBeNull();
-    root.querySelector<HTMLButtonElement>('button')!.click();
-    http.expectOne('/api/photo/related_files?path=/next.jpg').flush(response); fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('[data-related-files] button')!.click();
+    related('/next.jpg').flush(response); fixture.detectChanges();
     expect(root.textContent).toContain('shot.CR2'); expect(root.querySelector('[role="alert"]')).toBeNull();
   });
 
-  it('clears owner data, blocks new reads during navigation and discards rotated-credential responses', () => {
+  it('clears owner data, holds reads during navigation and reads again after a rotated credential', () => {
     const { fixture, root, trigger } = render();
-    trigger.click(); fixture.detectChanges();
-    http.expectOne('/api/photo/related_files?path=/shot.jpg').flush(response); fixture.detectChanges();
+    related().flush(response); fixture.detectChanges();
+    trigger().click(); fixture.detectChanges();
     logical().flush({ asset: null, can_group: false, candidates: [] });
-    auth.status.set(null); fixture.detectChanges(); expect(root.textContent).not.toContain('shot.CR2');
-    trigger.click(); http.expectNone(() => true);
-    auth.status.set({ user_id: 'bob' }); fixture.detectChanges();
-    events.next(new NavigationStart(1, '/persons')); trigger.click(); http.expectNone(() => true);
-    events.next(new NavigationCancel(1, '/persons', 'cancelled')); trigger.click(); fixture.detectChanges();
-    const request = http.expectOne('/api/photo/related_files?path=/shot.jpg');
+    expect(root.textContent).toContain('shot.CR2');
+    auth.status.set(null); fixture.detectChanges();
+    expect(root.querySelector('mat-expansion-panel')).toBeNull(); http.expectNone(() => true);
+    events.next(new NavigationStart(1, '/persons'));
+    auth.status.set({ user_id: 'bob' }); fixture.detectChanges(); http.expectNone(() => true);
+    events.next(new NavigationCancel(1, '/persons', 'cancelled')); fixture.detectChanges();
+    const request = related();
     auth.token = 'two'; request.flush(response); fixture.detectChanges();
-    expect(root.textContent).not.toContain('shot.CR2'); expect(isOpen(root)).toBe(false);
-    trigger.click(); fixture.detectChanges(); http.expectOne('/api/photo/related_files?path=/shot.jpg').flush(response);
-    fixture.detectChanges(); expect(root.textContent).toContain('shot.CR2');
+    expect(root.textContent).not.toContain('shot.CR2');
+    related().flush(response); fixture.detectChanges();
+    expect(isOpen(root)).toBe(false);
+    trigger().click(); fixture.detectChanges(); expect(root.textContent).toContain('shot.CR2');
   });
+
   it('renders inventory warnings, every candidate label and relays logical changes', () => {
-    const { fixture, root, trigger } = render(); trigger.click(); fixture.detectChanges();
-    http.expectOne('/api/photo/related_files?path=/shot.jpg').flush({ ...response,
+    const { fixture, root, trigger } = render();
+    related().flush({ ...response,
       indexed_images_only: true, multiple_raw_candidates: true,
       files: [
         { name: 'shot.jpeg', kind: 'jpeg', state: 'missing', indexed: true, raw_download: false },
@@ -110,6 +140,7 @@ describe('PhotoRelatedFilesComponent', () => {
         { name: 'fallback.xmp', kind: 'xmp_fallback', state: 'link', indexed: false, raw_download: false },
       ],
     }); fixture.detectChanges();
+    trigger().click(); fixture.detectChanges();
     const text = root.textContent!;
     for (const label of ['jpeg', 'missing', 'xmp_full', 'unavailable', 'xmp_fallback', 'link', 'indexed', 'multiple_raw']) {
       expect(text).toContain('related_files.' + label);
@@ -126,9 +157,9 @@ describe('PhotoRelatedFilesComponent', () => {
 
   it('lists the RAW/JPEG photo inline once the panel opens, with the help icon beside the file list', () => {
     const { fixture, root, trigger } = render();
-    trigger.click(); fixture.detectChanges();
+    related().flush(response); fixture.detectChanges();
     http.expectNone('/api/logical_assets/by-photo?path=/shot.jpg');
-    http.expectOne('/api/photo/related_files?path=/shot.jpg').flush(response); fixture.detectChanges();
+    trigger().click(); fixture.detectChanges();
     logical().flush({ asset: null, can_group: false, candidates: [] }); fixture.detectChanges();
     const inline = root.querySelector<HTMLElement>('[data-logical-asset]')!;
     expect(inline.tagName).toBe('SECTION');
