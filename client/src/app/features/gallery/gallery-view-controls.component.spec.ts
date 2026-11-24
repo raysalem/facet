@@ -152,7 +152,8 @@ describe('GalleryViewControlsComponent', () => {
       host.componentInstance.template = fixture.componentInstance.displayControls()!;
       host.detectChanges();
       const tip = (selector: string) => host.debugElement.query(By.css(selector)).injector.get(MatTooltip).message;
-      expect(tip('[data-choice="tooltip-mode"]')).toBe(I18N.gallery.display_tips.tooltip_mode);
+      expect(tip('[data-choice="photo-details"]')).toBe(I18N.gallery.display_tips.photo_details);
+      expect(tip('[data-choice="open-with"]')).toBe(I18N.gallery.display_tips.open_with);
       expect(tip('[data-choice="tile-fit"]')).toBe(I18N.gallery.display_tips.tile_fit);
       expect(tip('[data-reset-display]')).toBe(I18N.gallery.display_tips.reset_display);
     });
@@ -187,20 +188,24 @@ describe('GalleryViewControlsComponent', () => {
       expect(label.classList.contains('!inline')).toBe(forced);
     });
 
-    it('rehosts Tooltip and Tile fit as labelled choice rows showing the current value', () => {
+    it('rehosts Photo details, Open with and Tile fit as labelled choice rows showing the current value', () => {
       const { fixture, store } = render();
       fixture.componentRef.setInput('portDisplay', true);
-      store.filters.update(filters => ({ ...filters, tooltip_mode: 'click', hide_details: true, tile_fit: 'natural' }));
+      store.filters.update(filters => ({ ...filters, details_place: 'card', details_trigger: 'click', hide_details: true, tile_fit: 'natural' }));
       store.galleryMode.set('grid');
       fixture.detectChanges();
       const host = TestBed.createComponent(RehostedControls);
       host.componentInstance.template = fixture.componentInstance.displayControls()!;
       host.detectChanges();
-      const rows = Array.from((host.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('[data-choice]'));
-      expect(rows.map(row => row.getAttribute('data-choice'))).toEqual(['tooltip-mode', 'tile-fit']);
-      expect(rows.map(row => row.querySelector('[data-value]')!.textContent!.trim()))
-        .toEqual([I18N.gallery.tooltip_mode.click, I18N.gallery.tile_fit.natural]);
-      expect(rows.every(row => row.getAttribute('aria-haspopup') === 'menu')).toBe(true);
+      const rows = () => Array.from((host.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('[data-choice]'));
+      expect(rows().map(row => row.getAttribute('data-choice'))).toEqual(['photo-details', 'open-with', 'tile-fit']);
+      expect(rows().map(row => row.querySelector('[data-value]')!.textContent!.trim()))
+        .toEqual([I18N.gallery.photo_details.card, I18N.gallery.photo_details.click, I18N.gallery.tile_fit.natural]);
+      expect(rows().every(row => row.getAttribute('aria-haspopup') === 'menu')).toBe(true);
+      // Off has nothing to open, so its Open with row goes away (the saved trigger is kept).
+      store.filters.update(filters => ({ ...filters, details_place: 'off' }));
+      host.detectChanges();
+      expect(rows().map(row => row.getAttribute('data-choice'))).toEqual(['photo-details', 'tile-fit']);
     });
 
     it.each([[true, 'grid', true], [false, 'grid', false], [true, 'mosaic', false], [true, 'list', false]] as const)(
@@ -394,22 +399,34 @@ describe('GalleryViewControlsComponent', () => {
       expect(label()).not.toContain('sort_options.date_added_library');
     });
 
-    it('offers the tooltip modes as one shared radio menu with the current mode checked', async () => {
+    it('shows Photo details and Open with together in one menu, each with its current value checked', async () => {
       const { fixture, root, store } = render();
-      store.filters.update(filters => ({ ...filters, tooltip_mode: 'click' }));
+      store.filters.update(filters => ({ ...filters, details_place: 'card', details_trigger: 'click' }));
       fixture.detectChanges();
-      const triggers = Array.from(byLabel(root, I18N.gallery.tooltip_mode.label)) as HTMLButtonElement[];
+      const triggers = Array.from(byLabel(root, I18N.gallery.photo_details.label)) as HTMLButtonElement[];
       expect(triggers).toHaveLength(1);
-      const menus = fixture.debugElement.queryAll(By.directive(MatMenuTrigger))
-        .filter(d => triggers.includes(d.nativeElement as HTMLButtonElement))
-        .map(d => d.injector.get(MatMenuTrigger).menu);
-      expect(menus[0]).toBeDefined();
       await openMenu(fixture, triggers[0]);
       const items = menuItems();
-      expect(items.map(item => item.getAttribute('aria-checked'))).toEqual(['false', 'true', 'false']);
-      expect(items.map(item => item.textContent?.includes('check'))).toEqual([false, true, false]);
-      items[2].click();
-      expect(store.updateFilter).toHaveBeenCalledWith('tooltip_mode', 'off');
+      expect(items.map(item => item.getAttribute('data-details-place') ?? item.getAttribute('data-details-trigger')))
+        .toEqual(['off', 'card', 'hover', 'click', 'both']);
+      expect(items.map(item => item.getAttribute('aria-checked'))).toEqual(['false', 'true', 'false', 'true', 'false']);
+      expect(document.querySelector('.mat-mdc-menu-panel')!.textContent).toContain(I18N.gallery.photo_details.open_with);
+      items[4].click();
+      expect(store.updateFilter).toHaveBeenLastCalledWith('details_trigger', 'both');
+      items[0].click();
+      expect(store.updateFilter).toHaveBeenLastCalledWith('details_place', 'off');
+    });
+
+    it('disables Open with while Photo details is Off, keeping the saved trigger checked', async () => {
+      const { fixture, root, store } = render();
+      store.filters.update(filters => ({ ...filters, details_place: 'off', details_trigger: 'click' }));
+      fixture.detectChanges();
+      await openMenu(fixture, byLabel(root, I18N.gallery.photo_details.label)[0] as HTMLButtonElement);
+      const triggers = menuItems().filter(item => item.hasAttribute('data-details-trigger')) as HTMLButtonElement[];
+      expect(triggers.map(item => item.disabled)).toEqual([true, true, true]);
+      expect(triggers.map(item => item.getAttribute('aria-checked'))).toEqual(['false', 'true', 'false']);
+      triggers[2].click();
+      expect(store.updateFilter).not.toHaveBeenCalled();
     });
 
     it.each([true, false])('reads pointer hover capability (%s) and cleans up listeners', canHover => {
@@ -438,18 +455,18 @@ describe('GalleryViewControlsComponent', () => {
       }
     });
 
-    it('greys the hover trigger out on a pure touch device at any width', async () => {
+    it('greys the Hover trigger out on a pure touch device at any width', async () => {
       const { fixture, root, store } = render();
       const capability = fixture.componentInstance as unknown as {
         tooltipCapable: { setMatches(value: boolean): void };
         hoverCapable: { setMatches(value: boolean): void };
       };
-      store.filters.update(filters => ({ ...filters, tooltip_mode: 'off' }));
+      store.filters.update(filters => ({ ...filters, details_place: 'card', details_trigger: 'click' }));
       capability.tooltipCapable.setMatches(true);
       capability.hoverCapable.setMatches(false);
       fixture.detectChanges();
-      await openMenu(fixture, byLabel(root, I18N.gallery.tooltip_mode.label)[0] as HTMLButtonElement);
-      const hover = () => menuItems()[0] as HTMLButtonElement;
+      await openMenu(fixture, byLabel(root, I18N.gallery.photo_details.label)[0] as HTMLButtonElement);
+      const hover = () => document.querySelector<HTMLButtonElement>('.mat-mdc-menu-panel [data-details-trigger="hover"]')!;
       expect(hover().disabled).toBe(true);
       hover().click();
       expect(store.updateFilter).not.toHaveBeenCalled();
@@ -458,32 +475,30 @@ describe('GalleryViewControlsComponent', () => {
       expect(hover().disabled).toBe(false);
       // An already-selected Hover stays selectable, so the saved trigger is never silently replaced.
       capability.hoverCapable.setMatches(false);
-      store.filters.update(filters => ({ ...filters, tooltip_mode: 'hover' }));
+      store.filters.update(filters => ({ ...filters, details_trigger: 'hover' }));
       fixture.detectChanges();
       expect(hover().disabled).toBe(false);
-      (menuItems()[1] as HTMLButtonElement).click();
-      expect(store.updateFilter).toHaveBeenLastCalledWith('tooltip_mode', 'click');
+      document.querySelector<HTMLButtonElement>('.mat-mdc-menu-panel [data-details-trigger="click"]')!.click();
+      expect(store.updateFilter).toHaveBeenLastCalledWith('details_trigger', 'click');
     });
 
-    it('greys the side panel hover activation out on a pure touch device', async () => {
+    it.each([
+      ['card', true, true, false],
+      ['card', false, true, true],
+      ['panel', false, true, false],
+      ['panel', true, false, true],
+    ] as const)('Hover with the %s place: desktop width %s, hover pointer %s -> disabled %s', async (place, wide, hovers, disabled) => {
       const { fixture, root, store } = render();
       const capability = fixture.componentInstance as unknown as {
-        railCapable: { setMatches(value: boolean): void };
+        tooltipCapable: { setMatches(value: boolean): void };
         hoverCapable: { setMatches(value: boolean): void };
       };
-      capability.railCapable.setMatches(true);
-      capability.hoverCapable.setMatches(false);
-      store.filters.update(filters => ({ ...filters, tooltip_mode: 'panel', panel_activation: 'click' }));
+      store.filters.update(filters => ({ ...filters, details_place: place, details_trigger: 'click' }));
+      capability.tooltipCapable.setMatches(wide);
+      capability.hoverCapable.setMatches(hovers);
       fixture.detectChanges();
-      await openMenu(fixture, byLabel(root, I18N.gallery.tooltip_mode.label)[0] as HTMLButtonElement);
-      const activationTrigger = Array.from(document.querySelectorAll<HTMLButtonElement>('.mat-mdc-menu-panel button'))
-        .find(button => button.textContent?.includes(I18N.gallery.panel_activation.label))!;
-      await openMenu(fixture, activationTrigger);
-      const panels = document.querySelectorAll('.mat-mdc-menu-panel');
-      const activation = Array.from(panels[panels.length - 1].querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'));
-      expect(activation.map(item => item.disabled)).toEqual([true, false, false]);
-      activation[2].click();
-      expect(store.updateFilter).toHaveBeenLastCalledWith('panel_activation', 'both');
+      await openMenu(fixture, byLabel(root, I18N.gallery.photo_details.label)[0] as HTMLButtonElement);
+      expect(document.querySelector<HTMLButtonElement>('.mat-mdc-menu-panel [data-details-trigger="hover"]')!.disabled).toBe(disabled);
     });
 
     it('announces how many filters are active, not only that the button opens them', () => {
@@ -523,7 +538,7 @@ describe('GalleryViewControlsComponent', () => {
       commands.toggleSortDirection();
       commands.toggleFilters();
       commands.toggleSlideshow();
-      commands.setPresentationFilter('tooltip_mode', 'off');
+      commands.setPresentationFilter('details_place', 'off');
       expect(store.setUserSort).not.toHaveBeenCalled();
       expect(store.updateFilter).not.toHaveBeenCalled();
       expect(store.setFilterDrawerOpen).not.toHaveBeenCalled();
@@ -539,17 +554,17 @@ describe('GalleryViewControlsComponent', () => {
 
     it('refuses a captured inspection menu item after parking and accepts it after return', async () => {
       const { fixture, root, store } = render();
-      const trigger = byLabel(root, I18N.gallery.tooltip_mode.label)[0] as HTMLButtonElement;
+      const trigger = byLabel(root, I18N.gallery.photo_details.label)[0] as HTMLButtonElement;
       await openMenu(fixture, trigger);
-      const off = menuItems().find(item => item.textContent?.includes(I18N.gallery.tooltip_mode.off))!;
+      const off = menuItems().find(item => item.getAttribute('data-details-place') === 'off')!;
       expect(off).toBeTruthy();
       fixture.componentInstance.setActive(false);
       off.click();
       expect(store.updateFilter).not.toHaveBeenCalled();
       fixture.componentInstance.setActive(true);
       await openMenu(fixture, trigger);
-      menuItems().find(item => item.textContent?.includes(I18N.gallery.tooltip_mode.off))!.click();
-      expect(store.updateFilter).toHaveBeenCalledExactlyOnceWith('tooltip_mode', 'off');
+      menuItems().find(item => item.getAttribute('data-details-place') === 'off')!.click();
+      expect(store.updateFilter).toHaveBeenCalledExactlyOnceWith('details_place', 'off');
     });
 
     it('blocks pending and redirected navigation, then resumes after rejection, error or completion', () => {
@@ -605,21 +620,31 @@ describe('GalleryViewControlsComponent', () => {
       expect(byLabel(root, I18N.ui.filters.search)).toHaveLength(0);
       expect(byLabel(root, I18N.gallery.scan_action)).toHaveLength(0);
       expect(byLabel(root, I18N.slideshow.start).length).toBeGreaterThan(0);
-      expect(byLabel(root, I18N.gallery.tooltip_mode.label).length).toBeGreaterThan(0);
+      expect(byLabel(root, I18N.gallery.photo_details.label).length).toBeGreaterThan(0);
       store.pinnedPaths.set(null);
       fixture.detectChanges();
       expect(sortButtons(root)).toHaveLength(1);
       expect(byLabel(root, I18N.gallery.filters)).toHaveLength(1);
       expect(store.setFilterDrawerOpen).not.toHaveBeenCalled();
     });
-    it.each([false, true])('offers the dock only on desktop (%s)', async dock => {
-      const { fixture, root } = render();
+    it.each([false, true])('offers the side panel only where it can dock (%s)', async dock => {
+      const { fixture, root, store } = render();
       const controls = fixture.componentInstance as unknown as { railCapable: { setMatches(value: boolean): void } };
+      store.filters.update(filters => ({ ...filters, details_place: 'card' }));
       controls.railCapable.setMatches(dock);
       fixture.detectChanges();
-      await openMenu(fixture, root.querySelector<HTMLButtonElement>(`[aria-label="${I18N.gallery.tooltip_mode.label}"]`)!);
-      const labels = menuItems().map(item => item.textContent);
-      expect(labels.some(label => label?.includes(I18N.gallery.tooltip_mode.panel))).toBe(dock);
+      await openMenu(fixture, root.querySelector<HTMLButtonElement>(`[aria-label="${I18N.gallery.photo_details.label}"]`)!);
+      expect(menuItems().some(item => item.getAttribute('data-details-place') === 'panel')).toBe(dock);
+    });
+
+    it('keeps a saved Side panel listed, and checked, on a window too narrow to dock it', async () => {
+      const { fixture, root, store } = render();
+      const controls = fixture.componentInstance as unknown as { railCapable: { setMatches(value: boolean): void } };
+      store.filters.update(filters => ({ ...filters, details_place: 'panel' }));
+      controls.railCapable.setMatches(false);
+      fixture.detectChanges();
+      await openMenu(fixture, root.querySelector<HTMLButtonElement>(`[aria-label="${I18N.gallery.photo_details.label}"]`)!);
+      expect(menuItems().find(item => item.getAttribute('data-details-place') === 'panel')?.getAttribute('aria-checked')).toBe('true');
     });
 
   });

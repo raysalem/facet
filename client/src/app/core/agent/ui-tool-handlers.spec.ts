@@ -33,7 +33,7 @@ class StubPage {}
 
 const CONFIG = {
   pagination: { default_per_page: 64 },
-  defaults: { type: '', sort: 'aggregate', sort_direction: 'DESC', hide_blinks: true, hide_bursts: true, hide_duplicates: true, hide_brackets: true, hide_panoramas: true, hide_details: true, tooltip_mode: 'hover', panel_activation: 'both', hide_rejected: true },
+  defaults: { type: '', sort: 'aggregate', sort_direction: 'DESC', hide_blinks: true, hide_bursts: true, hide_duplicates: true, hide_brackets: true, hide_panoramas: true, hide_details: true, details_place: 'card', details_trigger: 'hover', hide_rejected: true },
   display: { tags_per_photo: 5, card_width_px: 300, image_width_px: 640 },
   sort_options_grouped: null,
   features: {},

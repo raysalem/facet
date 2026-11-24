@@ -1604,7 +1604,8 @@ Anzeige und Verhalten der Web-Galerie.
       "hide_brackets": true,
       "hide_panoramas": true,
       "hide_details": true,
-      "tooltip_mode": "panel",
+      "details_place": "panel",
+      "details_trigger": "both",
       "hide_rejected": true,
       "sort": "aggregate",
       "sort_direction": "DESC",
@@ -1693,8 +1694,8 @@ Anzeige und Verhalten der Web-Galerie.
 | `hide_brackets` | `true` | Standardmäßig nur die Basisbelichtung einer Belichtungsreihe anzeigen |
 | `hide_panoramas` | `true` | Standardmäßig nur ein repräsentatives Bild je Panorama zeigen |
 | `hide_details` | `true` | Fotodetails auf Karten standardmäßig ausblenden |
-| `tooltip_mode` | `"panel"` | Tooltip-Auslöser: `"hover"`, `"click"`, `"off"` oder `"panel"` (angedockte Leiste); ersetzt `hide_tooltip` |
-| `panel_activation` | `"both"` | Geste, die im Modus `"panel"` das Foto der angedockten Leiste wechselt: `"hover"`, `"click"` oder `"both"` |
+| `details_place` | `"panel"` | Wo Fotodetails erscheinen (Anzeige > **Fotodetails**): `"off"`, `"card"` (eine Karte neben dem Foto) oder `"panel"` (die angedockte Seitenleiste) |
+| `details_trigger` | `"both"` | Was sie öffnet (Anzeige > **Öffnen mit**), für Karte und Seitenleiste gleichermaßen: `"hover"`, `"click"` oder `"both"`. Die früheren Schlüssel `tooltip_mode` und `panel_activation` werden weiter gelesen und haben Vorrang, wenn sie gesetzt sind (`hover`/`click` = Karte mit dieser Geste, `panel` = Seitenleiste mit `panel_activation`, `off` = aus) |
 | `hide_rejected` | `true` | Abgelehnte Fotos standardmäßig ausblenden |
 | `gallery_mode` | `"mosaic"` | Standard-Galerie-Layout (`"grid"` oder `"mosaic"`) |
 | **allowed_origins** | | |
@@ -1769,7 +1770,7 @@ Wird `badges.stack` ausgeschaltet, verschwindet nur das Badge; die Kartenschaltf
 | `badge_percent` | `5` | Prozent der Pixel im schlechtesten R/G/B-Kanal, ab dem die Karte ein Badge erhält (bei einer Stichprobe etwa 1 Foto von 25) |
 | `indicator_percent` | `1` | Schwelle für die eigenen R/G/B-Endmarker des Histogramms |
 | `histogram_mode` | `"rgb"` | Standard für das Histogramm des **Detailbereichs**: `"luma"`, `"rgb"`, `"r"`, `"g"` oder `"b"` |
-| `tooltip_histogram_mode` | `"luma"` | Standard für den Histogramm-Tab der **Seitenleiste** (`tooltip_mode: "panel"`), dieselben fünf Werte |
+| `tooltip_histogram_mode` | `"luma"` | Standard für den Histogramm-Tab der **Seitenleiste** (`details_place: "panel"`), dieselben fünf Werte |
 
 Hinweise:
 

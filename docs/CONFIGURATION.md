@@ -1596,7 +1596,8 @@ Web gallery display and behavior.
       "hide_brackets": true,
       "hide_panoramas": true,
       "hide_details": true,
-      "tooltip_mode": "panel",
+      "details_place": "panel",
+      "details_trigger": "both",
       "hide_rejected": true,
       "sort": "aggregate",
       "sort_direction": "DESC",
@@ -1685,8 +1686,8 @@ Web gallery display and behavior.
 | `hide_brackets` | `true` | Show only a bracket's base exposure by default |
 | `hide_panoramas` | `true` | Show only one representative frame per panorama by default |
 | `hide_details` | `true` | Hide photo details on cards by default |
-| `tooltip_mode` | `"panel"` | Tooltip trigger: `"hover"`, `"click"`, `"off"`, or `"panel"` (docked rail); replaces `hide_tooltip` |
-| `panel_activation` | `"both"` | Gesture that changes the docked rail's photo in `"panel"` mode: `"hover"`, `"click"` or `"both"` |
+| `details_place` | `"panel"` | Where photo details appear (Display > **Photo details**): `"off"`, `"card"` (a card beside the photo) or `"panel"` (the docked side panel) |
+| `details_trigger` | `"both"` | What opens them (Display > **Open with**), for the card and the panel alike: `"hover"`, `"click"` or `"both"`. The earlier keys `tooltip_mode` and `panel_activation` are still read and win when present (`hover`/`click` = card opened that way, `panel` = side panel opened by `panel_activation`, `off` = off) |
 | `hide_rejected` | `true` | Hide rejected photos by default |
 | `gallery_mode` | `"mosaic"` | Default gallery layout (`"grid"` or `"mosaic"`) |
 | **allowed_origins** | | |
@@ -1760,7 +1761,7 @@ Turning `badges.stack` off hides only the badge; the "Open photo stack" card but
 | `badge_percent` | `5` | Percent of pixels, in the worst of R/G/B, above which the card is badged (about 1 photo in 25 on a sample) |
 | `indicator_percent` | `1` | Threshold for the histogram's own R/G/B end markers |
 | `histogram_mode` | `"rgb"` | Default for the **detail panel's** histogram: `"luma"`, `"rgb"`, `"r"`, `"g"` or `"b"` |
-| `tooltip_histogram_mode` | `"luma"` | Default for the **side panel's** Histogram tab (`tooltip_mode: "panel"`), same five values |
+| `tooltip_histogram_mode` | `"luma"` | Default for the **side panel's** Histogram tab (`details_place: "panel"`), same five values |
 
 Notes:
 - A user's own histogram choice is stored in `localStorage` (`facet_histogram_mode`, `facet_histogram_mode_tooltip`) and wins over these defaults. The two settings are independent.

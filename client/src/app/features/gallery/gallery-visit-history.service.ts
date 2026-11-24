@@ -9,7 +9,7 @@ export interface GalleryVisit {
 }
 
 const LIMIT = 10;
-const PRESENTATION_KEYS = new Set(['page', 'per_page', 'hide_details', 'tooltip_mode', 'panel_activation']);
+const PRESENTATION_KEYS = new Set(['page', 'per_page', 'hide_details', 'details_place', 'details_trigger', 'tooltip_mode', 'panel_activation']);
 const SORT_KEYS = new Set(['sort', 'sort_direction']);
 const QUERY_KEYS = new Set(Object.keys(DEFAULT_FILTERS));
 

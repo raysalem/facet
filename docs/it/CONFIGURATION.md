@@ -1600,7 +1600,8 @@ Visualizzazione e comportamento della galleria web.
       "hide_brackets": true,
       "hide_panoramas": true,
       "hide_details": true,
-      "tooltip_mode": "panel",
+      "details_place": "panel",
+      "details_trigger": "both",
       "hide_rejected": true,
       "sort": "aggregate",
       "sort_direction": "DESC",
@@ -1689,8 +1690,8 @@ Visualizzazione e comportamento della galleria web.
 | `hide_brackets` | `true` | Mostra per impostazione predefinita solo l'esposizione base di ogni bracketing |
 | `hide_panoramas` | `true` | Mostrare per impostazione predefinita un solo fotogramma per panorama |
 | `hide_details` | `true` | Nasconde per impostazione predefinita i dettagli della foto sulle schede |
-| `tooltip_mode` | `"panel"` | Attivazione del tooltip: `"hover"`, `"click"`, `"off"` o `"panel"` (barra ancorata); sostituisce `hide_tooltip` |
-| `panel_activation` | `"both"` | Gesto che cambia la foto della barra ancorata in modalità `"panel"`: `"hover"`, `"click"` o `"both"` |
+| `details_place` | `"panel"` | Dove compaiono i dettagli della foto (Visualizzazione > **Dettagli della foto**): `"off"`, `"card"` (una scheda accanto alla foto) o `"panel"` (il pannello laterale ancorato) |
+| `details_trigger` | `"both"` | Cosa li apre (Visualizzazione > **Apri con**), per la scheda e per il pannello: `"hover"`, `"click"` o `"both"`. Le chiavi precedenti `tooltip_mode` e `panel_activation` vengono ancora lette e prevalgono se presenti (`hover`/`click` = scheda aperta così, `panel` = pannello laterale con `panel_activation`, `off` = disattivato) |
 | `hide_rejected` | `true` | Nasconde per impostazione predefinita le foto rifiutate |
 | `gallery_mode` | `"mosaic"` | Layout predefinito della galleria (`"grid"` o `"mosaic"`) |
 | **allowed_origins** | | |
@@ -1764,7 +1765,7 @@ Disattivare `badges.stack` nasconde solo il badge; il pulsante della scheda «Ap
 | `badge_percent` | `5` | Percentuale di pixel, nel peggiore dei canali R/G/B, oltre la quale la scheda riceve il badge (circa 1 foto su 25 su un campione) |
 | `indicator_percent` | `1` | Soglia dei marcatori R/G/B dell'istogramma stesso |
 | `histogram_mode` | `"rgb"` | Predefinito per l'istogramma del **pannello dei dettagli**: `"luma"`, `"rgb"`, `"r"`, `"g"` o `"b"` |
-| `tooltip_histogram_mode` | `"luma"` | Predefinito per la scheda Istogramma del **pannello laterale** (`tooltip_mode: "panel"`), gli stessi cinque valori |
+| `tooltip_histogram_mode` | `"luma"` | Predefinito per la scheda Istogramma del **pannello laterale** (`details_place: "panel"`), gli stessi cinque valori |
 
 Note:
 - La scelta dell'istogramma di un utente è memorizzata in `localStorage` (`facet_histogram_mode`, `facet_histogram_mode_tooltip`) e prevale su questi predefiniti. Le due impostazioni sono indipendenti.

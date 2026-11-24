@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '../fixtures';
 import { expectCleanUI } from '../helpers/ui-probe.helpers';
-import { openAlbum, photoUrl, recordContentWidth, useTheme, WIDTHS } from '../helpers/nav';
+import { openAlbum, photoUrl, recordContentWidth, useHoverCard, useTheme, WIDTHS } from '../helpers/nav';
 
 // Geometry, not class names: the unit specs for B44 (three scrollbars in an album) and B38/B43
 // (a 1397 px hover card whose tags wrapped over many lines) pin Tailwind classes, so a parent or
@@ -64,13 +64,9 @@ for (const width of [1280, 1600]) {
 test('the hover card stays compact: at most 640 px, tags on one line with a +N', async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
 
-  await test.step('1. Open the album and switch the photo tooltip to Hover', async () => {
+  await test.step('1. Open the album and show photo details in the hover card', async () => {
     await openLayoutAlbum(page);
-    await page.getByRole('button', { name: 'Display' }).click();
-    await page.getByRole('button', { name: /^Tooltip:/ }).click();
-    await page.getByRole('menuitemradio', { name: /Hover/ }).click();
-    await page.keyboard.press('Escape');
-    await expect(page.getByRole('menuitemradio')).toHaveCount(0);
+    await useHoverCard(page);
   });
 
   await test.step('2. Hover the photo with 20 tags: the floating card is at most 640 px wide', async () => {

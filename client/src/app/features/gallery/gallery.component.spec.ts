@@ -118,7 +118,7 @@ describe('GalleryComponent', () => {
     const desktop = signal(true);
     Object.defineProperty(component, 'isDesktop', { value: desktop });
     const geometry = component as unknown as { noticeInsetPx: WritableSignal<number>; noticeRightPx: () => number };
-    mockStore.filters.update((filters: GalleryFilters) => ({ ...filters, tooltip_mode: 'hover' }));
+    mockStore.filters.update((filters: GalleryFilters) => ({ ...filters, details_place: 'card', details_trigger: 'hover' }));
     mockStore.filterDrawerOpen.set(true);
     geometry.noticeInsetPx.set(320);
     expect(geometry.noticeRightPx()).toBe(336);
@@ -493,6 +493,36 @@ describe('GalleryComponent', () => {
       fixture.destroy();
     });
 
+    it('from lg the Showing panel is resized by dragging its inner-edge handle, and remembers the width', () => {
+      const KEY = 'facet_gallery_showing_width';
+      localStorage.removeItem(KEY);
+      vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1; });
+      vi.stubGlobal('cancelAnimationFrame', () => undefined);
+      try {
+        const { fixture, root } = render(true);
+        const panel = root.querySelector<HTMLElement>('[data-gallery-panel="filter"]')!;
+        expect(panel.style.width).toBe('320px');
+        expect(panel.classList).not.toContain('w-80');
+        const handle = panel.querySelector<HTMLElement>('app-panel-resize-handle')!;
+        expect(handle.getAttribute('role')).toBe('separator');
+        expect(handle.getAttribute('aria-label')).toBe(I18N.gallery.rail.resize_showing);
+        handle.setPointerCapture = vi.fn(); handle.releasePointerCapture = vi.fn();
+        const pointer = (type: string, clientX: number) =>
+          handle.dispatchEvent(new PointerEvent(type, { clientX, pointerId: 3, isPrimary: true, button: 0, bubbles: true }));
+        pointer('pointerdown', 900); pointer('pointermove', 820); pointer('pointerup', 820);
+        fixture.detectChanges();
+        expect(panel.style.width).toBe('400px');
+        expect(localStorage.getItem(KEY)).toBe('400');
+        handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+        fixture.detectChanges();
+        expect(panel.style.width).toBe('560px');
+        fixture.destroy();
+      } finally {
+        localStorage.removeItem(KEY);
+        vi.unstubAllGlobals();
+      }
+    });
+
     it('from lg the Showing panel clips what it holds, so only the grid and the scroller inside the panel can scroll', () => {
       const { fixture, root } = render(true);
       const panel = root.querySelector<HTMLElement>('[data-gallery-panel="filter"]')!;
@@ -809,7 +839,7 @@ describe('GalleryComponent', () => {
     Object.defineProperty(fixture.componentInstance, 'isDesktop', { value: signal(false) });
     Object.defineProperty(fixture.debugElement.injector.get(MatDialog), 'openDialogs', { value: [] });
     fixture.componentInstance['containerWidth'].set(375);
-    mockStore.filters.update((filters: GalleryFilters) => ({ ...filters, tooltip_mode: 'click' }));
+    mockStore.filters.update((filters: GalleryFilters) => ({ ...filters, details_place: 'card', details_trigger: 'click' }));
     fixture.componentInstance['tooltipPhoto'].set(mockStore.photos()[0]);
     fixture.detectChanges();
     const query = mockStore.filters();
@@ -825,7 +855,7 @@ describe('GalleryComponent', () => {
     expect(fixture.componentInstance.tooltipDisabled()).toBe(true);
     expect(fixture.nativeElement.querySelectorAll('[data-selection-affordance]')).toHaveLength(2);
     expect(fixture.debugElement.queryAll(By.directive(PhotoCardComponent))
-      .every(card => card.componentInstance.tooltipMode() === 'off')).toBe(true);
+      .every(card => card.componentInstance.detailsPlace() === 'off')).toBe(true);
     expect(mockStore.selectAll).not.toHaveBeenCalled();
     expect(mockStore.selectedPaths().size).toBe(0);
     mockStore.selectedPaths.set(new Set(['/a.jpg']));
@@ -845,13 +875,13 @@ describe('GalleryComponent', () => {
   it('disables card tooltips on a narrow viewport while photos are selected, even without the Select affordance', () => {
     mockStore.selectedPaths.set(new Set(['/a.jpg']));
     mockStore.selectionCount.set(1);
-    mockStore.filters.update((filters: GalleryFilters) => ({ ...filters, tooltip_mode: 'click' }));
+    mockStore.filters.update((filters: GalleryFilters) => ({ ...filters, details_place: 'card', details_trigger: 'click' }));
     const fixture = TestBed.createComponent(GalleryComponent);
     Object.defineProperty(fixture.componentInstance, 'isDesktop', { value: signal(false) });
     fixture.detectChanges();
     expect(fixture.componentInstance['selectionAffordance']()).toBe(false);
     expect(fixture.componentInstance.tooltipDisabled()).toBe(true);
-    expect(fixture.componentInstance['cardTooltipMode']()).toBe('off');
+    expect(fixture.componentInstance['cardDetailsPlace']()).toBe('off');
     fixture.destroy();
   });
 
@@ -866,7 +896,7 @@ describe('GalleryComponent', () => {
   });
 
   it('clears a parked tooltip when the docked-rail breakpoint flips panel mode', () => {
-    mockStore.filters.update((filters: GalleryFilters) => ({ ...filters, tooltip_mode: 'panel' }));
+    mockStore.filters.update((filters: GalleryFilters) => ({ ...filters, details_place: 'panel' }));
     const fixture = TestBed.createComponent(GalleryComponent);
     const wide = signal(false);
     Object.defineProperty(fixture.componentInstance['railWide'], 'isDesktop', { value: wide, configurable: true });
@@ -1676,7 +1706,7 @@ describe('GalleryComponent', () => {
       mockStore.config.set({ features: { show_rating_controls: true } });
       // The floating tooltip: the docked rail (the default at this width) would
       // render a full details panel these path-only stand-in photos cannot fill.
-      mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'hover' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'card', details_trigger: 'hover' });
       mockStore.galleryMode.set(mode);
       mockStore.virtualScroll.set(virtual);
       fixture = TestBed.createComponent(GalleryComponent);
@@ -1824,7 +1854,7 @@ describe('GalleryComponent', () => {
       mockStore.config.set({ features: { show_rating_controls: true } });
       // The docked rail would render a full details panel these path-only
       // stand-in photos cannot fill; the floating bubble is what is asserted on.
-      mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'panel', panel_activation: 'both' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'panel', details_trigger: 'both' });
       fixture = TestBed.createComponent(GalleryComponent);
       fixture.detectChanges();
       return [...fixture.nativeElement.querySelectorAll('app-photo-card')] as HTMLElement[];
@@ -2944,7 +2974,7 @@ describe('GalleryComponent', () => {
 
   });
 
-  describe('docked details panel (tooltip_mode = panel)', () => {
+  describe('docked details panel (details_place = panel)', () => {
     const hoverEvent = { currentTarget: null } as unknown as MouseEvent;
 
     /** Force the rail's width gate on, the way a >=1280px viewport would. */
@@ -2956,13 +2986,13 @@ describe('GalleryComponent', () => {
     }
 
     beforeEach(() => {
-      mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'panel' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'panel' });
     });
 
     afterEach(() => vi.unstubAllGlobals());
 
     it('needs a wide viewport as well as the setting, not the setting alone', () => {
-      expect(component['tooltipMode']()).toBe('panel');
+      expect(component['detailsPlace']()).toBe('panel');
       expect(component.panelMode()).toBe(false);
     });
 
@@ -3202,7 +3232,7 @@ describe('GalleryComponent', () => {
       });
 
       it('Escape in Hover mode never touches the panel hold: it only clears the selection', () => {
-        mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'hover' });
+        mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'card', details_trigger: 'hover' });
         mockStore.photos.set([{ path: '/a.jpg' }, { path: '/b.jpg' }]);
         click({ path: '/b.jpg' }, 1);
         mockStore.selectionCount.set(1);
@@ -3468,7 +3498,7 @@ describe('GalleryComponent', () => {
     });
 
     it('still clears on mouse-out in hover mode', () => {
-      mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'hover' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'card', details_trigger: 'hover' });
       component.hideTooltip();
       expect(component['tooltipPhoto']()).toBeNull();
     });
@@ -3503,13 +3533,13 @@ describe('GalleryComponent', () => {
     const photo = { path: '/a.jpg', image_width: 4000, image_height: 3000 } as never;
 
     it('a hover-shown tooltip does not survive a switch to click mode', () => {
-      mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'hover' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'card', details_trigger: 'hover' });
       TestBed.flushEffects();
       const card = makeCard();
       component.showTooltip({ currentTarget: card } as unknown as MouseEvent, photo);
       expect(component['tooltipPhoto']()).toBe(photo);
 
-      mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'click' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'card', details_trigger: 'click' });
       TestBed.flushEffects();
 
       expect(component['tooltipPhoto']()).toBeNull();
@@ -3520,12 +3550,12 @@ describe('GalleryComponent', () => {
       // A test asserting only "clicking twice toggles" would pass even if a
       // stale hover-set tooltipPhoto made this very first click hide instead
       // of show -- assert the show explicitly.
-      mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'hover' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'card', details_trigger: 'hover' });
       TestBed.flushEffects();
       const card = makeCard();
       component.showTooltip({ currentTarget: card } as unknown as MouseEvent, photo);
 
-      mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'click' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'card', details_trigger: 'click' });
       TestBed.flushEffects();
       component.showTooltip({ currentTarget: card } as unknown as MouseEvent, photo);
 
@@ -3534,13 +3564,13 @@ describe('GalleryComponent', () => {
     });
 
     it('a click-pinned tooltip does not survive a switch to hover mode', () => {
-      mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'click' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'card', details_trigger: 'click' });
       TestBed.flushEffects();
       const card = makeCard();
       component.showTooltip({ currentTarget: card } as unknown as MouseEvent, photo);
       expect(component['tooltipPhoto']()).toBe(photo);
 
-      mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'hover' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'card', details_trigger: 'hover' });
       TestBed.flushEffects();
 
       expect(component['tooltipPhoto']()).toBeNull();
@@ -3548,7 +3578,7 @@ describe('GalleryComponent', () => {
     });
 
     it('Escape closes a click-opened tooltip first and leaves the selection for the next Escape', () => {
-      mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'click' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'card', details_trigger: 'click' });
       TestBed.flushEffects();
       mockStore.photos.set([{ path: '/a.jpg' }]);
       mockStore.selectionCount.set(1);
@@ -3567,25 +3597,112 @@ describe('GalleryComponent', () => {
     });
 
     it('a tooltip does not survive a switch to off mode', () => {
-      mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'hover' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'card', details_trigger: 'hover' });
       TestBed.flushEffects();
       const card = makeCard();
       component.showTooltip({ currentTarget: card } as unknown as MouseEvent, photo);
 
-      mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'off' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'off' });
       TestBed.flushEffects();
 
       expect(component['tooltipPhoto']()).toBeNull();
       card.remove();
     });
 
+    describe('a card opened with Hover or click', () => {
+      const other = { path: '/b.jpg', image_width: 4000, image_height: 3000 } as never;
+      const at = (card: HTMLElement, type: string) => ({ type, currentTarget: card }) as unknown as MouseEvent;
+      const pinned = () => (component as unknown as { tooltipPinned(): boolean }).tooltipPinned();
+      const leave = () => (component as unknown as { onTooltipLeave(): void }).onTooltipLeave();
+      beforeEach(() => {
+        mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'card', details_trigger: 'both' });
+        TestBed.flushEffects();
+      });
+
+      it('shows on hover and goes when the pointer leaves', () => {
+        const card = makeCard();
+        component.showTooltip(at(card, 'mouseenter'), photo);
+        expect(component['tooltipPhoto']()).toBe(photo);
+        expect(pinned()).toBe(false);
+        leave();
+        expect(component['tooltipPhoto']()).toBeNull();
+        card.remove();
+      });
+
+      it('a click pins it: it stays when the pointer leaves or crosses other photos, and a second click closes it', () => {
+        const card = makeCard();
+        component.showTooltip(at(card, 'mouseenter'), photo);
+        component.showTooltip(at(card, 'click'), photo);
+        expect(pinned()).toBe(true);
+        leave();
+        component.showTooltip(at(card, 'mouseenter'), other);
+        expect(component['tooltipPhoto']()).toBe(photo);
+        component.showTooltip(at(card, 'click'), photo);
+        expect(component['tooltipPhoto']()).toBeNull();
+        expect(pinned()).toBe(false);
+        // Unpinned again, so hover works as before.
+        component.showTooltip(at(card, 'mouseenter'), other);
+        expect(component['tooltipPhoto']()).toBe(other);
+        card.remove();
+      });
+
+      it('clicking another photo moves the pinned card to it', () => {
+        const card = makeCard();
+        component.showTooltip(at(card, 'click'), photo);
+        component.showTooltip(at(card, 'click'), other);
+        expect(component['tooltipPhoto']()).toBe(other);
+        expect(pinned()).toBe(true);
+        card.remove();
+      });
+
+      it('Escape closes a pinned card first', () => {
+        mockStore.photos.set([{ path: '/a.jpg' }]);
+        const card = makeCard();
+        component.showTooltip(at(card, 'click'), photo);
+        press('Escape');
+        expect(component['tooltipPhoto']()).toBeNull();
+        card.remove();
+      });
+
+      it('a hover card stays off a touch device, but a tap (click) still opens it', () => {
+        component['isTouchDevice'].set(true);
+        const card = makeCard();
+        component.showTooltip(at(card, 'mouseenter'), photo);
+        expect(component['tooltipPhoto']()).toBeNull();
+        component.showTooltip(at(card, 'click'), photo);
+        expect(component['tooltipPhoto']()).toBe(photo);
+        component['isTouchDevice'].set(false);
+        card.remove();
+      });
+    });
+
+    it('a card opened with Hover only is never pinned and leaves with the pointer', () => {
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'card', details_trigger: 'hover' });
+      TestBed.flushEffects();
+      const card = makeCard();
+      component.showTooltip({ type: 'mouseenter', currentTarget: card } as unknown as MouseEvent, photo);
+      expect((component as unknown as { tooltipPinned(): boolean }).tooltipPinned()).toBe(false);
+      (component as unknown as { onTooltipLeave(): void }).onTooltipLeave();
+      expect(component['tooltipPhoto']()).toBeNull();
+      card.remove();
+    });
+
+    it('changing only Open with keeps the side panel on its photo', () => {
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'panel', details_trigger: 'both' });
+      TestBed.flushEffects();
+      component['tooltipPhoto'].set(photo);
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'panel', details_trigger: 'click' });
+      TestBed.flushEffects();
+      expect(component['tooltipPhoto']()).toBe(photo);
+    });
+
     it('switching into panel mode does not carry over a stale hover tooltip', () => {
-      mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'hover' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'card', details_trigger: 'hover' });
       TestBed.flushEffects();
       const card = makeCard();
       component.showTooltip({ currentTarget: card } as unknown as MouseEvent, photo);
 
-      mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'panel' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'panel' });
       TestBed.flushEffects();
 
       expect(component['tooltipPhoto']()).toBeNull();
@@ -6813,7 +6930,7 @@ describe('GalleryComponent', () => {
     });
 
     it('closes child-owned tooltip menus when the gallery parks', async () => {
-      mockStore.filters.update((f: GalleryFilters) => ({ ...f, tooltip_mode: 'click' }));
+      mockStore.filters.update((f: GalleryFilters) => ({ ...f, details_place: 'card', details_trigger: 'click' }));
       harness.detectChanges();
       const tooltips = harness.routeDebugElement!.queryAll(By.directive(PhotoTooltipComponent));
       const closes = tooltips.map(el => vi.spyOn(el.componentInstance as PhotoTooltipComponent, 'closeOverlays'));
@@ -7497,13 +7614,13 @@ describe('GalleryComponent', () => {
   describe('leaving panel mode (rendered)', () => {
     it('releases the held photo when the mode switches away from panel', () => {
       mockStore.photos.set([{ path: '/a.jpg' }]);
-      mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'panel' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'panel' });
       const fixture = TestBed.createComponent(GalleryComponent);
       fixture.detectChanges();
       const comp = fixture.componentInstance as unknown as { activeIndex: WritableSignal<number>; releasePanel(): void };
       comp.activeIndex.set(0);
       const release = vi.spyOn(comp, 'releasePanel').mockImplementation(() => {});
-      mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'hover' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'card', details_trigger: 'hover' });
       fixture.detectChanges();
       expect(release).toHaveBeenCalledOnce();
       fixture.destroy();
@@ -7511,13 +7628,13 @@ describe('GalleryComponent', () => {
 
     it('does not release on Hover -> Click: activeIndex is the keyboard cursor in every mode', () => {
       mockStore.photos.set([{ path: '/a.jpg' }]);
-      mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'hover' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'card', details_trigger: 'hover' });
       const fixture = TestBed.createComponent(GalleryComponent);
       fixture.detectChanges();
       const comp = fixture.componentInstance as unknown as { activeIndex: WritableSignal<number>; releasePanel(): void };
       comp.activeIndex.set(0);
       const release = vi.spyOn(comp, 'releasePanel').mockImplementation(() => {});
-      mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'click' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'card', details_trigger: 'click' });
       fixture.detectChanges();
       expect(release).not.toHaveBeenCalled();
       fixture.destroy();
@@ -7525,13 +7642,13 @@ describe('GalleryComponent', () => {
 
     it('releases on Panel -> Click with a live cursor', () => {
       mockStore.photos.set([{ path: '/a.jpg' }]);
-      mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'panel' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'panel' });
       const fixture = TestBed.createComponent(GalleryComponent);
       fixture.detectChanges();
       const comp = fixture.componentInstance as unknown as { activeIndex: WritableSignal<number>; releasePanel(): void };
       comp.activeIndex.set(0);
       const release = vi.spyOn(comp, 'releasePanel').mockImplementation(() => {});
-      mockStore.filters.set({ ...DEFAULT_FILTERS, tooltip_mode: 'click' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'card', details_trigger: 'click' });
       fixture.detectChanges();
       expect(release).toHaveBeenCalledOnce();
       fixture.destroy();

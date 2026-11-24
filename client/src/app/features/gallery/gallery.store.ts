@@ -24,18 +24,18 @@ import { readReviewQueue, saveReviewQueue } from './review-queue.util';
 import { REVIEW_PROGRESS_VISIBLE_KEY, readReviewProgressVisible } from './review-progress-dismiss.util';
 import type { components } from '../../core/api/schema';
 import {
-  type GalleryFilters, type GalleryMode, type TooltipMode, type PanelActivation, type DisplayOptions,
+  type GalleryFilters, type GalleryMode, type DetailsPlace, type DetailsTrigger, type DisplayOptions,
   type ViewFilterParams,
   DEFAULT_FILTERS, DISPLAY_OPTION_KEYS,
   GALLERY_MODE_KEY, DRAWER_STATE_KEY, CARD_WIDTH_KEY, GALLERY_SESSION_QUERY_KEY, LAST_SORT_KEY, RELEVANCE_SORT, parseGalleryMode,
-  loadDisplayOptionsFromStorage, saveDisplayOptionsToStorage,
+  loadDisplayOptionsFromStorage, saveDisplayOptionsToStorage, configDetailsDefaults, resolveDetailsSettings,
   countActiveFilters, reviewStatusPatch, setScopePatch, applyQueryParams, applySavedAlbumFilters, buildSyncParams, buildApiParams,
   buildViewFilterParams, viewFilterParamsEqual, anyHideToggleActive,
   seededSearchThreshold, buildByPathsFilters, BY_PATHS_MAX, semanticSortPatch, exclusiveHidePatch,
 } from './gallery-filters.util';
 
 // Re-export the filter types/consts so existing importers of gallery.store keep working.
-export type { GalleryFilters, GalleryMode, TooltipMode, PanelActivation, DisplayOptions, ViewFilterParams };
+export type { GalleryFilters, GalleryMode, DetailsPlace, DetailsTrigger, DisplayOptions, ViewFilterParams };
 export { DEFAULT_FILTERS, anyHideToggleActive };
 
 /** The five hide toggles the hidden-photos banner clears and restores together. */
@@ -188,8 +188,12 @@ export interface ViewerConfig {
     hide_brackets: boolean;
     hide_panoramas: boolean;
     hide_details: boolean;
-    tooltip_mode: TooltipMode;
-    panel_activation: PanelActivation;
+    /** Where and how a photo's details open; read through configDetailsDefaults. */
+    details_place?: DetailsPlace;
+    details_trigger?: DetailsTrigger;
+    /** Pre-split keys an operator's own config may still set; they win over the shipped new keys. */
+    tooltip_mode?: string;
+    panel_activation?: string;
     hide_rejected: boolean;
     gallery_mode: GalleryMode;
   };
@@ -1098,8 +1102,7 @@ export class GalleryStore {
         type: defaults?.type ?? '',
         hide_details: storedDisplay.hide_details ?? (defaults?.hide_details ?? true),
         tile_fit: storedDisplay.tile_fit ?? 'square',
-        tooltip_mode: storedDisplay.tooltip_mode ?? (defaults?.tooltip_mode ?? 'panel'),
-        panel_activation: storedDisplay.panel_activation ?? (defaults?.panel_activation ?? 'both'),
+        ...resolveDetailsSettings(storedDisplay, configDetailsDefaults(defaults)),
         hide_blinks: storedDisplay.hide_blinks ?? (defaults?.hide_blinks ?? true),
         hide_bursts: storedDisplay.hide_bursts ?? (defaults?.hide_bursts ?? true),
         hide_duplicates: storedDisplay.hide_duplicates ?? (defaults?.hide_duplicates ?? true),
@@ -1680,7 +1683,7 @@ export class GalleryStore {
 
   /** Display-only keys that never affect the API query */
   private static readonly DISPLAY_ONLY_KEYS: ReadonlySet<keyof GalleryFilters> = new Set([
-    'hide_details', 'tooltip_mode', 'panel_activation', 'tile_fit',
+    'hide_details', 'details_place', 'details_trigger', 'tile_fit',
   ]);
 
   private static readonly JOURNAL_SKIPPED_KEYS: ReadonlySet<string> = new Set([
@@ -1972,8 +1975,7 @@ export class GalleryStore {
       sort: defaults?.sort ?? 'aggregate',
       sort_direction: defaults?.sort_direction ?? 'DESC',
       hide_details: defaults?.hide_details ?? true,
-      tooltip_mode: defaults?.tooltip_mode ?? 'panel',
-      panel_activation: defaults?.panel_activation ?? 'both',
+      ...configDetailsDefaults(defaults),
       hide_blinks: defaults?.hide_blinks ?? true,
       hide_bursts: defaults?.hide_bursts ?? true,
       hide_duplicates: defaults?.hide_duplicates ?? true,
@@ -2022,8 +2024,7 @@ export class GalleryStore {
     this.resetCardWidth();
     await this.updateFilters({
       hide_details: config?.defaults.hide_details ?? true,
-      tooltip_mode: config?.defaults.tooltip_mode ?? 'panel',
-      panel_activation: config?.defaults.panel_activation ?? 'both',
+      ...configDetailsDefaults(config?.defaults),
     });
   }
 

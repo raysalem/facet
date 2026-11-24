@@ -4,6 +4,11 @@ All notable changes to Facet are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Photo details are two settings: where they appear and what opens them.** The Tooltip menu mixed the two (Hover, Click, Side panel, Off, plus a Panel activation submenu that applied to the side panel only). Display now shows **Photo details** (Off, Hover card, Side panel) and **Open with** (Hover, Click, Hover or click), which applies to the card and the panel alike and is hidden while details are Off. A card opened with Hover or click previews on hover and stays pinned after a click. Saved settings, shared links and `viewer.defaults` carry over: `tooltip_mode` hover and click become the card opened that way, panel keeps its `panel_activation`, off stays off. The new keys are `details_place` and `details_trigger`; the old keys are still read (and, in `viewer.defaults`, win when set).
+- **The gallery's side panels can be resized.** Showing and the photo details panel were a fixed 320 px; drag the grip on a panel's left edge, or focus it and use the arrow keys, Home and End (288 to 560 px). Each panel remembers its width. The photo page inspector's resize edge, which worked but was an invisible strip, now shows the same grip, a resize cursor and a how-to tooltip, and lights up on hover, focus and while dragging.
+
 ### Fixed
 
 - **The Date Added sort waits for a dated photo, and names the library inside an album.** An upgraded library has no Date Added until a scan rewrites its rows, so the option sorted only by path; it now joins the data-gated sorts and appears once a photo has a date (an explicit `sort=date_added` still works). Inside an album it reads "Date Added to Library", since it orders by library import time, not by when the photo joined the album.

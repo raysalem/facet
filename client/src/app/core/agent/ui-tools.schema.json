@@ -629,6 +629,8 @@
     "album_id",
     "album_set",
     "burst_group_id",
+    "details_place",
+    "details_trigger",
     "duplicate_group_id",
     "gps_lat",
     "gps_lng",

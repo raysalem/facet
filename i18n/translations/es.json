@@ -71,7 +71,8 @@
       "from": "Desde",
       "to": "Hasta",
       "loading": "Cargando...",
-      "na": "N/D"
+      "na": "N/D",
+      "resize_hint": "Arrastra para cambiar el ancho. Con el foco, también funcionan las flechas, Inicio y Fin."
     },
     "badges": {
       "best": "MEJOR",
@@ -1243,17 +1244,16 @@
     "composition_range": "Rango de composición",
     "hide_details": "Ocultar detalles",
     "tooltip_mode": {
-      "label": "Tooltip",
-      "hover": "Hover",
-      "click": "Clic",
-      "panel": "Panel lateral",
-      "off": "Desactivado",
       "panel_empty": "Pasa el cursor sobre una foto o haz clic en ella para ver aquí sus detalles",
       "panel_deselect": "Deseleccionar",
       "details": "Detalles de la foto"
     },
-    "panel_activation": {
-      "label": "Activación del panel",
+    "photo_details": {
+      "label": "Detalles de la foto",
+      "off": "Desactivado",
+      "card": "Tarjeta al pasar",
+      "panel": "Panel lateral",
+      "open_with": "Abrir con",
       "hover": "Hover",
       "click": "Clic",
       "both": "Hover o clic"
@@ -1805,13 +1805,15 @@
       "hide_details": "Muestra solo las fotos, sin la información bajo cada foto",
       "fast_scrolling": "Dibuja solo las filas cercanas a la pantalla para que las galerías largas se desplacen con fluidez. Desactívalo si el diseño falla.",
       "card_buttons": "Elige qué botones muestra una tarjeta al pasar el ratón, y en qué orden",
-      "tooltip_mode": "Cómo se abren los detalles de una foto: al pasar el ratón, al hacer clic, en el panel lateral o nunca",
+      "photo_details": "Dónde aparecen los detalles de una foto: en una tarjeta junto a la foto, en el panel lateral en el borde de la galería o en ninguna parte",
+      "open_with": "Qué abre los detalles de una foto: señalar la foto (Hover), hacer clic en ella (Clic) o cualquiera de las dos (Hover o clic). Se aplica a la tarjeta y al panel lateral por igual.",
       "tile_fit": "Recorta las miniaturas en cuadrado o muestra cada foto en su proporción original",
       "reset_display": "Restablece el diseño, el tamaño de las miniaturas y los detalles de las fotos predeterminados. Los filtros, el orden y la selección no cambian."
     },
     "rail": {
       "label": "Paneles de la galería",
       "showing": "Mostrando",
+      "resize_showing": "Cambiar el ancho del panel Mostrando",
       "filters_one": "{count} filtro",
       "filters": "{count} filtros"
     }

@@ -1596,7 +1596,8 @@ Affichage et comportement de la galerie web.
       "hide_brackets": true,
       "hide_panoramas": true,
       "hide_details": true,
-      "tooltip_mode": "panel",
+      "details_place": "panel",
+      "details_trigger": "both",
       "hide_rejected": true,
       "sort": "aggregate",
       "sort_direction": "DESC",
@@ -1685,8 +1686,8 @@ Affichage et comportement de la galerie web.
 | `hide_brackets` | `true` | Afficher uniquement l'exposition de base de chaque bracketing par défaut |
 | `hide_panoramas` | `true` | N'afficher qu'une image représentative par panorama par défaut |
 | `hide_details` | `true` | Masquer les détails des photos sur les cartes par défaut |
-| `tooltip_mode` | `"panel"` | Déclencheur de l'infobulle : `"hover"`, `"click"`, `"off"` ou `"panel"` (rail ancré) ; remplace `hide_tooltip` |
-| `panel_activation` | `"both"` | Geste qui change la photo du rail ancré en mode `"panel"` : `"hover"`, `"click"` ou `"both"` |
+| `details_place` | `"panel"` | Où apparaissent les détails de la photo (Affichage > **Détails de la photo**) : `"off"`, `"card"` (une carte à côté de la photo) ou `"panel"` (le panneau latéral ancré) |
+| `details_trigger` | `"both"` | Ce qui les ouvre (Affichage > **Ouvrir avec**), pour la carte comme pour le panneau : `"hover"`, `"click"` ou `"both"`. Les anciennes clés `tooltip_mode` et `panel_activation` sont toujours lues et l'emportent si elles sont présentes (`hover`/`click` = carte ouverte ainsi, `panel` = panneau latéral selon `panel_activation`, `off` = désactivé) |
 | `hide_rejected` | `true` | Masquer les photos rejetées par défaut |
 | `gallery_mode` | `"mosaic"` | Disposition de galerie par défaut (`"grid"` ou `"mosaic"`) |
 | **allowed_origins** | | |
@@ -1760,7 +1761,7 @@ Désactiver `badges.stack` ne masque que le badge ; le bouton de carte « Ouvr
 | `badge_percent` | `5` | Pourcentage de pixels, dans le pire de R/V/B, au-dessus duquel la carte reçoit un badge (environ 1 photo sur 25 sur un échantillon) |
 | `indicator_percent` | `1` | Seuil des repères d'extrémité R/V/B propres à l'histogramme |
 | `histogram_mode` | `"rgb"` | Valeur par défaut de l'histogramme du **panneau de détail** : `"luma"`, `"rgb"`, `"r"`, `"g"` ou `"b"` |
-| `tooltip_histogram_mode` | `"luma"` | Valeur par défaut de l'onglet Histogramme du **panneau latéral** (`tooltip_mode: "panel"`), mêmes cinq valeurs |
+| `tooltip_histogram_mode` | `"luma"` | Valeur par défaut de l'onglet Histogramme du **panneau latéral** (`details_place: "panel"`), mêmes cinq valeurs |
 
 Remarques :
 - Le choix d'histogramme d'un utilisateur est stocké dans `localStorage` (`facet_histogram_mode`, `facet_histogram_mode_tooltip`) et l'emporte sur ces valeurs par défaut. Les deux réglages sont indépendants.

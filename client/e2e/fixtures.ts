@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import * as path from 'node:path';
-import { test as base, expect, type Page } from '@playwright/test';
+import { test as base, expect, type Page, type Locator } from '@playwright/test';
 import { EDITION_PASSWORD, PYTHON } from './env';
 import { attachNetworkGate } from './helpers/ui-probe.helpers';
 
@@ -109,4 +109,4 @@ export const test = base.extend<{ gate: void }>({
 });
 
 export { expect };
-export type { Page };
+export type { Page, Locator };

@@ -12,6 +12,8 @@ import { GalleryCriteriaComponent } from './gallery-criteria.component';
 import { definingFilters, galleryFilterChips } from './gallery-filter-chips';
 import { AddonRail } from '../../core/addons/addon-rail';
 import { PanelRailComponent, type RailTab } from '../../shared/components/panel-rail/panel-rail.component';
+import { PanelResizeHandleComponent } from '../../shared/components/panel-resize-handle/panel-resize-handle.component';
+import { PanelWidth } from '../../shared/utils/panel-width';
 import { StackActionsService } from './stack-actions.service';
 import { STACK_EDITOR_HISTORY } from './stack-editor-history';
 import {
@@ -87,7 +89,7 @@ import {
   gridColumnCount, totalRowsHeight, windowRange, MOBILE_MIN_COLUMNS, MOBILE_DETAILS_MIN_COLUMNS,
 } from './gallery-rows.util';
 import { noticeLiftPx } from './selection-bar-layout.util';
-import { GalleryFilters, applyQueryParams, applySavedAlbumFilters, loadDisplayOptionsFromStorage, nextGalleryMode, inAlbum } from './gallery-filters.util';
+import { type DetailsPlace, GalleryFilters, applyQueryParams, applySavedAlbumFilters, loadDisplayOptionsFromStorage, nextGalleryMode, inAlbum } from './gallery-filters.util';
 import { AlbumService, Album } from '../../core/services/album.service';
 import { InfiniteScrollDirective } from '../../shared/directives/infinite-scroll.directive';
 import { I18N, i18nKeys } from '../../core/i18n/keys';
@@ -156,7 +158,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
     PhotoTooltipComponent,
     SlideshowComponent,
     GalleryFilterSidebarComponent,
-    GalleryViewControlsComponent, GalleryCriteriaComponent, PanelRailComponent,
+    GalleryViewControlsComponent, GalleryCriteriaComponent, PanelRailComponent, PanelResizeHandleComponent,
     PhotoCardComponent,
     GalleryPhotoMenuComponent,
     PhotoSkeletonComponent,
@@ -457,11 +459,11 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
                     [thumbSize]="thumbSize()"
                     [isEditionMode]="auth.isEdition()"
                     [personFilterId]="store.filters().person_id"
-                    [tooltipMode]="cardTooltipMode()"
-                    [panelActivation]="panelActivation()"
+                    [detailsPlace]="cardDetailsPlace()"
+                    [detailsTrigger]="detailsTrigger()"
                     (selectionChange)="toggleSelection($event.photo, $event.event, row.startIndex + i)"
                     (tooltipShow)="showTooltip($event.event, $event.photo)"
-                    (tooltipHide)="hideTooltip()"
+                    (tooltipHide)="onTooltipLeave()"
                     [filterLinks]="!pinned()"
                 [tagCollectionAvailable]="!store.filters().similar_to" (tagClicked)="navigateTag($event)"
                     (personFilterClicked)="filterByPerson($event)"
@@ -525,11 +527,11 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
                   [thumbSize]="thumbSize()"
                   [isEditionMode]="auth.isEdition()"
                   [personFilterId]="store.filters().person_id"
-                  [tooltipMode]="cardTooltipMode()"
-                      [panelActivation]="panelActivation()"
+                  [detailsPlace]="cardDetailsPlace()"
+                      [detailsTrigger]="detailsTrigger()"
                   (selectionChange)="toggleSelection($event.photo, $event.event, i)"
                   (tooltipShow)="showTooltip($event.event, $event.photo)"
-                  (tooltipHide)="hideTooltip()"
+                  (tooltipHide)="onTooltipLeave()"
                   [filterLinks]="!pinned()"
                       [tagCollectionAvailable]="!store.filters().similar_to" (tagClicked)="navigateTag($event)"
                   (personFilterClicked)="filterByPerson($event)"
@@ -589,11 +591,11 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
                       [thumbSize]="thumbSize()"
                       [isEditionMode]="auth.isEdition()"
                       [personFilterId]="store.filters().person_id"
-                      [tooltipMode]="cardTooltipMode()"
-                      [panelActivation]="panelActivation()"
+                      [detailsPlace]="cardDetailsPlace()"
+                      [detailsTrigger]="detailsTrigger()"
                       (selectionChange)="toggleSelection($event.photo, $event.event, row.startIndex + i)"
                       (tooltipShow)="showTooltip($event.event, $event.photo)"
-                      (tooltipHide)="hideTooltip()"
+                      (tooltipHide)="onTooltipLeave()"
                       [filterLinks]="!pinned()"
                       [tagCollectionAvailable]="!store.filters().similar_to" (tagClicked)="navigateTag($event)"
                       (personFilterClicked)="filterByPerson($event)"
@@ -986,7 +988,10 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
            Both panels are relative + overflow-hidden: an sr-only label is absolutely placed, and without a positioned
            ancestor it escapes the inner scroller and stretches the shell's <main> into a scrollbar of its own. -->
       <aside id="gallery-panel-filter" data-gallery-panel="filter" role="tabpanel" aria-labelledby="gallery-rail-filter" [hidden]="!filterPanelOpen()" (keydown)="closePanels($event)"
-        class="relative flex w-80 shrink-0 flex-col overflow-hidden border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] text-sm">
+        [style.width.px]="showingWidth.width()"
+        class="relative flex shrink-0 flex-col overflow-hidden border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] text-sm">
+        <!-- Drag or arrow-key the inner edge to widen the panel (remembered). Inside the panel: it clips its overflow. -->
+        <app-panel-resize-handle class="absolute inset-y-0 left-0 flex" [panel]="showingWidth" [label]="I18N.gallery.rail.resize_showing | translate" />
         <div data-panel-header class="flex shrink-0 items-center gap-2 px-4 pt-2">
           <div class="min-w-0 flex-1 py-1">
             <h2 class="m-0 truncate text-sm font-medium">{{ I18N.gallery.rail.showing | translate }}</h2>
@@ -1012,7 +1017,9 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
            Only with "Show details: Side panel" on a window wide enough for it. -->
       @if (detailsRailVisible()) {
         <aside data-details-rail data-gallery-panel="photo" tabindex="-1" (keydown.escape)="onRailEscape($event)" (keydown)="closePanels($event)" (focusout)="onGridFocusOut($event)"
-          class="relative flex w-80 shrink-0 flex-col overflow-hidden border-l border-[var(--mat-sys-outline-variant)] bg-[var(--facet-rail-bg)]">
+          [style.width.px]="detailsWidth.width()"
+          class="relative flex shrink-0 flex-col overflow-hidden border-l border-[var(--mat-sys-outline-variant)] bg-[var(--facet-rail-bg)]">
+          <app-panel-resize-handle class="absolute inset-y-0 left-0 flex" [panel]="detailsWidth" [label]="I18N.photo_detail.inspector_resize | translate" />
           <div data-panel-header class="flex shrink-0 items-center gap-2 border-b border-[var(--mat-sys-outline-variant)] px-4 py-2">
             <div class="min-w-0 flex-1">
               <h2 class="m-0 truncate text-sm font-medium text-[var(--mat-sys-on-surface)]">{{ photoPanelLabel() | translate }}</h2>
@@ -1105,13 +1112,13 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
          rail renders its own, so the floating one stays away while the rail is up;
          wherever the rail cannot dock (narrow or touch viewports) the panel place
          falls back to this bubble, and hover mode still hides on pure touch. -->
-    @if (!tooltipDisabled() && !panelMode() && (tooltipMode() === 'panel' || tooltipMode() === 'click' || (isDesktop() && !isTouchDevice()))) {
+    @if (!tooltipDisabled() && !panelMode() && (detailsPlace() === 'panel' || detailsTrigger() !== 'hover' || (isDesktop() && !isTouchDevice()))) {
       <app-photo-tooltip
         [photo]="tooltipPhoto()"
         [x]="tooltipX()"
         [y]="tooltipY()"
         [flipped]="tooltipFlipped()"
-        [pinned]="tooltipMode() === 'click'"
+        [pinned]="tooltipPinned()"
         [histogramDefaultMode]="tooltipHistogramDefaultMode()"
         [indicatorPercent]="clippingIndicatorPercent()"
         [addonNames]="addonNames()" [personLinks]="!pinned()" [tagCollectionAvailable]="!store.filters().similar_to" (tagSelected)="navigateTag($event)"
@@ -1505,15 +1512,28 @@ export class GalleryComponent implements OnInit, OnDestroy {
   protected readonly showSelectionIndicators = computed(() =>
     this.selectionAffordance() || (this.selectingPhotos() && !this.isDesktop()),
   );
-  protected readonly cardTooltipMode = computed(() =>
-    this.selectingPhotos() && !this.isDesktop() ? 'off' : this.tooltipMode(),
+  protected readonly cardDetailsPlace = computed<DetailsPlace>(() =>
+    this.selectingPhotos() && !this.isDesktop() ? 'off' : this.detailsPlace(),
   );
 
   /** Whether to hide photo details below the thumbnails */
   readonly effectiveHideDetails = computed(() => this.store.filters().hide_details);
 
-  /** Tooltip mode signal — 'hover' | 'click' | 'off' */
-  readonly tooltipMode = computed(() => this.store.filters().tooltip_mode);
+  /** The Showing and photo-details panels' user-set widths (drag or arrow-key their inner edge). */
+  protected readonly showingWidth = new PanelWidth({ storageKey: 'facet_gallery_showing_width', defaultWidth: 320, min: 288, max: 560, side: 'right' });
+  protected readonly detailsWidth = new PanelWidth({ storageKey: 'facet_gallery_details_width', defaultWidth: 320, min: 288, max: 560, side: 'right' });
+  /** "Photo details": where a photo's details appear — 'off' | 'card' | 'panel'. */
+  readonly detailsPlace = computed(() => this.store.filters().details_place);
+  /** "Open with": what opens them — 'hover' | 'click' | 'both', for the card and the panel alike. */
+  readonly detailsTrigger = computed(() => this.store.filters().details_trigger);
+  /** The path of the photo whose floating card a click (or Space) opened. Such a
+   *  card is pinned: it stays when the pointer leaves, takes pointer events, and a
+   *  second click on the same photo closes it. A hover-opened card is not. */
+  private readonly pinnedTooltipPath = signal<string | null>(null);
+  protected readonly tooltipPinned = computed(() => {
+    const photo = this.tooltipPhoto();
+    return !!photo && photo.path === this.pinnedTooltipPath();
+  });
   /** Leaving panel mode releases the held photo: the docked rail is going away
    *  (the Side panel switch hands the surface back to hover bubbles), so the dimming
    *  and the framed card cannot outlive the panel they belong to. Only a
@@ -1521,7 +1541,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
   private readonly releaseOnModeLeave = (() => {
     let previous: string | undefined;
     return effect(() => {
-      const mode = this.tooltipMode();
+      const mode = this.detailsPlace();
       untracked(() => {
         const left = previous === 'panel' && mode !== 'panel';
         previous = mode;
@@ -1529,13 +1549,11 @@ export class GalleryComponent implements OnInit, OnDestroy {
       });
     });
   })();
-  /** Which gesture(s) retarget the docked panel — only meaningful when tooltipMode is 'panel'. */
-  readonly panelActivation = computed(() => this.store.filters().panel_activation);
   /** Whether tooltip is fully disabled (off mode) — used for skipping rendering and hover handlers */
-  readonly tooltipDisabled = computed(() => this.tooltipMode() === 'off' || (this.selectingPhotos() && !this.isDesktop()));
+  readonly tooltipDisabled = computed(() => this.detailsPlace() === 'off' || (this.selectingPhotos() && !this.isDesktop()));
 
   /** Docked rail needs real width, not merely "not a phone". */
-  readonly panelMode = computed(() => this.tooltipMode() === 'panel' && this.railWide.isDesktop());
+  readonly panelMode = computed(() => this.detailsPlace() === 'panel' && this.railWide.isDesktop());
 
   /** An assistant-pinned list is shown: the filter controls are hidden so no edit can drop it. */
   protected readonly pinned = computed(() => this.store.pinnedPaths() !== null);
@@ -2289,7 +2307,9 @@ export class GalleryComponent implements OnInit, OnDestroy {
       untracked(() => this.selectionAffordance.set(false));
     });
     effect(() => {
-      this.tooltipMode(); // track dependency
+      // A card's trigger change drops it (a hover card must not turn into a pinned one);
+      // the docked panel keeps its photo when only the trigger changes.
+      if (this.detailsPlace() !== 'panel') this.detailsTrigger();
       this.panelMode(); // the rail breakpoint flips panel mode without a mode change
       untracked(() => this.dropHeldPhoto());
     });
@@ -3105,26 +3125,33 @@ export class GalleryComponent implements OnInit, OnDestroy {
   }
 
   showTooltip(event: MouseEvent, photo: Photo): void {
-    const mode = this.tooltipMode();
-    if (mode === 'off') return;
+    const place = this.detailsPlace();
+    if (place === 'off') return;
     // The rail is parked, so none of the placement maths below applies to it.
     // Only while it is actually shown, though: with the mode selected on a
     // viewport too narrow for the rail, skipping the maths left the floating
     // tooltip to render at a stale coordinate in the middle of the page.
-    if (mode === 'panel' && this.panelMode()) {
+    if (place === 'panel' && this.panelMode()) {
       this.tooltipPhoto.set(photo);
       this.openRail();
       return;
     }
-    // Hover mode is meaningless on touch (mouseenter fires once on tap and
-    // sticks) so we suppress it there. Click mode is the intended touch path
-    // and must work — only block hover on touch devices.
-    if (mode === 'hover' && this.isTouchDevice()) return;
-    // In click mode, toggle: clicking the same photo hides the tooltip.
-    if (mode === 'click' && this.tooltipPhoto() === photo) {
+    // The card only asks for a gesture its trigger allows; a click or Space pins
+    // the card, a hover shows it until the pointer leaves.
+    const byClick = event?.type !== 'mouseenter';
+    if (!byClick) {
+      // A hover card is meaningless on touch (mouseenter fires once on tap and
+      // sticks), so it is suppressed there; the panel's floating stand-in is a
+      // phone's only details surface and keeps it.
+      if (place === 'card' && this.isTouchDevice()) return;
+      // A click-pinned card stays put while the pointer crosses other photos.
+      if (this.tooltipPinned()) return;
+    } else if (this.tooltipPinned() && this.tooltipPhoto()?.path === photo.path) {
+      // Toggle: clicking the pinned photo again closes its card.
       this.hideTooltip();
       return;
     }
+    this.pinnedTooltipPath.set(byClick ? photo.path : null);
     const card = (event.currentTarget as HTMLElement)?.closest('.relative.rounded-lg') as HTMLElement ?? event.currentTarget as HTMLElement;
     const rect = card.getBoundingClientRect();
     const padding = 16;
@@ -3192,7 +3219,13 @@ export class GalleryComponent implements OnInit, OnDestroy {
     // A docked rail keeps the last photo on mouse-out. Blanking it every time
     // the cursor crossed a gap would undo the reason for docking it.
     if (this.panelMode()) return;
+    this.pinnedTooltipPath.set(null);
     this.tooltipPhoto.set(null);
+  }
+
+  /** The pointer left a card: a hover card goes with it, a click-pinned one stays. */
+  protected onTooltipLeave(): void {
+    if (!this.tooltipPinned()) this.hideTooltip();
   }
 
   // --- Card action handlers ---
@@ -3584,7 +3617,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
       case 'Escape':
         // A click-opened tooltip — and the panel place's floating fallback where
         // the rail cannot dock — is the innermost layer: close it before touching the selection.
-        if ((this.tooltipMode() === 'click' || (this.tooltipMode() === 'panel' && !this.panelMode())) && this.tooltipPhoto()) {
+        if (!this.panelMode() && this.tooltipPhoto() && (this.tooltipPinned() || this.detailsPlace() === 'panel')) {
           event.preventDefault();
           this.hideTooltip();
           return;

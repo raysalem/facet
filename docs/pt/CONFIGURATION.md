@@ -1592,7 +1592,8 @@ Exibição e comportamento da galeria web.
       "hide_brackets": true,
       "hide_panoramas": true,
       "hide_details": true,
-      "tooltip_mode": "panel",
+      "details_place": "panel",
+      "details_trigger": "both",
       "hide_rejected": true,
       "sort": "aggregate",
       "sort_direction": "DESC",
@@ -1681,8 +1682,8 @@ Exibição e comportamento da galeria web.
 | `hide_brackets` | `true` | Mostra apenas a exposição base de cada bracketing por padrão |
 | `hide_panoramas` | `true` | Mostrar por padrão apenas um quadro representativo por panorâmica |
 | `hide_details` | `true` | Oculta os detalhes da foto nos cartões por padrão |
-| `tooltip_mode` | `"panel"` | Gatilho do tooltip: `"hover"`, `"click"`, `"off"` ou `"panel"` (barra fixada); substitui `hide_tooltip` |
-| `panel_activation` | `"both"` | Gesto que muda a foto da barra fixada no modo `"panel"`: `"hover"`, `"click"` ou `"both"` |
+| `details_place` | `"panel"` | Onde aparecem os detalhes da foto (Visualização > **Detalhes da foto**): `"off"`, `"card"` (um cartão ao lado da foto) ou `"panel"` (o painel lateral fixado) |
+| `details_trigger` | `"both"` | O que os abre (Visualização > **Abrir com**), para o cartão e o painel: `"hover"`, `"click"` ou `"both"`. As chaves anteriores `tooltip_mode` e `panel_activation` continuam sendo lidas e prevalecem quando presentes (`hover`/`click` = cartão aberto assim, `panel` = painel lateral com `panel_activation`, `off` = desligado) |
 | `hide_rejected` | `true` | Oculta fotos rejeitadas por padrão |
 | `gallery_mode` | `"mosaic"` | Layout padrão da galeria (`"grid"` ou `"mosaic"`) |
 | **allowed_origins** | | |
@@ -1755,7 +1756,7 @@ Desativar `badges.stack` oculta apenas o selo; o botão de cartão «Abrir pilha
 | `badge_percent` | `5` | Porcentagem de pixels, no pior dos canais R/G/B, acima da qual o cartão recebe selo (cerca de 1 foto em 25 em uma amostra) |
 | `indicator_percent` | `1` | Limiar dos marcadores R/G/B próprios do histograma |
 | `histogram_mode` | `"rgb"` | Padrão do histograma do **painel de detalhe**: `"luma"`, `"rgb"`, `"r"`, `"g"` ou `"b"` |
-| `tooltip_histogram_mode` | `"luma"` | Padrão da aba Histograma do **painel lateral** (`tooltip_mode: "panel"`), os mesmos cinco valores |
+| `tooltip_histogram_mode` | `"luma"` | Padrão da aba Histograma do **painel lateral** (`details_place: "panel"`), os mesmos cinco valores |
 
 Notas:
 - A escolha de histograma do próprio usuário fica em `localStorage` (`facet_histogram_mode`, `facet_histogram_mode_tooltip`) e prevalece sobre estes padrões. As duas configurações são independentes.

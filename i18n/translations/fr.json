@@ -71,7 +71,8 @@
       "from": "Du",
       "to": "Au",
       "loading": "Chargement...",
-      "na": "N/A"
+      "na": "N/A",
+      "resize_hint": "Faites glisser pour redimensionner. Avec le focus, les flèches, Début et Fin fonctionnent aussi."
     },
     "badges": {
       "best": "TOP",
@@ -1243,17 +1244,16 @@
     "composition_range": "Plage composition",
     "hide_details": "Masquer détails",
     "tooltip_mode": {
-      "label": "Infobulle",
-      "hover": "Survol",
-      "click": "Clic",
-      "panel": "Panneau latéral",
-      "off": "Désactivée",
       "panel_empty": "Survolez une photo ou cliquez dessus pour voir ses détails ici",
       "panel_deselect": "Désélectionner",
       "details": "Détails de la photo"
     },
-    "panel_activation": {
-      "label": "Activation du panneau",
+    "photo_details": {
+      "label": "Détails de la photo",
+      "off": "Désactivée",
+      "card": "Carte au survol",
+      "panel": "Panneau latéral",
+      "open_with": "Ouvrir avec",
       "hover": "Survol",
       "click": "Clic",
       "both": "Survol ou clic"
@@ -1805,13 +1805,15 @@
       "hide_details": "Affiche les photos seules, sans les informations sous chaque photo",
       "fast_scrolling": "N’affiche que les lignes proches de l’écran, pour un défilement fluide des grandes galeries. Désactivez-le si la mise en page se dérègle.",
       "card_buttons": "Choisissez les boutons qu’une vignette affiche au survol, et leur ordre",
-      "tooltip_mode": "Comment s’ouvrent les détails d’une photo : au survol, au clic, dans le panneau latéral, ou jamais",
+      "photo_details": "Où apparaissent les détails d'une photo : dans une carte à côté de la photo, dans le panneau latéral au bord de la galerie, ou nulle part",
+      "open_with": "Ce qui ouvre les détails d'une photo : pointer la photo (Survol), cliquer dessus (Clic), ou l'un ou l'autre (Survol ou clic). S'applique à la carte comme au panneau latéral.",
       "tile_fit": "Recadre les vignettes en carré, ou montre chaque photo dans son ratio d’origine",
       "reset_display": "Rétablit la disposition, la taille des vignettes et les détails des photos par défaut. Les filtres, le tri et la sélection restent inchangés."
     },
     "rail": {
       "label": "Panneaux de la galerie",
       "showing": "Affiché",
+      "resize_showing": "Redimensionner le panneau Affiché",
       "filters_one": "{count} filtre",
       "filters": "{count} filtres"
     }

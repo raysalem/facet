@@ -22,10 +22,13 @@ describe('PanelWidth', () => {
     vi.stubGlobal('requestAnimationFrame', () => 1);
     vi.stubGlobal('cancelAnimationFrame', () => undefined);
     const panel = create(side), handle = target();
+    expect(panel.dragging()).toBe(false);
     panel.start(pointer('pointerdown', 100, handle));
+    expect(panel.dragging()).toBe(true);
     panel.move(pointer('pointermove', 150, handle));
     expect(document.body.style.userSelect).toBe('none');
     panel.finish(pointer('pointerup', 150, handle));
+    expect(panel.dragging()).toBe(false);
     expect(document.body.style.userSelect).toBe('');
     expect(panel.width()).toBe(expected);
     expect(localStorage.getItem(KEY)).toBe(String(expected));
@@ -43,6 +46,7 @@ describe('PanelWidth', () => {
     panel.move(pointer('pointermove', 600, handle));
     panel.finish(pointer('pointercancel', 600, handle), true);
     expect(panel.width()).toBe(400);
+    expect(panel.dragging()).toBe(false);
   });
 
   it('falls back to the default width when storage is blocked', () => {
