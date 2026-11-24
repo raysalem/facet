@@ -41,7 +41,7 @@ Hover over any photo to see its score breakdown and EXIF data in the gallery's s
 - **Auto-cull** — one button culls a whole scope (all groups, or bursts / similars / scenes only, optionally narrowed to an album or date window) with a dry-run preview, a keeper budget, and an optional Highlights album
 - **Auto-cull from the terminal** — `python facet.py --auto-cull [PATH]` previews the cull as a dry run, `--apply` writes it and `--copy-keepers DIR` copies the survivors (see [docs/COMMANDS.md](docs/COMMANDS.md#culling))
 - **Genre profiles** — sports / wedding / concert / wildlife presets bundle strictness, keeper budget, similarity threshold and face gates in a single pick
-- **Edited-look preview** `[Edition]` — render a photo through a named darktable style inside the culling darkroom, so you cull on the developed look instead of the flat RAW preview
+- **Edited-look preview** `[Editing]` — render a photo through a named darktable style inside the culling darkroom, so you cull on the developed look instead of the flat RAW preview
 - **Subject close-ups** — no-face groups (wildlife, macro, product) compare by an auto-cropped subject strip with group-normalized sharpness badges
 - **Junk sweep** — zero-shot detection of non-photo clutter (screenshots, documents, receipts, memes, slides) with a fast review queue: keep or reject each candidate, or reject all at once
 - **Per-face culling badges** — the culling lightbox shows per-face eyes open/closed, expression, and detection-confidence badges, not just a single photo-level blink flag; optional MediaPipe blendshapes sharpen the eyes/smile reads
@@ -106,7 +106,7 @@ Hover over any photo to see its score breakdown and EXIF data in the gallery's s
 - **Learning from labels** — culling decisions, star ratings, favorites, and rejections feed the weight optimizer (`--sync-label-comparisons`, `--mine-insights`)
 - **Snapshots** — save, restore, and compare weight configurations
 - **Histogram** — RGB/luminance histogram with clipping indicators, in the gallery side panel and detail view
-- **AI captions** `[GPU]` `[12gb/16gb/24gb]` — text descriptions, editable `[Edition]` and translatable to 5 languages (viewing is open; generation and editing need edition)
+- **AI captions** `[GPU]` `[12gb/16gb/24gb]` — text descriptions, editable `[Editing]` and translatable to 5 languages (viewing is open; generation and editing need editing unlocked)
 
 <table><tr>
 <td><img src="docs/screenshots/stats-gear.jpg" alt="Equipment statistics" width="100%"></td>
@@ -135,8 +135,8 @@ Hover over any photo to see its score breakdown and EXIF data in the gallery's s
 - **Phone auto-upload** — point PhotoSync or any WebDAV app at the built-in `/dav` inbox; `--watch` scores new shots as they arrive
 - **Photo frames & kiosks** — a token-guarded endpoint feeds your curated best shots to smart photo frames and Home Assistant dashboards
 - **AI agents (MCP)** — a [Model Context Protocol](https://modelcontextprotocol.io/) endpoint (on by default, `viewer.mcp.enabled`) lets assistants search the library with revocable personal tokens. Higher token levels can rate, tag, organise and cull; destructive actions preview first and need confirmation
-- **Portfolio export** `[Edition]` — render an album into a self-contained static HTML gallery (no CDN references, works offline) you can drop on any web host
-- **Social crops** `[Edition]` — full-resolution exports framed on the detected subject for square, portrait and story aspect presets
+- **Portfolio export** `[Editing]` — render an album into a self-contained static HTML gallery (no CDN references, works offline) you can drop on any web host
+- **Social crops** `[Editing]` — full-resolution exports framed on the detected subject for square, portrait and story aspect presets
 - **Photo download** — download individual photos or selections from the gallery
 - **Export** — export all scores to CSV or JSON for external analysis
 
@@ -150,7 +150,7 @@ Hover over any photo to see its score breakdown and EXIF data in the gallery's s
 - **7 UI languages** — the viewer ships in English, French, German, Spanish, Italian, Brazilian Portuguese, and Simplified Chinese (简体中文); documentation is available in all seven
 - **Multi-user** — per-user directories, ratings, and role-based access
 - **Plugins & webhooks** — custom actions triggered on scoring events
-- **Scan from web UI** — trigger scans from the browser (superadmin in multi-user mode; edition access on a single-user install with an edition password)
+- **Scan from web UI** — trigger scans from the browser (superadmin in multi-user mode; edit access on a single-user install with an editing password)
 
 <table><tr>
 <td width="33%"><img src="docs/screenshots/mobile-gallery.jpg" alt="Mobile gallery" width="100%"></td>
@@ -164,7 +164,7 @@ Hover over any photo to see its score breakdown and EXIF data in the gallery's s
 - **Apple Silicon** uses the Metal (`mps`) backend automatically. The `auto` profile follows unified memory: 32 GB reaches `16gb`, 48 GB reaches `24gb`.
 - **An NVIDIA GPU** on the `12gb`/`16gb`/`24gb` profiles unlocks the strongest models: TOPIQ, SigLIP 2, VLM tagging, AI captions and critique, subject saliency.
 - **No GPU?** Point VLM tagging, captions and critique at a remote **Ollama** or **OpenAI-compatible** server with `vlm_backend` in `scoring_config.json`.
-- **Editing in the viewer** (ratings, faces, culling) needs the **edition password**. The Scan button needs `viewer.features.show_scan_button: true` and edition access (the **superadmin** role in multi-user mode).
+- **Editing in the viewer** (ratings, faces, culling) needs the **editing password**. The Scan button needs `viewer.features.show_scan_button: true` and edit access (the **superadmin** role in multi-user mode).
 
 → Full per-feature requirements (GPU, VRAM profile, optional packages, auth): **[Installation › Feature requirements](docs/INSTALLATION.md#feature-requirements)**.
 

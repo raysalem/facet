@@ -10,7 +10,7 @@ the details for each.
 
 ## Before you start
 
-### 1. Set an edition password
+### 1. Set an editing password
 
 A fresh install is **read-only**. To edit (ratings, culling, faces, albums, tags, Scan),
 set `viewer.edition_password` in `scoring_config.json` and restart the viewer (the config is not hot-reloaded).
@@ -24,7 +24,7 @@ docker compose logs facet
 
 Then log in as an editor from the gallery. Details: [Single-User Mode](VIEWER.md#single-user-mode-default) and [Docker settings you can change](INSTALLATION.md#docker-settings-you-can-change).
 
-![Edition login](screenshots/getting-started-edition-login.jpg)
+![Editing login](screenshots/getting-started-edition-login.jpg)
 
 ### 2. Pick an install path
 
@@ -61,7 +61,7 @@ formats — see [supported file types](README.md#supported-file-types)) and scan
 do that from the terminal ([Scanning](COMMANDS.md#scanning)) or from the browser:
 
 - Set `viewer.features.show_scan_button` to `true` (it ships off).
-- Single-user: you need an edition password **and** to be logged in as editor. Multi-user:
+- Single-user: you need an editing password **and** to be logged in as editor. Multi-user:
   you need the superadmin role.
 - Add the folder to `viewer.scan_directories` so the launcher has something to pick.
 

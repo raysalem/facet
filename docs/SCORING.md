@@ -67,7 +67,7 @@ Shipped presets, editable in the viewer's **Scoring Context** tab or in the JSON
 | `landscape` | `landscape`, `golden_hour`, `blue_hour` | — |
 | `motorsport` | `sports`, `vehicle` | `silhouette` |
 
-You edit only the promoted list (edition mode; drag, or move up/down) and the exclusions. The other categories always keep the global order, so a new category is never missing from a context. Validation rules: [Editing a context](CONFIGURATION.md#editing-a-context).
+You edit only the promoted list (editing unlocked; drag, or move up/down) and the exclusions. The other categories always keep the global order, so a new category is never missing from a context. Validation rules: [Editing a context](CONFIGURATION.md#editing-a-context).
 
 **Assigning a context:**
 
@@ -96,7 +96,7 @@ Example: `sports` (priority 71) has `shutter_speed_max: 0.02`. A dance frame sho
 
 ### Reordering global priority
 
-You can reorder the global priority in the viewer (edition mode). The reorder swaps the existing priority numbers between categories instead of renumbering, so the numbers in the table above stay meaningful. `default` (priority 999) always stays last. Each write saves a timestamped `.backup.<timestamp>` copy of `scoring_config.json` first.
+You can reorder the global priority in the viewer (editing unlocked). The reorder swaps the existing priority numbers between categories instead of renumbering, so the numbers in the table above stay meaningful. `default` (priority 999) always stays last. Each write saves a timestamped `.backup.<timestamp>` copy of `scoring_config.json` first.
 
 Reordering does not change any photo's stored `category`: run a recompute afterwards.
 
@@ -325,7 +325,7 @@ Run `--compute-recommendations` after switching profiles to analyze score distri
 ### Option A: Via Viewer (Recommended)
 
 1. Open `/stats` → **Categories** tab → **Weights** sub-tab
-2. Unlock edition mode
+2. Unlock editing
 3. Select a category from the editor dropdown
 4. Adjust sliders — the live **Score Distribution Preview** shows estimated impact
 5. Click **Save** then **Recompute Scores** to apply

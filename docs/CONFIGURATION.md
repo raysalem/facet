@@ -52,7 +52,7 @@ Every setting ships in `config/scoring_config.default.json`. Your own `scoring_c
 
 `scoring_config.json` holds **only what you changed**. Facet resolves it on top of `config/scoring_config.default.json`, so anything you leave out keeps the shipped value. A new install has no `scoring_config.json` and runs on the defaults.
 
-To raise the aesthetic weight for portraits and set an edition password, the whole file is:
+To raise the aesthetic weight for portraits and set an editing password, the whole file is:
 
 ```json
 {
@@ -273,7 +273,7 @@ If `label_key` has no translation, the picker shows the context's **`name`** (e.
 
 ### Editing a context
 
-In the viewer's **Scoring Context** tab (edition-gated, `PUT /api/config/scoring_contexts/{name}`), drag or move categories into the promoted list, click a category to toggle its exclusion, then save.
+In the viewer's **Scoring Context** tab (edit-gated, `PUT /api/config/scoring_contexts/{name}`), drag or move categories into the promoted list, click a category to toggle its exclusion, then save.
 
 - Only `promote` and `excluded` are editable; `label_key`, `suggest_from_moments` and other contexts are left as they were.
 - A save is refused when the context doesn't exist, when an entry isn't an existing category, when `default` is in either list, or when `promote` repeats a name. A name in both lists is accepted (`excluded` wins); a repeat inside `excluded` is collapsed.
@@ -282,7 +282,7 @@ In the viewer's **Scoring Context** tab (edition-gated, `PUT /api/config/scoring
 
 ### Assigning a context
 
-Assign a context **per album** with `PUT /api/albums/{id}/scoring_context` (edition-gated).
+Assign a context **per album** with `PUT /api/albums/{id}/scoring_context` (edit-gated).
 
 - It applies to every photo in the album at that moment, except photos whose context you set by hand.
 - A photo added to a manual album later inherits the context. A new photo matching a smart album's filter does not; call `PUT` again to re-apply.
@@ -291,19 +291,19 @@ Assign a context **per album** with `PUT /api/albums/{id}/scoring_context` (edit
 - Removing photos from an album (`DELETE /api/albums/{id}/photos`) removes this album's context from them. A photo still in another album with a context takes that album's context.
 - `GET /api/albums/{id}/suggested_context` proposes a context from the album's dominant `narrative_moment`, through `suggest_from_moments`. It changes nothing.
 
-For one stubborn photo, use a **category override**: `POST /api/comparison/override_category` (edition-gated) sets the category directly, and `POST /api/comparison/clear_category_override` removes it. An override wins over any context.
+For one stubborn photo, use a **category override**: `POST /api/comparison/override_category` (edit-gated) sets the category directly, and `POST /api/comparison/clear_category_override` removes it. An override wins over any context.
 
 Overrides and contexts survive rescans. A numeric filter still fails when its EXIF value is missing, whatever the context — see [Scoring — the missing-EXIF trap](SCORING.md#the-missing-exif-trap).
 
 ### Reordering the global priority
 
-`GET|POST /api/config/category_priorities` (edition-gated) reads and saves the global order that every context starts from. The viewer reorders the existing priority numbers rather than renumbering them.
+`GET|POST /api/config/category_priorities` (edit-gated) reads and saves the global order that every context starts from. The viewer reorders the existing priority numbers rather than renumbering them.
 
 - `default` (priority 999) stays last and cannot be moved.
 - A category with a missing or duplicate priority gets a fresh value past the current maximum on save.
 - Each save keeps a timestamped `.backup.<timestamp>` copy of `scoring_config.json`; the 20 most recent are kept.
 
-**Changing priorities requires a recompute.** A reorder does not change any photo's stored `category`. Run `python facet.py --recompute-average`, or start `POST /api/scan/recompute` from the viewer (edition-gated) and follow `GET /api/scan/recompute_status`.
+**Changing priorities requires a recompute.** A reorder does not change any photo's stored `category`. Run `python facet.py --recompute-average`, or start `POST /api/scan/recompute` from the viewer (edit-gated) and follow `GET /api/scan/recompute_status`.
 
 - A recompute and a scan cannot run at the same time: the CLI refuses, and the viewer reports which job holds the library.
 - Two scans started from a terminal only get a warning (`--resume` refuses).
@@ -977,12 +977,12 @@ Groups similar photos taken in quick succession.
 
 ## Update Notifications
 
-Tells edition users when a newer Facet release exists. This is separate from the browser's "a new version is available — Reload" prompt.
+Tells users with edit access when a newer Facet release exists. This is separate from the browser's "a new version is available — Reload" prompt.
 
 - The running version is shown at the bottom of the user menu for everyone who can open the viewer. Clicking it copies the version and build line, for a bug report.
 - An image built with `--build-arg FACET_BUILD=<branch>@<commit>` also shows that build line, and so does a Windows MSI install, with the `<branch>@<commit>` it was built from. `/api/config` returns both as `version` and `build`, only to callers who can read the library.
 - The server asks GitHub at most once per `interval_days`, with no token or library data. A failed check shows as "no update known".
-- Only edition users see the notice, at most once a week per browser.
+- Only users with edit access see the notice, at most once a week per browser.
 
 ```json
 {
@@ -1616,8 +1616,8 @@ Web gallery display and behavior.
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `default_category` | `""` | Default category filter |
-| `edition_password` | `""` | Password to unlock edition mode; empty = read-only (except under `trusted_local_editing`) |
-| `trusted_local_editing` | `false` | Grant edition rights to a browser on the same computer, without a password. See [Trusted Local Editing](#trusted-local-editing) |
+| `edition_password` | `""` | Password to unlock editing; empty = read-only (except under `trusted_local_editing`) |
+| `trusted_local_editing` | `false` | Grant editing rights to a browser on the same computer, without a password. See [Trusted Local Editing](#trusted-local-editing) |
 | `place_search_url` | `"https://photon.komoot.io/api"` | Photon endpoint for the gallery's **Search online** lookup; `""` disables it. See [Online place search](#online-place-search) |
 | `map_tile_url` | `""` | Self-hosted basemap tiles for the map surfaces; `""` keeps the OpenStreetMap default. Same-origin path (e.g. `/tiles/{z}/{x}/{y}.png`) or `https://` — `http://` is refused, the CSP only permits 'self' and https images |
 | `map_tile_attribution` | `""` | Attribution line shown for the custom tiles (HTML allowed; operator-configured, so trusted). Empty shows a generic self-hosted label |
@@ -1700,7 +1700,7 @@ Web gallery display and behavior.
 | `moment_confidence_min` | `0` | Moment labels below this confidence (0–1) render dimmed with "(uncertain)"; `0` = never dim |
 
 Notes:
-- **`trusted_local_editing`** applies only while both `password` and `edition_password` are empty on a single-user install. It covers every edition-gated route, scans included, and lets the Connect dialog create a Full-editing assistant token for same-machine `/mcp` requests.
+- **`trusted_local_editing`** applies only while both `password` and `edition_password` are empty on a single-user install. It covers every edit-gated route, scans included, and lets the Connect dialog create a Full-editing assistant token for same-machine `/mcp` requests.
 
 > **Warning:** Never enable `trusted_local_editing` behind a reverse proxy on the same host.
 
@@ -1740,9 +1740,9 @@ Notes:
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `badges.favorite` | `true` | Heart badge on a favourited photo (edition mode) |
-| `badges.star_rating` | `true` | Star + count badge on a rated photo (edition mode) |
-| `badges.rejected` | `true` | Thumb-down badge on a rejected photo (edition mode) |
+| `badges.favorite` | `true` | Heart badge on a favourited photo (editing unlocked) |
+| `badges.star_rating` | `true` | Star + count badge on a rated photo (editing unlocked) |
+| `badges.rejected` | `true` | Thumb-down badge on a rejected photo (editing unlocked) |
 | `badges.sequence_kind` | `true` | Set badge (burst/bracket/panorama/duplicate), shown while the matching hide toggle collapses the set |
 | `badges.sequence_override_pending` | `true` | Clock badge for a panorama correction awaiting the next detection run |
 | `badges.stack` | `true` | Layers + member-count badge on a manual photo stack's cards; click opens the stack |
@@ -1803,7 +1803,7 @@ Toggle optional features to reduce memory usage or simplify the UI:
 | `show_albums` | `true` | Show albums feature (create, manage, and browse photo albums) |
 | `show_critique` | `true` | Show AI critique button on photo cards (rule-based score breakdown) |
 | `show_vlm_critique` | `true` | Enable VLM critique (12gb/16gb/24gb profile); `false` when the key is absent |
-| `show_embed_metadata` | `true` | Show "Write metadata to file" in edition mode (embeds ratings/keywords via exiftool) |
+| `show_embed_metadata` | `true` | Show "Write metadata to file" with editing unlocked (embeds ratings/keywords via exiftool) |
 | `show_memories` | `true` | Show "On This Day" memories dialog (photos taken on the same date in previous years) |
 | `show_captions` | `true` | Show AI-generated captions on photo cards |
 | `show_timeline` | `true` | Show timeline view for chronological browsing with date navigation |
@@ -1812,19 +1812,19 @@ Toggle optional features to reduce memory usage or simplify the UI:
 | `show_folders` | `true` | Show folder-based browsing of the photo directory structure |
 | `show_scenes` | `true` | Show the Scenes view (`/scenes`), burst leads grouped into chronological scenes |
 | `show_my_taste` | `true` | Show the "My Taste" sort from the personal ranker, with a confidence badge |
-| `show_social_export` | `true` | Show the edition-only **Social crop** download menu. See [Social Export](#social-export) |
-| `show_portfolio_export` | `true` | Show the edition-only **Export portfolio** album action. See [Portfolio Export](#portfolio-export) |
+| `show_social_export` | `true` | Show the editing-only **Social crop** download menu. See [Social Export](#social-export) |
+| `show_portfolio_export` | `true` | Show the editing-only **Export portfolio** album action. See [Portfolio Export](#portfolio-export) |
 | `show_proofing` | `false` | Enable client proofing on shared albums. See [Client Proofing](#client-proofing) |
 
 Notes:
-- **`show_scan_button`:** visible to the superadmin in multi-user mode, or to an unlocked edition session in single-user mode. Scans run CPU-only on the `legacy` profile. A trusted-local session (`trusted_local_editing`) can scan without it.
+- **`show_scan_button`:** visible to the superadmin in multi-user mode, or to an unlocked editing session in single-user mode. Scans run CPU-only on the `legacy` profile. A trusted-local session (`trusted_local_editing`) can scan without it.
 - **Memory optimization:** `show_similar_button: false` keeps numpy from loading, which lowers viewer memory.
 
 > **Warning:** `metrics_enabled` exposes photo/person/face counts, DB size and process memory. Enable it only where the scraper network can reach it, never the public internet.
 
 ### Client Proofing
 
-`viewer.features.show_proofing` (default `false`) turns any shared album into a client-proofing page. A client with the share link (and the optional `viewer.proofing.pin`) can heart photos and leave comments without an account. The owner reviews them from an edition-gated dialog on the album card. Client picks never touch the owner's ratings or train the personal ranker.
+`viewer.features.show_proofing` (default `false`) turns any shared album into a client-proofing page. A client with the share link (and the optional `viewer.proofing.pin`) can heart photos and leave comments without an account. The owner reviews them from an edit-gated dialog on the album card. Client picks never touch the owner's ratings or train the personal ranker.
 
 ```json
 {
@@ -1891,7 +1891,7 @@ When set, users must sign in before using the viewer.
 
 ### Trusted Local Editing
 
-Lets a single-user viewer, used only from a browser on the same computer, edit without an edition password:
+Lets a single-user viewer, used only from a browser on the same computer, edit without an editing password:
 
 ```json
 {
@@ -1901,7 +1901,7 @@ Lets a single-user viewer, used only from a browser on the same computer, edit w
 }
 ```
 
-It applies only while **both** `viewer.password` and `viewer.edition_password` are empty, multi-user mode is off, and the config loaded cleanly. Setting an edition password turns it off. It does not set or reveal a password, change tokens, or enable multi-user administration.
+It applies only while **both** `viewer.password` and `viewer.edition_password` are empty, multi-user mode is off, and the config loaded cleanly. Setting an editing password turns it off. It does not set or reveal a password, change tokens, or enable multi-user administration.
 
 Facet checks every request. A request is trusted only when all of these hold:
 
@@ -1912,14 +1912,14 @@ Facet checks every request. A request is trusted only when all of these hold:
 
 Any other request is treated as if the option were off, GET requests included.
 
-A trusted request has full edition rights on every edition-gated route: ratings, comparisons, culling (including **Cull to folder**, which moves or trashes files, and per-photo delete), albums, persons and faces, weights, priorities and scoring contexts, metadata embedding and exports, recompute and panorama jobs, and caption and critique generation. It can also scan without `viewer.features.show_scan_button`. The scan progress stream accepts a trusted-local stream token only from the same local machine.
+A trusted request has full editing rights on every edit-gated route: ratings, comparisons, culling (including **Cull to folder**, which moves or trashes files, and per-photo delete), albums, persons and faces, weights, priorities and scoring contexts, metadata embedding and exports, recompute and panorama jobs, and caption and critique generation. It can also scan without `viewer.features.show_scan_button`. The scan progress stream accepts a trusted-local stream token only from the same local machine.
 
 **Assistants.** The Connect dialog can then create a **Full editing** token (still needs `viewer.mcp.enabled`).
 
 - The token acts as `edition` only for `/mcp` requests that pass the checks above: `http://localhost:<port>` or `127.0.0.1`, on `:5000` or the `ng serve` dev proxy `:4200`.
 - From a LAN client, a hostname or `0.0.0.0` URL, or a Docker deployment, it acts as `readonly`. Setting any password also makes it `readonly`; clearing it restores it.
 - Delete tools still need `viewer.mcp.allow_destructive`. See [AI Agents (MCP)](AGENTS.md).
-- On an open install, creating, listing and revoking assistant tokens works only from a request that passes these checks (or an edition session when `viewer.edition_password` is set), whatever `trusted_local_editing` says.
+- On an open install, creating, listing and revoking assistant tokens works only from a request that passes these checks (or an editing session when `viewer.edition_password` is set), whatever `trusted_local_editing` says.
 - `ng serve --host 0.0.0.0`, or a same-host proxy that adds no forwarding header, lets a LAN client pass with `Host: localhost`. A reverse proxy must send `X-Forwarded-For` or `Forwarded`.
 
 > **Warning:** Only the loopback check is a real boundary; the other headers come from the client. A reverse proxy, tunnel or port forward on the same host that adds none of the headers above looks exactly like your browser. Never enable this option behind any reverse proxy on the same host. While it is on, every local process and account on the computer can edit.
@@ -1930,7 +1930,7 @@ A trusted request has full edition rights on every edition-gated route: ratings,
 
 - Set `""` to disable address/business lookup, or point it at a self-hosted Photon HTTP(S) endpoint (no credentials, query parameters or fragments).
 - The browser only learns `place_search_enabled`, never the URL.
-- Searches need edition access and an explicit **Search online** click. There are no retries or redirects.
+- Searches need edit access and an explicit **Search online** click. There are no retries or redirects.
 - A request times out after five seconds; DNS resolution follows the OS resolver and can take longer.
 
 See [Online place search](VIEWER.md#online-place-search) for privacy, caching and limits. The [Photon demo policy](https://github.com/komoot/photon#demo-server) allows reasonable project use with no availability guarantee; the [Photon API documentation](https://github.com/komoot/photon/blob/master/docs/api-v1.md) defines its GeoJSON format.
@@ -2138,7 +2138,7 @@ An add-on is a separate program (its own repository and virtual environment) tha
 
 A manifest is refused as a whole, with the reason shown on the **Add-ons** page (user menu → Add-ons), when: `id` does not match `^[a-z0-9][a-z0-9._-]{0,63}$` or differs from its folder name; a key, permission or slot is unknown; `start` and `ui.url` are both present (or neither); `start.argv[0]` is not an absolute path to an existing file; `health` or `ui.path` is not a plain path; or `facet_api` is not an integer this server speaks (currently `1`). An add-on without `start` runs elsewhere (for example a Docker service) and sets `"ui": {"url": "http://astro:5100/"}` instead.
 
-The Add-ons page and the panels need scan access (edition, or the administrator in multi-user mode). Any signed-in viewer may read `GET /api/addons/names` (each add-on's `id`, `name`, `icon` and `slots`, nothing else), so the photo page names an add-on's object tags ("Astro") and a page rail shows the add-on's tab, switched off with the reason, until the viewer unlocks editing.
+The Add-ons page and the panels need scan access (editing unlocked, or the administrator in multi-user mode). Any signed-in viewer may read `GET /api/addons/names` (each add-on's `id`, `name`, `icon` and `slots`, nothing else), so the photo page names an add-on's object tags ("Astro") and a page rail shows the add-on's tab, switched off with the reason, until the viewer unlocks editing.
 
 **Permissions and tokens.** An add-on authenticates with an `fct_` token of kind `addon` (stored as a SHA-256 hash in the same table as agent tokens). The token acts as the account that minted it, at most at that account's live level, so a changed password or a demoted account cuts it off on the next call. The add-on reads and writes Facet data over Facet's MCP endpoint (`POST /mcp`, see [AI agents (MCP)](AGENTS.md)), like an assistant, but `tools/list` shows it only the tools its permissions grant (below) and any other tool answers `forbidden_level`. Each tool's own level still applies, and no destructive tool is ever granted, whatever `viewer.mcp.allow_destructive` says. On `/api` an add-on token opens only the three reads in the table; any other route answers 403. For an add-on without `start`, the Add-ons page mints the token once (**Create access token**) and shows it once; **Revoke tokens** revokes it.
 
@@ -2182,7 +2182,7 @@ The add-on reads its photos over MCP with `search_photos` and the filter `scan_r
 
 ### Started by Facet
 
-An add-on with a `start` block is started by Facet: **Start** on the Add-ons page, or simply **Open** (which starts it first). Starting and stopping need the same rights as starting a scan (multi-user: superadmin; single user: the edition password), plus `addons.enabled`. The request carries only the scope: the program, its arguments and its environment come from the manifest and from Facet.
+An add-on with a `start` block is started by Facet: **Start** on the Add-ons page, or simply **Open** (which starts it first). Starting and stopping need the same rights as starting a scan (multi-user: superadmin; single user: the editing password), plus `addons.enabled`. The request carries only the scope: the program, its arguments and its environment come from the manifest and from Facet.
 
 - Facet runs `start.argv` without a shell, in the manifest's folder, with an environment built from scratch: `PATH`, `SYSTEMROOT`, `USERPROFILE`/`HOME`, `LOCALAPPDATA`, `TEMP`/`TMP`, `LANG`, `FACET_URL`, `FACET_TOKEN`, `FACET_ADDON_ID`, `FACET_LAUNCH_SECRET` (+ `FACET_PORT` when `port` is a number). Nothing else of Facet's environment is passed on.
 - With `"port": "auto"` the add-on binds a free port and prints exactly one line, `FACET_ADDON_PORT=<n>`, on stdout; everything else goes to stderr. Both land in `<facet data>/logs/addons/<id>.log` (**Log** on the Add-ons page).
@@ -2327,7 +2327,7 @@ Settings for similar-photo culling, which groups visually similar photos by CLIP
 
 ## Auto-Cull
 
-One-button auto-cull for the culling darkroom (`POST /api/culling/auto`, edition-gated). It culls a whole scope in one pass: all groups, or only bursts / similars / scenes, optionally limited to an album or date window. Each group keeps its best photo plus everything within a margin set by strictness (as with the darkroom slider), at least a per-group minimum, and rejects the rest.
+One-button auto-cull for the culling darkroom (`POST /api/culling/auto`, edit-gated). It culls a whole scope in one pass: all groups, or only bursts / similars / scenes, optionally limited to an album or date window. Each group keeps its best photo plus everything within a margin set by strictness (as with the darkroom slider), at least a per-group minimum, and rejects the rest.
 
 ```json
 {
@@ -2591,13 +2591,13 @@ Album export (`POST /api/albums/{id}/export`, modes `copy`/`symlink`) and cull-t
 
 **Fail-closed by design.** With no `allowed_target_dirs` and no scan directories, copy/symlink/move export is refused.
 
-**Troubleshooting "access denied."** The web UI shows a generic "Access denied" toast. To see why, open the browser's Network tab, find the failed `/api/cull/apply` or `/api/albums/{id}/export` request and read the `detail` field: either this allow-list, or an expired edition session. A real filesystem permission error looks different: the request succeeds, the response's `errors` count is nonzero, and the server log has a traceback per file. See [Deployment — Container Path Semantics](DEPLOYMENT.md#container-path-semantics) for the container case.
+**Troubleshooting "access denied."** The web UI shows a generic "Access denied" toast. To see why, open the browser's Network tab, find the failed `/api/cull/apply` or `/api/albums/{id}/export` request and read the `detail` field: either this allow-list, or an expired editing session. A real filesystem permission error looks different: the request succeeds, the response's `errors` count is nonzero, and the server log has a traceback per file. See [Deployment — Container Path Semantics](DEPLOYMENT.md#container-path-semantics) for the container case.
 
 See [Web Viewer — Cull to folder](VIEWER.md#cull-to-folder) and [Web Viewer — Editor Export](VIEWER.md#editor-export).
 
 ## Social Export
 
-Crop presets for social aspect ratios, framed on the subject (`GET /api/photo/social_crop`, edition-gated). Each preset crops the full-resolution original to the largest rectangle of that aspect, centered on the subject. The subject is the BiRefNet subject box (`photos.subject_bbox`), else the union of face boxes, else the image center. See [Web Viewer — Download](VIEWER.md#download).
+Crop presets for social aspect ratios, framed on the subject (`GET /api/photo/social_crop`, edit-gated). Each preset crops the full-resolution original to the largest rectangle of that aspect, centered on the subject. The subject is the BiRefNet subject box (`photos.subject_bbox`), else the union of face boxes, else the image center. See [Web Viewer — Download](VIEWER.md#download).
 
 ```json
 {
@@ -2622,7 +2622,7 @@ Gated by `viewer.features.show_social_export` (default `true`). The subject box 
 
 ## Portfolio Export
 
-Exports an album as a self-contained static HTML gallery you can upload to any web host (`POST /api/albums/{album_id}/export-portfolio`, edition-gated).
+Exports an album as a self-contained static HTML gallery you can upload to any web host (`POST /api/albums/{album_id}/export-portfolio`, edit-gated).
 
 - The output folder holds `index.html` (thumbnail grid and lightbox, no external or CDN references), an `assets/` folder of sequentially named JPEGs (no library paths) and a `manifest.json`.
 - Each photo uses the **original**, downscaled to `max_edge`, or the stored 640px thumbnail when the original is unreachable. The manifest records which.
@@ -2653,7 +2653,7 @@ Exposes the tools described in [AI Agents (MCP)](AGENTS.md) at `POST /mcp`: read
 On an open install (no `viewer.password`):
 - `/mcp` serves only a read-only anonymous key, which shows nothing the open `/api` does not.
 - A new token is `readonly`, unless `viewer.trusted_local_editing` is on or the session is logged in with `viewer.edition_password`: either can mint a Full-editing token, which edits only for same-machine requests.
-- Tokens can be created, listed and revoked only from the computer running Facet (or in an edition session when `viewer.edition_password` is set).
+- Tokens can be created, listed and revoked only from the computer running Facet (or in an editing session when `viewer.edition_password` is set).
 
 ```json
 {
