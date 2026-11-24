@@ -1083,7 +1083,7 @@ type RatingOption = 'any' | '1' | '2' | '3' | '4' | '5' | 'zero';
               <span class="text-sm text-[var(--mat-sys-on-surface-variant)] shrink-0" [matTooltip]="I18N.gallery.display_tips.thumbnail_size | translate">{{ I18N.gallery.thumbnail_size | translate }}</span>
               <span id="display-tip-thumbnail-size" class="sr-only">{{ I18N.gallery.display_tips.thumbnail_size | translate }}</span>
               <mat-slider [min]="thumbnailSliderMin()" [max]="sc.max_px" [step]="sc.step_px" class="flex-1">
-                <input matSliderThumb aria-describedby="display-tip-thumbnail-size" [value]="store.cardWidth()" (valueChange)="store.setCardWidth($event)" [attr.aria-label]="I18N.gallery.thumbnail_size | translate" />
+                <input matSliderThumb aria-describedby="display-tip-thumbnail-size" [value]="store.cardWidth()" (input)="store.setCardWidth(+$any($event.target).value)" [attr.aria-label]="I18N.gallery.thumbnail_size | translate" />
               </mat-slider>
               <span class="text-xs text-[var(--mat-sys-on-surface-variant)] w-10 text-right">{{ store.cardWidth() }}px</span>
             </div>

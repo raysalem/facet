@@ -1162,6 +1162,16 @@ describe('GalleryFilterSidebarComponent', () => {
         expect(described(el.querySelector('[data-face-outline-toggle] input'))).toBe(I18N.gallery.display_tips.face_outlines);
       });
 
+      it('resizes the thumbnails while the size slider is dragged, not only on release', () => {
+        store['config'].set({ features: {}, display: { thumbnail_slider: { min_px: 120, max_px: 400, step_px: 10 } } });
+        fixture.componentInstance.selectTab('display');
+        settle();
+        const thumb = (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>('input[matSliderThumb]')!;
+        thumb.value = '300';
+        thumb.dispatchEvent(new Event('input'));
+        expect(store['setCardWidth']).toHaveBeenCalledWith(300);
+      });
+
       it('keeps the filename search reachable with / from every tab', () => {
         for (const id of TAB_IDS) {
           fixture.componentInstance.selectTab(id);
