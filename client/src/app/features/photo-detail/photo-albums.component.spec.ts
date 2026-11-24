@@ -3,6 +3,8 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
+import { By } from '@angular/platform-browser';
+import { MatTooltip } from '@angular/material/tooltip';
 import { AuthService } from '../../core/services/auth.service';
 import { I18nService } from '../../core/services/i18n.service';
 import { makePhoto } from '../../../testing/photo.fixture';
@@ -49,6 +51,15 @@ describe('PhotoAlbumsComponent', () => {
     expect(items[0].hasAttribute('aria-label')).toBe(false);
     expect(items[1].getAttribute('aria-label')).toBe('photo_detail.labelled_value');
     expect(items[0].className).toContain('min-h-11');
+  });
+
+  it('explains the smart-album sparkle with a tooltip and gives a manual album none', async () => {
+    const fixture = await render();
+    http.expectOne('/api/photo/albums?path=/a.jpg').flush([{ id: 3, name: 'Alps', is_smart: false }, { id: 9, name: 'Best of', is_smart: true }]);
+    fixture.detectChanges();
+    const tooltips = fixture.debugElement.queryAll(By.directive(MatTooltip)).map(node => node.injector.get(MatTooltip));
+    expect(tooltips.map(tip => [tip.message, tip.disabled])).toEqual([['', true], ['albums.smart_tooltip', false]]);
+    expect((fixture.nativeElement as HTMLElement).querySelectorAll('[data-smart-album]')).toHaveLength(1);
   });
 
   it('renders nothing when the photo is in no album', async () => {

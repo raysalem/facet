@@ -142,7 +142,7 @@ Add these keys to its `viewer` block, beside the `edition_password` already ther
 ```
 
 Use the path inside the container (`/data/photos`), not the host path. Run
-`docker compose restart facet`, then unlock editing in the user menu with the edition
+`docker compose restart facet`, then unlock editing in the user menu with the editing
 password. **Scan photos to get started** then appears on the empty gallery. See
 [Scan Trigger](VIEWER.md#scan-trigger).
 
@@ -818,9 +818,9 @@ Each unlocks a feature; without it the feature is skipped or a fallback is used.
 ## Feature requirements
 
 Most of Facet runs anywhere (CPU, any profile). Some features need a GPU, a higher **VRAM
-profile**, an optional package, or the viewer's **edition password** / **superadmin**
+profile**, an optional package, or the viewer's **editing password** / **superadmin**
 role. Tags used in the docs:
-`[GPU]` · `[12gb/16gb/24gb]` (VRAM profile) · `[Edition]` · `[Superadmin]` · `[Optional: pkg]`.
+`[GPU]` · `[12gb/16gb/24gb]` (VRAM profile) · `[Editing]` · `[Superadmin]` · `[Optional: pkg]`.
 
 | Feature | GPU | Profile | Auth | Optional package |
 |---------|:---:|---------|:----:|------------------|
@@ -831,20 +831,20 @@ role. Tags used in the docs:
 | VLM tagging (Qwen3.5) | yes | `12gb`/`16gb`/`24gb` | — | — |
 | Composition pattern (SAMP-Net) | optional | any (`legacy` = CPU) | — | — |
 | Subject saliency (BiRefNet) | optional | any (`legacy` = CPU) | — | — |
-| AI captions (generate / view) | yes | `12gb`/`16gb`/`24gb` | edition (generate) | — |
-| AI captions (edit) | yes | `12gb`/`16gb`/`24gb` | edition | — |
-| VLM critique | yes | `12gb`/`16gb`/`24gb` | edition (generate) | — |
+| AI captions (generate / view) | yes | `12gb`/`16gb`/`24gb` | editing (generate) | — |
+| AI captions (edit) | yes | `12gb`/`16gb`/`24gb` | editing | — |
+| VLM critique | yes | `12gb`/`16gb`/`24gb` | editing (generate) | — |
 | Face detection / extraction (InsightFace) | recommended (CPU works, slow) | any | — | — |
 | Face clustering (HDBSCAN) | no (CPU) | any | — | `cuml`/`cupy` (optional GPU accel) |
 | Semantic search | no | any | — | `sqlite-vec` (falls back to NumPy) |
 | RAW / HEIF decode | no | any | — | `rawpy` / `pillow-heif` |
 | Watch mode (`--watch`) | no | any | — | `watchdog` |
 | GPS extract / darktable export | no | any | — | `exiftool` / `darktable-cli` |
-| Ratings, favorites, face & person edits, culling | no | any | edition | — |
-| Trigger scans from the web UI | no | any | edition (single-user) / superadmin (multi-user) | — |
+| Ratings, favorites, face & person edits, culling | no | any | editing | — |
+| Trigger scans from the web UI | no | any | editing (single-user) / superadmin (multi-user) | — |
 | Multi-user (per-user ratings & roles) | no | any | role-based | — |
 
-The edition password and user roles are set in `scoring_config.json`; see
+The editing password and user roles are set in `scoring_config.json`; see
 [Configuration](CONFIGURATION.md).
 
 > No local GPU? Point VLM tagging, captions and critique at a remote Ollama or

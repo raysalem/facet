@@ -22,11 +22,12 @@ import type { HistogramMode } from '../../utils/histogram';
 import { ExtendedQualityComponent } from '../extended-quality/extended-quality.component';
 import { HistogramComponent } from '../histogram/histogram.component';
 import { MetricScoreRowComponent } from '../metric-score-row/metric-score-row.component';
+import { ContextHelpComponent } from '../context-help/context-help.component';
 
 /** Shared measurement bodies, independent of tabs or collapsible section chrome. */
 @Component({
  selector:'app-photo-metric-section',
- imports:[MatIconModule, ExifCodePipe, ExposureCompensationPipe, FileSizePipe, FolderPathPipe, MegapixelsPipe, FixedPipe, IsLensNamePipe, ShutterSpeedPipe, ThumbnailUrlPipe, TranslatePipe, ExtendedQualityComponent, HistogramComponent, MetricScoreRowComponent],
+ imports:[MatIconModule, ExifCodePipe, ExposureCompensationPipe, FileSizePipe, FolderPathPipe, MegapixelsPipe, FixedPipe, IsLensNamePipe, ShutterSpeedPipe, ThumbnailUrlPipe, TranslatePipe, ExtendedQualityComponent, HistogramComponent, MetricScoreRowComponent, ContextHelpComponent],
  changeDetection:ChangeDetectionStrategy.OnPush,
  host:{class:'block min-w-0'},
  template:`@let p = photo(); @switch(kind()) {@case('exif') {
@@ -66,7 +67,7 @@ import { MetricScoreRowComponent } from '../metric-score-row/metric-score-row.co
               <div class="flex justify-between items-center gap-2 py-1.5"><span class="inline-flex items-center gap-2 text-[var(--mat-sys-on-surface-variant)]"><mat-icon aria-hidden="true" class="!h-4 !w-4 !text-base">filter_center_focus</mat-icon>{{ I18N.tooltip.metering | translate }}</span><span class="text-[var(--mat-sys-primary)] font-medium">{{ (p.metering_mode | exifCode:'metering') | translate }}</span></div>
             }
             @if (has().dimensions) {
-              <div class="flex justify-between items-center gap-2 py-1.5"><span class="inline-flex items-center gap-2 text-[var(--mat-sys-on-surface-variant)]"><mat-icon aria-hidden="true" class="!h-4 !w-4 !text-base">aspect_ratio</mat-icon>{{ I18N.tooltip.dimensions | translate }}</span><span class="text-[var(--mat-sys-primary)] font-medium">{{ p.image_width }} × {{ p.image_height }} · {{ p.image_width | megapixels:p.image_height:locale() }}</span></div>
+              <div class="flex justify-between items-center gap-2 py-1.5"><span class="inline-flex items-center gap-2 text-[var(--mat-sys-on-surface-variant)]"><mat-icon aria-hidden="true" class="!h-4 !w-4 !text-base">aspect_ratio</mat-icon>{{ I18N.tooltip.dimensions | translate }}</span><span data-exif-dimensions class="inline-flex items-center gap-0.5 whitespace-nowrap text-[var(--mat-sys-primary)] font-medium">{{ p.image_width }} × {{ p.image_height }} · {{ p.image_width | megapixels:p.image_height:locale() }}@if (dimensionsHelp()) {<app-context-help class="-my-1.5" [label]="I18N.gallery.compare.rendition.sources" [keys]="[I18N.photo_detail.rendition.note]" [iconOnly]="true" />}</span></div>
             }
             @if (has().fileSize) {
               <div class="flex justify-between items-center gap-2 py-1.5"><span class="inline-flex items-center gap-2 text-[var(--mat-sys-on-surface-variant)]"><mat-icon aria-hidden="true" class="!h-4 !w-4 !text-base">sd_storage</mat-icon>{{ I18N.tooltip.file_size | translate }}</span><span class="text-[var(--mat-sys-primary)] font-medium">{{ p.file_size | fileSize:locale() }}</span></div>
@@ -253,6 +254,8 @@ export class PhotoMetricSectionComponent {
  readonly histogramSurface = input<HistogramSurface>('detail');
  readonly histogramDefaultMode = input<HistogramMode>('luma');
  readonly indicatorPercent = input(1);
+ /** The image-source help beside the dimensions; only where no other line carries it. */
+ readonly dimensionsHelp = input(false);
 
  /** Which optional EXIF rows have a value; a meaningful 0 (flash off, 0 EV) counts, only null and undefined do not. */
  protected readonly has = computed(() => {

@@ -622,7 +622,7 @@
     "database_error": "Database Error",
     "rate_limited": "Too many requests — please wait a moment",
     "access_denied": "Access denied",
-    "edition_expired": "Edition mode is no longer active - unlock Edition and try again",
+    "edition_expired": "Editing is no longer on - unlock editing and try again",
     "server_error": "Server error — please try again",
     "action_failed": "Action failed — change reverted",
     "library_busy": "The library is busy, most likely finishing a one-time upgrade — changes cannot be saved right now; try again in a moment",
@@ -1018,7 +1018,7 @@
       "help_toggle": "Help",
       "help": {
         "breakdown": "Shows how your photos are distributed across categories. The bar chart displays photo counts per category sorted by volume. Select a category from the dropdown to see its average scores across dimensions and the aggregate score distribution histogram.",
-        "weights": "Each category has 12 weight dimensions that control how the aggregate score is calculated. The radar chart lets you visually compare weight profiles across up to 5 categories. The heatmap gives a full overview of all categories at a glance. In edition mode, you can adjust weights with sliders (should sum to 100%) and modify scoring modifiers like bonus points or penalty toggles.",
+        "weights": "Each category has 12 weight dimensions that control how the aggregate score is calculated. The radar chart lets you visually compare weight profiles across up to 5 categories. The heatmap gives a full overview of all categories at a glance. With editing unlocked, you can adjust weights with sliders (should sum to 100%) and modify scoring modifiers like bonus points or penalty toggles.",
         "correlations": "Shows how strongly each weight dimension actually correlates with the aggregate score using Pearson r (-1 to +1). Green cells indicate positive correlation, red cells negative. Click a category row to see a side-by-side comparison of configured weight % versus actual correlation - this highlights misalignments where a high weight has low impact or vice versa.",
         "overlap": "Categories are evaluated in priority order - a photo is assigned to the first matching category. This tab shows which category filters overlap: the top table lists pairs of categories whose filters both match the same photos. The summary table shows how many photos match each filter versus how many are actually assigned (the difference being captured by higher-priority categories)."
       },
@@ -1090,13 +1090,13 @@
     "invalid_credentials": "Invalid username or password"
   },
   "edition": {
-    "label": "Edition",
-    "unlock_title": "Unlock Edition Mode",
-    "unlock_description": "Enter the edition password to enable editing features.",
+    "label": "Editing",
+    "unlock_title": "Unlock editing",
+    "unlock_description": "Enter the editing password to turn on editing.",
     "unlock_button": "Unlock",
-    "lock_title": "Edition mode active - click to lock",
-    "lock_failed": "Could not confirm the lock. Edition may still be active; try again.",
-    "password_placeholder": "Edition password",
+    "lock_title": "Editing is on - click to lock",
+    "lock_failed": "Could not confirm the lock. Editing may still be on; try again.",
+    "password_placeholder": "Editing password",
     "invalid_password": "Invalid password",
     "read_only_hint": "Read-only: set viewer.edition_password in scoring_config.json to enable rating, culling and editing, then restart the viewer."
   },
@@ -1443,7 +1443,7 @@
         "blinks": "Blinks",
         "brackets": "Brackets",
         "panoramas": "Panoramas",
-        "edition": "Edition",
+        "edition": "Your corrections",
         "value_aria": "{label}: {value}",
         "values": {
           "all": "All",
@@ -1712,7 +1712,7 @@
     "manual_faces_review_hint": "Based on the last scan or face-editor check, not continuous monitoring. Open a photo’s face editor to review saved marks.",
     "faces_need_names": "Faces without names",
     "faces_need_names_hint": "Includes unassigned faces and unnamed person groups. Use + to assign a face, or name a group in People. Photos with no detected faces are excluded.",
-    "faces_need_names_readonly_hint": "Includes unassigned faces and unnamed person groups. Someone with edition access can assign faces or name groups. Photos with no detected faces are excluded.",
+    "faces_need_names_readonly_hint": "Includes unassigned faces and unnamed person groups. Someone with edit access can assign faces or name groups. Photos with no detected faces are excluded.",
     "help_none": "This page has no help text yet.",
     "notices": {
       "collapsed": "{count} notice",
@@ -2341,7 +2341,7 @@
     "find_more_no_centroid": "This person has no reference face yet: assign or merge a few faces first, then try again",
     "ignored_section": "Ignored",
     "ignored_help": "People you ignored (staff, strangers): left out of Needs naming, the people list, filters and Find more. Restore brings one back.",
-    "empty_hint": "People come from faces you assign on a photo page (edition mode). Open any photo with faces and pick Assign face to person to create the first one.",
+    "empty_hint": "People come from faces you assign on a photo page (with editing unlocked). Open any photo with faces and pick Assign face to person to create the first one.",
     "ignored_shown_of": "{shown} of {total}",
     "ignored_more_error": "Could not load more ignored people.",
     "find_more_too_many_unassigned": "Too many faces to compare in one search. Name or merge some groups first, then try again.",
@@ -4143,7 +4143,7 @@
     "add_selected_plural": "Add {count} selected photos",
     "select_all": "Select all {count} members",
     "unstack": "Unstack",
-    "read_only": "You can browse permitted members. Editing requires edition access to every member.",
+    "read_only": "You can browse permitted members. Editing requires edit access to every member.",
     "dissolve_hint": "Saving fewer than two members dissolves this stack. Photos are retained.",
     "error": "The request failed. Your draft is retained; try again.",
     "conflict": "Stack membership changed or is no longer available. Refresh to review current membership before saving.",

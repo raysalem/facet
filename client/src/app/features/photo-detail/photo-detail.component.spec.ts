@@ -1000,7 +1000,10 @@ describe('PhotoDetailComponent', () => {
     localStorage.setItem('facet_photo_detail_tab_camera', 'technical');
     const view = renderDetail();
     const photo = makePhoto({ camera_model: 'X100V', iso: 200, persons: [{ id: 1, name: 'Alice' }], unassigned_faces: 2 });
-    mockApi.get.mockImplementation((url: string) => of(url === '/photo' ? photo : {}));
+    const related = { inventory_state: 'checked', indexed_images_only: false, multiple_raw_candidates: false, basename_sidecar_unverified: false,
+      files: [{ name: 'test.jpg', kind: 'photo', state: 'available', indexed: true, raw_download: false },
+        { name: 'test.RAF', kind: 'raw', state: 'available', indexed: false, raw_download: true }] };
+    mockApi.get.mockImplementation((url: string) => of(url === '/photo' ? photo : url === '/photo/related_files' ? related : {}));
     TestBed.inject(GalleryStore).config.set({ features: { show_critique: false } } as never);
     view.componentInstance.photo.set(photo);
     view.detectChanges(); await view.whenStable(); view.detectChanges();
@@ -1041,7 +1044,9 @@ describe('PhotoDetailComponent', () => {
     }
     expect(aside.querySelector('details[data-logical-asset]')).toBeNull();
     expect(mockApi.get.mock.calls.filter(([url]) => url === '/photo/provenance')).toHaveLength(0);
-    expect(mockApi.get.mock.calls.filter(([url]) => url === '/photo/related_files')).toHaveLength(0);
+    // Related files is read up front (again when the page swaps in a fresh copy of the photo), so a photo with
+    // nothing beside it shows no section at all.
+    expect(mockApi.get.mock.calls.filter(([url]) => url === '/photo/related_files').length).toBeGreaterThan(0);
   });
 
   it('orders each rail panel by priority and pins Review on wide screens', async () => {
@@ -1069,7 +1074,6 @@ describe('PhotoDetailComponent', () => {
     };
     inOrder('content', ['[data-photo-when]', '[data-photo-describe]', '[data-photo-location]', '[data-file-details]']);
     inOrder('grade', ['[data-photo-review]', 'app-photo-metrics-tabs', '[data-photo-set]']);
-    inOrder('camera', ['[data-photo-capture]', 'app-photo-metrics-tabs']);
     const describe = aside.querySelector<HTMLElement>('[data-photo-describe]')!;
     expect(aside.querySelector('[data-photo-describe] [data-photo-location]')).toBeNull();
     const fields = ['[data-photo-caption]', '[data-testid="tags-section"]', '[data-photo-people]']
@@ -1080,26 +1084,22 @@ describe('PhotoDetailComponent', () => {
     }
     expect(aside.querySelector('[data-photo-review]')!.className).toContain('lg:sticky');
     expect(aside.querySelector('[data-photo-set-strip]')!.className).toContain('lg:grid-cols-5');
-    // Date and category share one line in Content; the capture settings show once, in Camera.
+    // Date and category share one line in Content. Camera shows the capture settings once, as the EXIF table at the
+    // panel's text size: no summary line repeats them above it.
     const when = aside.querySelector<HTMLElement>('[data-photo-when]')!;
     expect(when.querySelector('[data-photo-date]')!.parentElement).toBe(when.querySelector('[data-photo-category]')!.parentElement);
-    expect(when.querySelector('[data-photo-exposure]')).toBeNull();
-    expect(aside.querySelectorAll('[data-photo-exposure]')).toHaveLength(1);
-    const exposure = aside.querySelector<HTMLElement>('[data-photo-panel="camera"] [data-photo-exposure]')!;
-    // The image's pixel size closes the capture line; no readout bar under the image carries it any more.
-    // Each item carries the "·" before it inside a clipped row, so a wrapped line never opens with one; W × H keeps its ?.
-    expect(exposure.classList).toContain('overflow-x-clip');
-    const items = [...exposure.querySelectorAll<HTMLElement>(':scope > div > span')];
-    expect(items.map(span => (span.querySelector('[data-photo-dimensions]') ?? span).textContent!.trim())).toEqual(['Canon EOS R6', 'RF 85mm F2', '85mm', 'f/2.8', '1/100', 'ISO 4000', '1920 × 1080']);
-    const dimensions = items[items.length - 1];
-    expect(dimensions.classList).toContain('whitespace-nowrap');
-    expect(exposure.getAttribute('aria-label')).toBe('photo_detail.capture_settings');
+    expect(aside.querySelector('[data-photo-exposure], [data-photo-capture]')).toBeNull();
+    const camera = aside.querySelector<HTMLElement>('[data-photo-panel="camera"]')!;
+    const tabs = camera.querySelector<HTMLElement>('app-photo-metrics-tabs')!;
+    expect(camera.firstElementChild).toBe(tabs);
+    expect(tabs.classList).toContain('text-xs');
     expect((view.nativeElement as HTMLElement).querySelector('[data-image-readout]')).toBeNull();
-    // The rendition help sits beside the dimensions, icon-only (the metric tabs keep their own).
+    // The rendition help moved with the dimensions into the EXIF table, icon-only; it is the panel's only one there.
+    const dimensions = camera.querySelector<HTMLElement>('[data-exif-dimensions]')!;
+    expect(dimensions.textContent).toContain('1920 × 1080');
     const helps = [...aside.querySelectorAll('app-context-help')].filter(help => !help.closest('app-photo-metrics-tabs'));
-    expect(helps).toHaveLength(1);
-    expect(helps[0].parentElement).toBe(dimensions);
-    const renditionHelp = helps[0].querySelector<HTMLButtonElement>('button')!;
+    expect(helps).toHaveLength(0);
+    const renditionHelp = dimensions.querySelector<HTMLButtonElement>('app-context-help button')!;
     expect(renditionHelp.getAttribute('aria-label')).toBe('gallery.compare.rendition.sources');
     expect(renditionHelp.textContent!.trim()).toBe('help_outline');
   });

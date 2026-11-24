@@ -41,7 +41,7 @@ import { PhotoAssessmentComponent } from '../photo-assessment/photo-assessment.c
       <!-- EXIF section -->
       @if (shown().exif) {
         <mat-tab [aria-label]="'photo_detail.exif' | translate">
-          <ng-template mat-tab-label><mat-icon aria-hidden="true" [matTooltip]="'photo_detail.exif' | translate">photo_camera</mat-icon></ng-template><app-photo-metric-section kind="exif" [photo]="p" [populated]="populated()" [histogramSrcSize]="histogramSrcSize()" [histogramHeight]="histogramHeight()" [histogramSurface]="histogramSurface()" [histogramDefaultMode]="histogramDefaultMode()" [indicatorPercent]="indicatorPercent()" /></mat-tab>
+          <ng-template mat-tab-label><mat-icon aria-hidden="true" [matTooltip]="'photo_detail.exif' | translate">photo_camera</mat-icon></ng-template><app-photo-metric-section kind="exif" [photo]="p" [dimensionsHelp]="dimensionsHelp()" [populated]="populated()" [histogramSrcSize]="histogramSrcSize()" [histogramHeight]="histogramHeight()" [histogramSurface]="histogramSurface()" [histogramDefaultMode]="histogramDefaultMode()" [indicatorPercent]="indicatorPercent()" /></mat-tab>
       }
 
       @if (shown().quality) {
@@ -90,6 +90,8 @@ export class PhotoMetricsTabsComponent {
   readonly sections = input<readonly MetricsTab[]>(METRICS_TABS);
   /** The AI score line above the tabs. */
   readonly assessment = input(true);
+  /** The image-source help beside the EXIF dimensions (the photo page, where no other line carries it). */
+  readonly dimensionsHelp = input(false);
   /** Which remembered tab this instance follows. */
   readonly panel = input<MetricsPanel>('');
 

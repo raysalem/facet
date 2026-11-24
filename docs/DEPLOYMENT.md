@@ -801,7 +801,7 @@ python database.py --migrate-user-preferences --user alice
 
 ### Scan button
 
-To let the viewer trigger scans (the superadmin in multi-user mode; an edition session on a
+To let the viewer trigger scans (the superadmin in multi-user mode; an editing session on a
 single-user install with a non-empty `viewer.edition_password`), enable it. The scan runs on
 the viewer's machine and needs no GPU ([No graphics card](INSTALLATION.md#no-graphics-card)):
 
