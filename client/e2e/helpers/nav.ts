@@ -44,11 +44,13 @@ export async function openShowing(page: Page): Promise<void> {
   await expect(showingPanel(page).getByRole('combobox', { name: 'Tag' })).toBeVisible();
 }
 
-/** Switch the photo tooltip to the floating hover card. */
+/** Show photo details in the floating card, opened by hover (Display > Photo details: Hover card, Open with: Hover). */
 export async function useHoverCard(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Display' }).click();
-  await page.getByRole('button', { name: /^Tooltip:/ }).click();
-  await page.getByRole('menuitemradio', { name: /Hover/ }).click();
+  await page.getByRole('button', { name: /^Photo details:/ }).click();
+  await page.getByRole('menuitemradio', { name: 'Hover card', exact: true }).click();
+  await page.getByRole('button', { name: /^Open with:/ }).click();
+  await page.getByRole('menuitemradio', { name: 'Hover', exact: true }).click();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('menuitemradio')).toHaveCount(0);
 }

@@ -96,7 +96,8 @@
       "from": "From",
       "to": "To",
       "loading": "Loading...",
-      "na": "N/A"
+      "na": "N/A",
+      "resize_hint": "Drag to resize. When focused, the arrow keys, Home and End also work."
     },
     "badges": {
       "best": "BEST",
@@ -1269,17 +1270,16 @@
     "composition_range": "Composition Range",
     "hide_details": "Hide Details",
     "tooltip_mode": {
-      "label": "Tooltip",
-      "hover": "Hover",
-      "click": "Click",
-      "panel": "Side panel",
-      "off": "Off",
       "panel_empty": "Hover or click a photo to see its details here",
       "panel_deselect": "Deselect",
       "details": "Photo details"
     },
-    "panel_activation": {
-      "label": "Panel activation",
+    "photo_details": {
+      "label": "Photo details",
+      "off": "Off",
+      "card": "Hover card",
+      "panel": "Side panel",
+      "open_with": "Open with",
       "hover": "Hover",
       "click": "Click",
       "both": "Hover or click"
@@ -1830,13 +1830,15 @@
       "hide_details": "Show the photos alone, without the information under each photo",
       "fast_scrolling": "Draw only the rows near the screen, so long galleries scroll smoothly. Turn it off if the layout misbehaves.",
       "card_buttons": "Choose which buttons a photo card shows on hover, and in what order",
-      "tooltip_mode": "How a photo's details open: on hover, on click, in the side panel, or not at all",
+      "photo_details": "Where a photo's details appear: in a card next to the photo, in the side panel at the edge of the gallery, or not at all",
+      "open_with": "What opens a photo's details: pointing at the photo (Hover), clicking it (Click), or either one (Hover or click). Applies to the card and the side panel alike.",
       "tile_fit": "Crop thumbnails to squares, or show each photo in its original aspect ratio",
       "reset_display": "Restore the default layout, thumbnail size and photo details. Filters, sort and selection stay as they are."
     },
     "rail": {
       "label": "Gallery panels",
       "showing": "Showing",
+      "resize_showing": "Resize the Showing panel",
       "filters_one": "{count} filter",
       "filters": "{count} filters"
     }

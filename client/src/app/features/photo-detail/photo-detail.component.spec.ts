@@ -568,8 +568,12 @@ describe('PhotoDetailComponent', () => {
       expect(width(aside)).toBe('320px');
       expect(handle.getAttribute('role')).toBe('separator');
       expect(handle.getAttribute('aria-label')).toBe('photo_detail.inspector_resize');
-      expect(handle.className).toContain('hidden lg:block');
+      expect(handle.className).toContain('hidden lg:flex');
       expect(handle.classList).toContain('w-3');
+      // Discoverable: a resize cursor, a how-to tooltip and a visible grip, not a bare transparent strip.
+      expect(handle.classList).toContain('cursor-col-resize');
+      expect(handle.getAttribute('title')).toBe('ui.labels.resize_hint');
+      expect(handle.querySelectorAll('span[aria-hidden="true"]')).toHaveLength(2);
       const key = (name: string) => { handle.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true })); view.detectChanges(); };
       key('ArrowLeft'); expect(width(aside)).toBe('336px');
       expect(localStorage.getItem(KEY)).toBe('336');

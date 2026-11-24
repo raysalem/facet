@@ -66,7 +66,7 @@ describe('Query proposal with real Router, Store and HTTP', () => {
     store = TestBed.inject(GalleryStore);
     store.config.set({ pagination: { default_per_page: 64 }, defaults: { type: '', sort: 'aggregate', sort_direction: 'DESC',
       hide_blinks: true, hide_bursts: true, hide_duplicates: true, hide_brackets: true, hide_panoramas: true,
-      hide_details: true, tooltip_mode: 'hover', panel_activation: 'both', hide_rejected: true },
+      hide_details: true, details_place: 'card', details_trigger: 'hover', hide_rejected: true },
       display: { tags_per_photo: 5, card_width_px: 300, image_width_px: 640 }, sort_options_grouped: null,
       features: {}, quality_thresholds: { good: 6, great: 7, excellent: 8, best: 9 }, search_threshold_default: 0.15 } as ViewerConfig);
     harness = await RouterTestingHarness.create('/'); harness.detectChanges();

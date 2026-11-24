@@ -1,6 +1,7 @@
 import filterLimits from './gallery-filter-limits.generated.json';
 import { hasTagQuery, parseTagQuery, serializeTagQuery } from './tag-query.util';
 import { parseScorePresence, serializeScorePresence } from './score-presence.util';
+import { DETAILS_PLACES, DETAILS_TRIGGERS, detailsGestures, type DetailsPlace, type DetailsTrigger } from '../../shared/utils/photo-details';
 /**
  * Pure filter logic for the gallery: types, defaults, and the URL/API/storage
  * codec. Extracted from gallery.store.ts so it can be unit-tested in isolation
@@ -24,22 +25,78 @@ const NEXT_GALLERY_MODE: Record<GalleryMode, GalleryMode> = { grid: 'mosaic', mo
 export function nextGalleryMode(value: GalleryMode): GalleryMode {
   return NEXT_GALLERY_MODE[value];
 }
-export type TooltipMode = 'hover' | 'click' | 'off' | 'panel';
+export { DETAILS_PLACES, DETAILS_TRIGGERS, detailsGestures };
+export type { DetailsPlace, DetailsTrigger };
 
-/** Every accepted tooltip mode, so the URL parser and the mode picker cannot drift apart. */
-export const TOOLTIP_MODES: readonly TooltipMode[] = ['hover', 'click', 'off', 'panel'];
+export interface DetailsSettings {
+  details_place: DetailsPlace;
+  details_trigger: DetailsTrigger;
+}
 
-/** Which gesture(s) retarget the docked panel (tooltip_mode 'panel'). Meaningless
- *  for every other tooltip mode, which already has a single, fixed gesture.
- *  Default 'both' preserves the original panel behaviour exactly. */
-export type PanelActivation = 'hover' | 'click' | 'both';
+export const DEFAULT_DETAILS: Readonly<DetailsSettings> = { details_place: 'panel', details_trigger: 'both' };
+
+/** The settings as stored before the split, in localStorage, shared links and
+ *  `viewer.defaults`: `tooltip_mode` mixed the place with the gesture, and
+ *  `panel_activation` held the gesture for the panel only. */
+export interface LegacyDetailsSettings {
+  tooltip_mode?: unknown;
+  panel_activation?: unknown;
+}
+
+type DetailsSource = Partial<Record<keyof DetailsSettings, unknown>> & LegacyDetailsSettings;
+
+const isPlace = (value: unknown): value is DetailsPlace => DETAILS_PLACES.includes(value as DetailsPlace);
+const isTrigger = (value: unknown): value is DetailsTrigger => DETAILS_TRIGGERS.includes(value as DetailsTrigger);
+
+/** The old pair read as the new one: hover -> card + hover, click -> card + click,
+ *  panel -> panel + its panel_activation, off -> off (any panel_activation kept as the trigger). */
+function legacyDetails(source: LegacyDetailsSettings): Partial<DetailsSettings> {
+  const result: Partial<DetailsSettings> = {};
+  const mode = source.tooltip_mode;
+  if (mode === 'hover' || mode === 'click') {
+    result.details_place = 'card';
+    result.details_trigger = mode;
+  } else if (mode === 'panel' || mode === 'off') {
+    result.details_place = mode;
+  }
+  if (!result.details_trigger && isTrigger(source.panel_activation)) result.details_trigger = source.panel_activation;
+  return result;
+}
+
+/** The valid details settings a source names, new keys or old, without filling gaps.
+ *  `legacyFirst` lets the old keys win: in `viewer.defaults` the shipped file carries
+ *  the new keys, so an old key there can only be the operator's own override. */
+export function pickDetailsSettings(source: DetailsSource | null | undefined, legacyFirst = false): Partial<DetailsSettings> {
+  if (!source) return {};
+  const current: Partial<DetailsSettings> = {};
+  if (isPlace(source.details_place)) current.details_place = source.details_place;
+  if (isTrigger(source.details_trigger)) current.details_trigger = source.details_trigger;
+  const legacy = legacyDetails(source);
+  const [first, second] = legacyFirst ? [legacy, current] : [current, legacy];
+  const result: Partial<DetailsSettings> = {};
+  const place = first.details_place ?? second.details_place;
+  const trigger = first.details_trigger ?? second.details_trigger;
+  if (place) result.details_place = place;
+  if (trigger) result.details_trigger = trigger;
+  return result;
+}
+
+/** Both settings, gaps filled from `fallback`. */
+export function resolveDetailsSettings(
+  source: DetailsSource | null | undefined, fallback: Readonly<DetailsSettings> = DEFAULT_DETAILS, legacyFirst = false,
+): DetailsSettings {
+  return { ...fallback, ...pickDetailsSettings(source, legacyFirst) };
+}
+
+/** The install's defaults (`viewer.defaults`), where an operator's old key still counts. */
+export function configDetailsDefaults(defaults: DetailsSource | null | undefined): DetailsSettings {
+  return resolveDetailsSettings(defaults, DEFAULT_DETAILS, true);
+}
 
 /** How gallery tiles present the photo when the details block is hidden:
  *  cropped to a square, or the original aspect ratio (card hugs the photo). */
 export type TileFit = 'square' | 'natural';
 export const TILE_FITS: readonly TileFit[] = ['square', 'natural'];
-
-export const PANEL_ACTIVATIONS: readonly PanelActivation[] = ['hover', 'click', 'both'];
 
 export const GALLERY_MODE_KEY = 'facet_gallery_mode';
 export const DRAWER_STATE_KEY = 'facet_filter_drawer_open';
@@ -204,8 +261,8 @@ export interface GalleryFilters {
   duplicate_group_id: string;
   // Display
   hide_details: boolean;
-  tooltip_mode: TooltipMode;
-  panel_activation: PanelActivation;
+  details_place: DetailsPlace;
+  details_trigger: DetailsTrigger;
   tile_fit: TileFit;
   hide_blinks: boolean;
   hide_bursts: boolean;
@@ -267,8 +324,11 @@ export interface FilterDefaults {
   hide_brackets?: boolean;
   hide_panoramas?: boolean;
   hide_rejected?: boolean;
-  tooltip_mode?: TooltipMode;
-  panel_activation?: PanelActivation;
+  details_place?: DetailsPlace;
+  details_trigger?: DetailsTrigger;
+  /** Pre-split keys an operator's config may still carry; read through configDetailsDefaults. */
+  tooltip_mode?: string;
+  panel_activation?: string;
 }
 
 /** Highest match sensitivity the sidebar slider offers, and therefore the
@@ -300,7 +360,7 @@ export function seededSearchThreshold(searchThresholdDefault: number | null | un
 export const SMART_ALBUM_EXCLUDE_KEYS = new Set([
   'page', 'per_page', 'semanticQuery', 'search_threshold', 'album_id', 'album_set', 'photographer',
   'similar_to', 'similarity_mode', 'min_similarity',
-  'hide_details', 'tooltip_mode', 'panel_activation', 'tile_fit', 'hide_blinks', 'hide_bursts',
+  'hide_details', 'details_place', 'details_trigger', 'tooltip_mode', 'panel_activation', 'tile_fit', 'hide_blinks', 'hide_bursts',
   'hide_duplicates', 'hide_brackets', 'hide_panoramas', 'hide_rejected',
   'gps_lat', 'gps_lng', 'gps_radius_km',
   'sequence_group_id', 'sequence_kind', 'burst_group_id', 'duplicate_group_id',
@@ -545,8 +605,8 @@ export const DEFAULT_FILTERS: GalleryFilters = {
   similarity_mode: 'visual',
   min_similarity: '70',
   hide_details: true,
-  tooltip_mode: 'panel',
-  panel_activation: 'both',
+  details_place: DEFAULT_DETAILS.details_place,
+  details_trigger: DEFAULT_DETAILS.details_trigger,
   tile_fit: 'square',
   hide_blinks: true,
   hide_bursts: true,
@@ -569,18 +629,31 @@ export const DEFAULT_FILTERS: GalleryFilters = {
 };
 
 export type DisplayOptions = Pick<GalleryFilters,
-  'hide_details' | 'tooltip_mode' | 'panel_activation' | 'tile_fit' | 'hide_blinks' | 'hide_bursts' | 'hide_duplicates' | 'hide_brackets' | 'hide_panoramas' |
+  'hide_details' | 'details_place' | 'details_trigger' | 'tile_fit' | 'hide_blinks' | 'hide_bursts' | 'hide_duplicates' | 'hide_brackets' | 'hide_panoramas' |
   'hide_rejected' | 'favorites_only' | 'is_monochrome'>;
 
 export const DISPLAY_OPTION_KEYS: (keyof DisplayOptions)[] = [
-  'hide_details', 'tooltip_mode', 'panel_activation', 'tile_fit', 'hide_blinks', 'hide_bursts', 'hide_duplicates', 'hide_brackets', 'hide_panoramas',
+  'hide_details', 'details_place', 'details_trigger', 'tile_fit', 'hide_blinks', 'hide_bursts', 'hide_duplicates', 'hide_brackets', 'hide_panoramas',
   'hide_rejected', 'favorites_only', 'is_monochrome',
 ];
 
+/** Storage keys of the details pair, old and new; read only through pickDetailsSettings. */
+const DETAILS_STORAGE_KEYS: ReadonlySet<string> = new Set(['details_place', 'details_trigger', 'tooltip_mode', 'panel_activation']);
+
+/** The saved display options. A save from before the details split carries
+ *  `tooltip_mode` / `panel_activation`; they are read into the new pair, so the
+ *  gallery keeps behaving as before, and the next save writes only the new keys. */
 export function loadDisplayOptionsFromStorage(): Partial<DisplayOptions> {
   try {
     const raw = localStorage.getItem(DISPLAY_OPTIONS_KEY);
-    if (raw) return JSON.parse(raw) as Partial<DisplayOptions>;
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as (Partial<DisplayOptions> & LegacyDetailsSettings) | null;
+    if (!parsed || typeof parsed !== 'object') return {};
+    const rest: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (!DETAILS_STORAGE_KEYS.has(key)) rest[key] = value;
+    }
+    return { ...(rest as Partial<DisplayOptions>), ...pickDetailsSettings(parsed) };
   } catch { /* ignore */ }
   return {};
 }
@@ -708,12 +781,8 @@ export function applyQueryParams(
   if (params['is_monochrome'] !== undefined) result.is_monochrome = params['is_monochrome'] === 'true';
   if (params['manual_faces_need_review'] !== undefined) result.manual_faces_need_review = params['manual_faces_need_review'] === 'true';
   if (params['faces_need_names'] !== undefined) result.faces_need_names = params['faces_need_names'] === 'true';
-  if (params['tooltip_mode'] && TOOLTIP_MODES.includes(params['tooltip_mode'] as TooltipMode)) {
-    result.tooltip_mode = params['tooltip_mode'] as TooltipMode;
-  }
-  if (params['panel_activation'] && PANEL_ACTIVATIONS.includes(params['panel_activation'] as PanelActivation)) {
-    result.panel_activation = params['panel_activation'] as PanelActivation;
-  }
+  // A link shared before the split still names tooltip_mode / panel_activation.
+  Object.assign(result, pickDetailsSettings(params));
   if (params['page']) result.page = parseInt(params['page'], 10) || 1;
   return result;
 }
@@ -772,10 +841,11 @@ export function buildSyncParams(
 
   if (f.hide_details !== (defaults?.hide_details ?? true))
     params['hide_details'] = String(f.hide_details);
-  if (f.tooltip_mode !== (defaults?.tooltip_mode ?? 'panel'))
-    params['tooltip_mode'] = f.tooltip_mode;
-  if (f.panel_activation !== (defaults?.panel_activation ?? 'both'))
-    params['panel_activation'] = f.panel_activation;
+  const detailsDefaults = configDetailsDefaults(defaults);
+  if (f.details_place !== detailsDefaults.details_place)
+    params['details_place'] = f.details_place;
+  if (f.details_trigger !== detailsDefaults.details_trigger)
+    params['details_trigger'] = f.details_trigger;
   if (f.show_rejected) params['show_rejected'] = 'true';
   if (f.blinks_only) params['blinks_only'] = 'true';
   if (f.duplicates_only) params['duplicates_only'] = 'true';

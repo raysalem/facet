@@ -26,8 +26,13 @@ import {
   loadDisplayOptionsFromStorage,
   saveDisplayOptionsToStorage,
   DISPLAY_OPTIONS_KEY,
-  TOOLTIP_MODES,
-  PANEL_ACTIVATIONS,
+  DETAILS_PLACES,
+  DETAILS_TRIGGERS,
+  DEFAULT_DETAILS,
+  pickDetailsSettings,
+  resolveDetailsSettings,
+  configDetailsDefaults,
+  detailsGestures,
 } from './gallery-filters.util';
 
 function filters(overrides: Partial<GalleryFilters> = {}): GalleryFilters {
@@ -275,22 +280,39 @@ describe('applyQueryParams', () => {
     expect(applyQueryParams(DEFAULT_FILTERS, { similarity_mode: 'bogus' }).similarity_mode).toBe('visual');
     expect(applyQueryParams(DEFAULT_FILTERS, { similarity_mode: 'color' }).similarity_mode).toBe('color');
   });
-  it('accepts every tooltip mode and ignores anything else', () => {
-    // The parser silently drops unknown values, so a mode missing from the
+  it('accepts every details place and ignores anything else', () => {
+    // The parser silently drops unknown values, so a place missing from the
     // allowlist is un-shareable via URL rather than visibly broken.
-    for (const mode of TOOLTIP_MODES) {
-      expect(applyQueryParams(DEFAULT_FILTERS, { tooltip_mode: mode }).tooltip_mode).toBe(mode);
+    for (const place of DETAILS_PLACES) {
+      expect(applyQueryParams(DEFAULT_FILTERS, { details_place: place }).details_place).toBe(place);
     }
-    expect(applyQueryParams(DEFAULT_FILTERS, { tooltip_mode: 'sidebar' }).tooltip_mode)
-      .toBe(DEFAULT_FILTERS.tooltip_mode);
+    expect(applyQueryParams(DEFAULT_FILTERS, { details_place: 'sidebar' }).details_place)
+      .toBe(DEFAULT_FILTERS.details_place);
   });
-  it('accepts every panel activation and ignores anything else', () => {
-    for (const activation of PANEL_ACTIVATIONS) {
-      expect(applyQueryParams(DEFAULT_FILTERS, { panel_activation: activation }).panel_activation)
-        .toBe(activation);
+  it('accepts every details trigger and ignores anything else', () => {
+    for (const trigger of DETAILS_TRIGGERS) {
+      expect(applyQueryParams(DEFAULT_FILTERS, { details_trigger: trigger }).details_trigger).toBe(trigger);
     }
-    expect(applyQueryParams(DEFAULT_FILTERS, { panel_activation: 'bogus' }).panel_activation)
-      .toBe(DEFAULT_FILTERS.panel_activation);
+    expect(applyQueryParams(DEFAULT_FILTERS, { details_trigger: 'bogus' }).details_trigger)
+      .toBe(DEFAULT_FILTERS.details_trigger);
+  });
+  it('reads a link shared before the split (tooltip_mode / panel_activation)', () => {
+    const r = applyQueryParams(DEFAULT_FILTERS, { tooltip_mode: 'click' });
+    expect([r.details_place, r.details_trigger]).toEqual(['card', 'click']);
+    const p = applyQueryParams(DEFAULT_FILTERS, { tooltip_mode: 'panel', panel_activation: 'hover' });
+    expect([p.details_place, p.details_trigger]).toEqual(['panel', 'hover']);
+    // A new key beats an old one in the same link.
+    expect(applyQueryParams(DEFAULT_FILTERS, { tooltip_mode: 'off', details_place: 'card' }).details_place).toBe('card');
+  });
+  it('writes only the new keys, and only when they differ from the configured defaults', () => {
+    const at = (place: string, trigger: string, defaults?: Record<string, string>) =>
+      buildSyncParams(filters({ details_place: place as never, details_trigger: trigger as never }), defaults as never, null);
+    expect(at('panel', 'both')).not.toHaveProperty('details_place');
+    expect(at('panel', 'both')).not.toHaveProperty('details_trigger');
+    expect(at('card', 'click')).toMatchObject({ details_place: 'card', details_trigger: 'click' });
+    expect(at('card', 'click')).not.toHaveProperty('tooltip_mode');
+    // An operator's old default still counts as the default.
+    expect(at('card', 'hover', { tooltip_mode: 'hover' })).not.toHaveProperty('details_place');
   });
   it('parses page as int with fallback to 1', () => {
     expect(applyQueryParams(DEFAULT_FILTERS, { page: '3' }).page).toBe(3);
@@ -457,15 +479,35 @@ describe('seededSearchThreshold', () => {
 describe('display options storage', () => {
   beforeEach(() => localStorage.clear());
   it('saves and loads the display subset', () => {
-    saveDisplayOptionsToStorage(filters({ hide_details: false, tooltip_mode: 'click', is_monochrome: true }));
+    saveDisplayOptionsToStorage(filters({ hide_details: false, details_place: 'card', is_monochrome: true }));
     const loaded = loadDisplayOptionsFromStorage();
     expect(loaded.hide_details).toBe(false);
-    expect(loaded.tooltip_mode).toBe('click');
+    expect(loaded.details_place).toBe('card');
     expect(loaded.is_monochrome).toBe(true);
   });
-  it('saves and loads panel_activation, same channel as tooltip_mode', () => {
-    saveDisplayOptionsToStorage(filters({ panel_activation: 'click' }));
-    expect(loadDisplayOptionsFromStorage().panel_activation).toBe('click');
+  it('saves and loads details_trigger, same channel as details_place', () => {
+    saveDisplayOptionsToStorage(filters({ details_trigger: 'click' }));
+    expect(loadDisplayOptionsFromStorage().details_trigger).toBe('click');
+  });
+  it('writes only the new keys', () => {
+    saveDisplayOptionsToStorage(filters({ details_place: 'card', details_trigger: 'hover' }));
+    const saved = JSON.parse(localStorage.getItem(DISPLAY_OPTIONS_KEY) ?? '{}') as Record<string, unknown>;
+    expect(saved).toMatchObject({ details_place: 'card', details_trigger: 'hover' });
+    expect(saved).not.toHaveProperty('tooltip_mode');
+    expect(saved).not.toHaveProperty('panel_activation');
+  });
+  it.each([
+    [{ tooltip_mode: 'hover' }, { details_place: 'card', details_trigger: 'hover' }],
+    [{ tooltip_mode: 'click' }, { details_place: 'card', details_trigger: 'click' }],
+    [{ tooltip_mode: 'panel', panel_activation: 'click' }, { details_place: 'panel', details_trigger: 'click' }],
+    [{ tooltip_mode: 'panel', panel_activation: 'both' }, { details_place: 'panel', details_trigger: 'both' }],
+    [{ tooltip_mode: 'panel' }, { details_place: 'panel' }],
+    [{ tooltip_mode: 'off' }, { details_place: 'off' }],
+    [{ tooltip_mode: 'off', panel_activation: 'hover' }, { details_place: 'off', details_trigger: 'hover' }],
+  ])('migrates a pre-split save %j to %j and drops the old keys', (old, expected) => {
+    localStorage.setItem(DISPLAY_OPTIONS_KEY, JSON.stringify({ hide_details: false, ...old }));
+    const loaded = loadDisplayOptionsFromStorage() as Record<string, unknown>;
+    expect(loaded).toEqual({ hide_details: false, ...expected });
   });
   it('returns {} when storage is empty', () => {
     expect(loadDisplayOptionsFromStorage()).toEqual({});
@@ -781,5 +823,56 @@ describe('missing capture date scope', () => {
     const restored = applyQueryParams(datedAlbum, buildSyncParams(missingInstead, undefined));
     expect(restored).toMatchObject({ no_capture_date: '1', date_from: '', date_to: '' });
     expect(buildApiParams(restored, true, undefined)).not.toHaveProperty('date_from');
+  });
+});
+
+describe('photo details settings (place + trigger)', () => {
+  it('maps each old tooltip mode to the same behaviour', () => {
+    expect(resolveDetailsSettings({ tooltip_mode: 'hover' })).toEqual({ details_place: 'card', details_trigger: 'hover' });
+    expect(resolveDetailsSettings({ tooltip_mode: 'click' })).toEqual({ details_place: 'card', details_trigger: 'click' });
+    expect(resolveDetailsSettings({ tooltip_mode: 'off' })).toEqual({ details_place: 'off', details_trigger: 'both' });
+    for (const activation of DETAILS_TRIGGERS) {
+      expect(resolveDetailsSettings({ tooltip_mode: 'panel', panel_activation: activation }))
+        .toEqual({ details_place: 'panel', details_trigger: activation });
+    }
+  });
+  it('ignores panel_activation for the card modes, whose gesture was fixed', () => {
+    expect(resolveDetailsSettings({ tooltip_mode: 'hover', panel_activation: 'click' }).details_trigger).toBe('hover');
+  });
+  it('prefers new keys over old ones, unless legacyFirst', () => {
+    const both = { details_place: 'panel', details_trigger: 'both', tooltip_mode: 'click' };
+    expect(pickDetailsSettings(both)).toEqual({ details_place: 'panel', details_trigger: 'both' });
+    expect(pickDetailsSettings(both, true)).toEqual({ details_place: 'card', details_trigger: 'click' });
+  });
+  it('drops invalid values and fills gaps from the fallback', () => {
+    expect(pickDetailsSettings({ details_place: 'nowhere', tooltip_mode: 'sidebar' })).toEqual({});
+    expect(pickDetailsSettings(null)).toEqual({});
+    expect(resolveDetailsSettings({ details_trigger: 'click' }, { details_place: 'off', details_trigger: 'hover' }))
+      .toEqual({ details_place: 'off', details_trigger: 'click' });
+  });
+  it('reads the install defaults with an operator\'s old key winning over the shipped new ones', () => {
+    expect(configDetailsDefaults(undefined)).toEqual(DEFAULT_DETAILS);
+    expect(configDetailsDefaults({ details_place: 'card', details_trigger: 'click' })).toEqual({ details_place: 'card', details_trigger: 'click' });
+    expect(configDetailsDefaults({ details_place: 'panel', details_trigger: 'both', tooltip_mode: 'hover' }))
+      .toEqual({ details_place: 'card', details_trigger: 'hover' });
+    expect(configDetailsDefaults({ details_place: 'panel', details_trigger: 'both', tooltip_mode: 'off' }))
+      .toEqual({ details_place: 'off', details_trigger: 'both' });
+  });
+  it('the default is the side panel opened by hover or click, as before the split', () => {
+    expect(DEFAULT_DETAILS).toEqual({ details_place: 'panel', details_trigger: 'both' });
+    expect([DEFAULT_FILTERS.details_place, DEFAULT_FILTERS.details_trigger]).toEqual(['panel', 'both']);
+  });
+  it.each([
+    ['off', 'hover', false, false, false],
+    ['off', 'click', false, false, false],
+    ['off', 'both', false, false, false],
+    ['card', 'hover', true, false, false],
+    ['card', 'click', false, true, true],
+    ['card', 'both', true, true, true],
+    ['panel', 'hover', true, false, true],
+    ['panel', 'click', false, true, true],
+    ['panel', 'both', true, true, true],
+  ] as const)('%s + %s: hover %s, click %s, keyboard %s', (place, trigger, hover, click, keyboard) => {
+    expect(detailsGestures(place, trigger)).toEqual({ hover, click, keyboard });
   });
 });

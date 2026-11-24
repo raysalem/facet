@@ -939,16 +939,24 @@ describe('PhotoCardComponent unassigned faces action', () => {
 describe('PhotoCardComponent tooltip emission', () => {
   const mockI18n = { t: vi.fn((key: string) => key), currentLang: vi.fn(() => 'en'), locale: vi.fn(() => 'en'), translations: vi.fn(() => ({})) };
 
-  /** Drive the card directly: this is about which gesture emits, not markup. */
+  /** Drive the card directly: this is about which gesture emits, not markup.
+   *  Named by the pre-split modes these cases were written for, mapped the way
+   *  stored settings migrate: hover/click -> card + that trigger, panel -> panel + its activation. */
   function card(mode: 'hover' | 'click' | 'off' | 'panel', panelActivation?: 'hover' | 'click' | 'both') {
+    const place = mode === 'hover' || mode === 'click' ? 'card' : mode;
+    const trigger = mode === 'hover' || mode === 'click' ? mode : (panelActivation ?? 'both');
+    return cardFor(place, trigger);
+  }
+
+  function cardFor(place: 'off' | 'card' | 'panel', trigger: 'hover' | 'click' | 'both') {
     TestBed.configureTestingModule({
       imports: [PhotoCardComponent],
       providers: [{ provide: I18nService, useValue: mockI18n }],
     });
     const fixture = TestBed.createComponent(PhotoCardComponent);
     fixture.componentRef.setInput('photo', makePhoto());
-    fixture.componentRef.setInput('tooltipMode', mode);
-    if (panelActivation) fixture.componentRef.setInput('panelActivation', panelActivation);
+    fixture.componentRef.setInput('detailsPlace', place);
+    fixture.componentRef.setInput('detailsTrigger', trigger);
     fixture.detectChanges();
     const shown: string[] = [];
     let hidden = 0;
@@ -990,7 +998,7 @@ describe('PhotoCardComponent tooltip emission', () => {
     expect(hidden()).toBe(1);
   });
 
-  // --- panelActivation: which gesture(s) retarget panel mode ----------------
+  // --- details_trigger: which gesture(s) retarget the panel ---------------------
 
   it('activation "both" (the default) retargets on hover AND click', () => {
     const { c, shown } = card('panel', 'both');
@@ -1039,6 +1047,30 @@ describe('PhotoCardComponent tooltip emission', () => {
       expect(shown).toEqual(['/test.jpg']);
       TestBed.resetTestingModule();
     }
+  });
+
+  it.each([
+    ['card', 'hover', true, false, true],
+    ['card', 'click', false, true, false],
+    ['card', 'both', true, true, true],
+    ['panel', 'hover', true, false, true],
+    ['panel', 'click', false, true, false],
+    ['panel', 'both', true, true, true],
+    ['off', 'hover', false, false, false],
+    ['off', 'click', false, false, false],
+    ['off', 'both', false, false, false],
+  ] as const)('%s opened with %s: hover emits %s, click emits %s, mouse-out reported %s', (place, trigger, onHover, onClick, onLeave) => {
+    const { c, shown, hidden } = cardFor(place, trigger);
+    c.onMouseEnter(clickEvent);
+    expect(shown.length).toBe(onHover ? 1 : 0);
+    c.onSelect(clickEvent);
+    expect(shown.length).toBe((onHover ? 1 : 0) + (onClick ? 1 : 0));
+    c.onMouseLeave();
+    expect(hidden()).toBe(onLeave ? 1 : 0);
+    c.onKeySelect({ preventDefault: () => {} } as unknown as Event);
+    // Space feeds the panel whatever the trigger; a card opens from it unless it is hover-only.
+    const onKey = place === 'panel' || (place === 'card' && trigger !== 'hover');
+    expect(shown.length).toBe((onHover ? 1 : 0) + (onClick ? 1 : 0) + (onKey ? 1 : 0));
   });
 
   it('off mode reports nothing at all', () => {

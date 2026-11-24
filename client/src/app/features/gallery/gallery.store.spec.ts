@@ -51,8 +51,8 @@ function makeConfig(overrides: Partial<ViewerConfig> = {}): ViewerConfig {
       hide_brackets: true,
       hide_panoramas: true,
       hide_details: true,
-      tooltip_mode: "hover",
-      panel_activation: "both",
+      details_place: "card",
+      details_trigger: "hover",
       hide_rejected: true,
       gallery_mode: 'mosaic',
     },
@@ -422,7 +422,7 @@ describe('GalleryStore', () => {
     it('restores the configured display defaults separately from the query', async () => {
       const config = makeConfig();
       config.defaults.gallery_mode = 'mosaic';
-      config.defaults.tooltip_mode = 'off';
+      config.defaults.details_place = 'off';
       config.display.thumbnail_slider = { min_px: 96, max_px: 480, default_px: 192, step_px: 8 };
       store.config.set(config);
       store.setGalleryMode('list');
@@ -430,7 +430,7 @@ describe('GalleryStore', () => {
       await store.resetDisplay();
       expect(store.galleryMode()).toBe('mosaic');
       expect(store.cardWidth()).toBe(192);
-      expect(store.filters().tooltip_mode).toBe('off');
+      expect(store.filters().details_place).toBe('off');
       expect(apiGet).not.toHaveBeenCalled();
     });
   });
@@ -968,8 +968,8 @@ describe('GalleryStore', () => {
           hide_brackets: false,
           hide_panoramas: false,
           hide_details: false,
-          tooltip_mode: "hover",
-          panel_activation: "both",
+          details_place: "card",
+          details_trigger: "hover",
           hide_rejected: false,
           gallery_mode: 'mosaic',
         },
@@ -1286,7 +1286,7 @@ describe('GalleryStore', () => {
     it('keeps similarity for presentation and threshold changes but leaves it for batched refinements and sort', async () => {
       store.filters.set({ ...DEFAULT_FILTERS, similar_to: '/source.jpg' });
       apiGet.mockReturnValue(of({ similar: [], total: 0, has_more: false }));
-      await store.updateFilters({ hide_details: false, tooltip_mode: 'click' });
+      await store.updateFilters({ hide_details: false, details_trigger: 'click' });
       expect(store.filters().similar_to).toBe('/source.jpg');
       expect(apiGet).not.toHaveBeenCalled();
       await store.updateFilter('min_similarity', '50');
@@ -1964,8 +1964,8 @@ describe('gallery session query (nav-icon return)', () => {
           hide_brackets: true,
           hide_panoramas: true,
           hide_details: true,
-          tooltip_mode: "hover",
-          panel_activation: "both",
+          details_place: "card",
+          details_trigger: "hover",
           hide_rejected: true,
           gallery_mode: 'mosaic',
         },
@@ -4613,15 +4613,15 @@ describe('GalleryStore smart-album temporary refinements', () => {
       const query = store.filterKey();
       const rows = store.photos();
       get.mockClear();
-      if (mode === 'grouped') await store.updateFilters({ hide_details: false, tooltip_mode: 'off', panel_activation: 'click' });
+      if (mode === 'grouped') await store.updateFilters({ hide_details: false, details_place: 'off', details_trigger: 'click' });
       else {
         await store.updateFilter('hide_details', false);
-        await store.updateFilter('tooltip_mode', 'off');
-        await store.updateFilter('panel_activation', 'click');
+        await store.updateFilter('details_place', 'off');
+        await store.updateFilter('details_trigger', 'click');
       }
       TestBed.tick();
       await vi.advanceTimersByTimeAsync(500);
-      expect(store.filters()).toMatchObject({ page: 2, review_status: 'undecided', sort: 'date_taken', sort_direction: 'ASC', hide_details: false, tooltip_mode: 'off', panel_activation: 'click' });
+      expect(store.filters()).toMatchObject({ page: 2, review_status: 'undecided', sort: 'date_taken', sort_direction: 'ASC', hide_details: false, details_place: 'off', details_trigger: 'click' });
       expect(store.filterKey()).toBe(query);
       expect(store.photos()).toBe(rows);
       expect(store.viewScopeSelected()).toBe(true);

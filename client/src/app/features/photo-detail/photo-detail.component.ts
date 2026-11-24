@@ -76,6 +76,7 @@ import { PanelRailComponent } from '../../shared/components/panel-rail/panel-rai
 import { definingFilters, galleryFilterChips } from '../gallery/gallery-filter-chips';
 import { PluralKeyPipe } from '../../shared/pipes/plural-key.pipe';
 import { PanelWidth } from '../../shared/utils/panel-width';
+import { PanelResizeHandleComponent } from '../../shared/components/panel-resize-handle/panel-resize-handle.component';
 import { tagKinds } from '../../shared/utils/tag-kinds';
 import type { CategoryOverrideResult } from './category-override-dialog.component';
 import { StackNavigatorComponent } from './stack-navigator.component';
@@ -140,7 +141,7 @@ function inDetectedSet(photo: Photo): boolean {
 @Component({
   selector: 'app-photo-detail',
   imports: [ControlPopoverComponent, PhotoCollectionSidebarComponent, ContextHelpComponent, PhotoProvenanceComponent, PhotoRelatedFilesComponent, PhotoAlbumsComponent, IsLensNamePipe,
-    StackNavigatorComponent, NgTemplateOutlet, PanelRailComponent,
+    StackNavigatorComponent, NgTemplateOutlet, PanelRailComponent, PanelResizeHandleComponent,
     ZoomPanDirective,
     PhotoObjectLayerComponent,
     PhotoAnnotationLayerComponent,
@@ -422,11 +423,8 @@ function inDetectedSet(photo: Photo): boolean {
         <app-panel-rail data-photo-rail [rail]="rail" [tabs]="facetRailTabs" [label]="I18N.photo_detail.rail.label | translate" idPrefix="photo" />
 
         <!-- Drag or arrow-key the panel's left edge to trade image room for detail (lg+, remembered). -->
-        <div role="separator" tabindex="0" aria-orientation="vertical" data-inspector-resize [attr.aria-label]="I18N.photo_detail.inspector_resize | translate"
-          [attr.aria-valuemin]="inspectorWidth.min" [attr.aria-valuemax]="inspectorWidth.max" [attr.aria-valuenow]="inspectorWidth.width()" [class.lg:!hidden]="rail.addonActive() || !rail.shownPage()"
-          class="relative z-10 hidden lg:block w-3 -mx-1.5 shrink-0 cursor-col-resize touch-none focus-visible:bg-[var(--mat-sys-primary)]"
-          (pointerdown)="inspectorWidth.start($event)" (pointermove)="inspectorWidth.move($event)" (pointerup)="inspectorWidth.finish($event)"
-          (pointercancel)="inspectorWidth.finish($event, true)" (lostpointercapture)="inspectorWidth.finish($event, true)" (keydown)="inspectorWidth.key($event)"></div>
+        <app-panel-resize-handle data-inspector-resize [panel]="inspectorWidth" [label]="I18N.photo_detail.inspector_resize | translate"
+          [class.lg:!hidden]="rail.addonActive() || !rail.shownPage()" class="relative hidden lg:flex -mx-1.5" />
 
         <!-- Info panel -->
         <aside data-photo-inspector [attr.aria-label]="I18N.photo_detail.details | translate" [style.--facet-inspector-width]="inspectorWidth.width() + 'px'" [class.lg:!hidden]="rail.addonActive()" [class.!hidden]="!rail.shownPage()" [class.lg:flex]="rail.shownPage() === 'filter'" (keydown)="closePanels($event)" class="relative [overflow-wrap:anywhere] lg:flex-col lg:w-[var(--facet-inspector-width)] lg:shrink-0 lg:overflow-y-auto lg:border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-4 space-y-4 text-sm text-[var(--mat-sys-on-surface)]">

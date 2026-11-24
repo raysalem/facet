@@ -71,7 +71,8 @@
       "from": "从",
       "to": "至",
       "loading": "正在加载…",
-      "na": "不适用"
+      "na": "不适用",
+      "resize_hint": "拖动以调整宽度。获得焦点后，也可使用方向键、Home 和 End。"
     },
     "badges": {
       "best": "最佳",
@@ -1243,17 +1244,16 @@
     "composition_range": "构图评分范围",
     "hide_details": "隐藏照片详情",
     "tooltip_mode": {
-      "label": "提示信息",
-      "hover": "悬停",
-      "click": "点击",
-      "panel": "侧边面板",
-      "off": "关闭",
       "panel_empty": "将鼠标悬停在照片上或点击照片，即可在此查看详情",
       "panel_deselect": "取消选择",
       "details": "照片详情"
     },
-    "panel_activation": {
-      "label": "面板触发方式",
+    "photo_details": {
+      "label": "照片详情",
+      "off": "关闭",
+      "card": "悬停卡片",
+      "panel": "侧边面板",
+      "open_with": "打开方式",
       "hover": "悬停",
       "click": "点击",
       "both": "悬停或点击"
@@ -1805,13 +1805,15 @@
       "hide_details": "只显示照片，不显示每张照片下方的信息",
       "fast_scrolling": "只绘制屏幕附近的行，让大型图库滚动流畅。若布局出现异常，请关闭此项。",
       "card_buttons": "选择照片卡片在悬停时显示哪些按钮及其顺序",
-      "tooltip_mode": "照片详情的打开方式：悬停、点击、在侧边面板中，或不显示",
+      "photo_details": "照片详情的显示位置：照片旁的卡片、图库边缘的侧边面板，或不显示",
+      "open_with": "打开照片详情的方式：指向照片（悬停）、点击照片（点击）或两者皆可（悬停或点击）。卡片和侧边面板都适用。",
       "tile_fit": "将缩略图裁切为正方形，或按原有比例显示每张照片",
       "reset_display": "恢复默认的布局、缩略图大小和照片详情。筛选、排序和选择保持不变。"
     },
     "rail": {
       "label": "图库面板",
       "showing": "当前显示",
+      "resize_showing": "调整“当前显示”面板宽度",
       "filters_one": "{count} 个筛选条件",
       "filters": "{count} 个筛选条件"
     }

@@ -1598,7 +1598,8 @@ Visualización y comportamiento de la galería web.
       "hide_brackets": true,
       "hide_panoramas": true,
       "hide_details": true,
-      "tooltip_mode": "panel",
+      "details_place": "panel",
+      "details_trigger": "both",
       "hide_rejected": true,
       "sort": "aggregate",
       "sort_direction": "DESC",
@@ -1687,8 +1688,8 @@ Visualización y comportamiento de la galería web.
 | `hide_brackets` | `true` | Mostrar solo la exposición base de cada horquillado por defecto |
 | `hide_panoramas` | `true` | Mostrar solo un fotograma representativo por panorámica por defecto |
 | `hide_details` | `true` | Ocultar los detalles de la foto en las tarjetas por defecto |
-| `tooltip_mode` | `"panel"` | Activación del tooltip: `"hover"`, `"click"`, `"off"` o `"panel"` (panel acoplado); sustituye a `hide_tooltip` |
-| `panel_activation` | `"both"` | Gesto que cambia la foto del panel acoplado en modo `"panel"`: `"hover"`, `"click"` o `"both"` |
+| `details_place` | `"panel"` | Dónde aparecen los detalles de la foto (Visualización > **Detalles de la foto**): `"off"`, `"card"` (una tarjeta junto a la foto) o `"panel"` (el panel lateral acoplado) |
+| `details_trigger` | `"both"` | Qué los abre (Visualización > **Abrir con**), igual para la tarjeta y el panel: `"hover"`, `"click"` o `"both"`. Las claves anteriores `tooltip_mode` y `panel_activation` se siguen leyendo y tienen prioridad si están presentes (`hover`/`click` = tarjeta con ese gesto, `panel` = panel lateral con `panel_activation`, `off` = desactivado) |
 | `hide_rejected` | `true` | Ocultar las fotos rechazadas por defecto |
 | `gallery_mode` | `"mosaic"` | Disposición de la galería por defecto (`"grid"` o `"mosaic"`) |
 | **allowed_origins** | | |
@@ -1762,7 +1763,7 @@ Desactivar `badges.stack` solo oculta la insignia; el botón de tarjeta «Abrir 
 | `badge_percent` | `5` | Porcentaje de píxeles, en el peor canal R/G/B, por encima del cual se marca la tarjeta (aproximadamente 1 foto de cada 25 en una muestra) |
 | `indicator_percent` | `1` | Umbral de los propios marcadores R/G/B de los extremos del histograma |
 | `histogram_mode` | `"rgb"` | Valor predeterminado del histograma del **panel de detalle**: `"luma"`, `"rgb"`, `"r"`, `"g"` o `"b"` |
-| `tooltip_histogram_mode` | `"luma"` | Valor predeterminado de la pestaña Histograma del **panel lateral** (`tooltip_mode: "panel"`), los mismos cinco valores |
+| `tooltip_histogram_mode` | `"luma"` | Valor predeterminado de la pestaña Histograma del **panel lateral** (`details_place: "panel"`), los mismos cinco valores |
 
 Notas:
 - La elección de histograma de cada usuario se guarda en `localStorage` (`facet_histogram_mode`, `facet_histogram_mode_tooltip`) y prevalece sobre estos valores. Los dos ajustes son independientes.

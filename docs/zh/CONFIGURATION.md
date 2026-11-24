@@ -1593,7 +1593,8 @@ python facet.py --recompute-tags-vlm   # 用 VLM 标签模型重新打标签
       "hide_brackets": true,
       "hide_panoramas": true,
       "hide_details": true,
-      "tooltip_mode": "panel",
+      "details_place": "panel",
+      "details_trigger": "both",
       "hide_rejected": true,
       "sort": "aggregate",
       "sort_direction": "DESC",
@@ -1682,8 +1683,8 @@ python facet.py --recompute-tags-vlm   # 用 VLM 标签模型重新打标签
 | `hide_brackets` | `true` | 默认只显示包围曝光组的基准曝光 |
 | `hide_panoramas` | `true` | 默认每组全景只显示一张代表帧 |
 | `hide_details` | `true` | 默认在卡片上隐藏照片详情 |
-| `tooltip_mode` | `"panel"` | 提示触发方式：`"hover"`、`"click"`、`"off"` 或 `"panel"`（停靠侧栏）；取代 `hide_tooltip` |
-| `panel_activation` | `"both"` | 在 `"panel"` 模式下切换停靠侧栏所示照片的操作：`"hover"`、`"click"` 或 `"both"` |
+| `details_place` | `"panel"` | 照片详情的显示位置（显示 > **照片详情**）：`"off"`、`"card"`（照片旁的卡片）或 `"panel"`（停靠的侧边面板） |
+| `details_trigger` | `"both"` | 打开方式（显示 > **打开方式**），卡片和面板通用：`"hover"`、`"click"` 或 `"both"`。旧键 `tooltip_mode` 和 `panel_activation` 仍会读取，且存在时优先（`hover`/`click` = 以该方式打开的卡片，`panel` = 按 `panel_activation` 打开的侧边面板，`off` = 关闭） |
 | `hide_rejected` | `true` | 默认隐藏已淘汰照片 |
 | `gallery_mode` | `"mosaic"` | 默认的照片库布局（`"grid"` 或 `"mosaic"`） |
 | **allowed_origins** | | |
@@ -1757,7 +1758,7 @@ python facet.py --recompute-tags-vlm   # 用 VLM 标签模型重新打标签
 | `badge_percent` | `5` | R/G/B 中最差通道的像素占比，超过此值的照片会被加角标（在一个样本上约每 25 张照片触发 1 张） |
 | `indicator_percent` | `1` | 直方图自身 R/G/B 端点标记的阈值 |
 | `histogram_mode` | `"rgb"` | **详情面板**直方图的默认值：`"luma"`、`"rgb"`、`"r"`、`"g"` 或 `"b"` |
-| `tooltip_histogram_mode` | `"luma"` | **侧边面板**直方图标签页（`tooltip_mode: "panel"`）的默认值，取值同样是那五种 |
+| `tooltip_histogram_mode` | `"luma"` | **侧边面板**直方图标签页（`details_place: "panel"`）的默认值，取值同样是那五种 |
 
 说明：
 - 用户自己的直方图选择存在 `localStorage`（`facet_histogram_mode`、`facet_histogram_mode_tooltip`）中，并优先于这些默认值。这两项设置相互独立。

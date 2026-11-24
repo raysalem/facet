@@ -71,7 +71,8 @@
       "from": "De",
       "to": "Até",
       "loading": "Carregando...",
-      "na": "N/D"
+      "na": "N/D",
+      "resize_hint": "Arraste para redimensionar. Com o foco, as setas, Home e End também funcionam."
     },
     "badges": {
       "best": "MELHOR",
@@ -1243,17 +1244,16 @@
     "composition_range": "Faixa de composição",
     "hide_details": "Ocultar detalhes",
     "tooltip_mode": {
-      "label": "Dica",
-      "hover": "Passar o mouse",
-      "click": "Clicar",
-      "panel": "Painel lateral",
-      "off": "Desligado",
       "panel_empty": "Passe o cursor sobre uma foto ou clique nela para ver aqui os seus detalhes",
       "panel_deselect": "Desmarcar",
       "details": "Detalhes da foto"
     },
-    "panel_activation": {
-      "label": "Ativação do painel",
+    "photo_details": {
+      "label": "Detalhes da foto",
+      "off": "Desligado",
+      "card": "Cartão ao passar",
+      "panel": "Painel lateral",
+      "open_with": "Abrir com",
       "hover": "Passar o mouse",
       "click": "Clicar",
       "both": "Passar o mouse ou clicar"
@@ -1805,13 +1805,15 @@
       "hide_details": "Mostra só as fotos, sem as informações por baixo de cada foto",
       "fast_scrolling": "Desenha só as linhas perto do ecrã, para que galerias longas rolem com fluidez. Desative se o layout falhar.",
       "card_buttons": "Escolha que botões um cartão mostra ao passar o rato, e por que ordem",
-      "tooltip_mode": "Como abrem os detalhes de uma foto: ao passar o rato, ao clicar, no painel lateral ou nunca",
+      "photo_details": "Onde aparecem os detalhes de uma foto: num cartão ao lado da foto, no painel lateral na borda da galeria, ou em lugar nenhum",
+      "open_with": "O que abre os detalhes de uma foto: apontar para a foto (Passar o mouse), clicar nela (Clicar) ou qualquer um (Passar o mouse ou clicar). Vale para o cartão e para o painel lateral.",
       "tile_fit": "Recorta as miniaturas em quadrado ou mostra cada foto na proporção original",
       "reset_display": "Repõe o layout, o tamanho das miniaturas e os detalhes das fotos predefinidos. Os filtros, a ordenação e a seleção mantêm-se."
     },
     "rail": {
       "label": "Painéis da galeria",
       "showing": "Exibindo",
+      "resize_showing": "Redimensionar o painel Exibindo",
       "filters_one": "{count} filtro",
       "filters": "{count} filtros"
     }

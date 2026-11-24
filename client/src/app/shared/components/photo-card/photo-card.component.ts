@@ -3,6 +3,7 @@ import { I18nService } from '../../../core/services/i18n.service';
 import { i18nKeys } from '../../../core/i18n/keys';
 import { sortLabelKey } from '../../utils/sort-label';
 import { Component, computed, effect, inject, input, output, signal, untracked, viewChildren, ChangeDetectionStrategy } from '@angular/core';
+import { detailsGestures, type DetailsPlace, type DetailsTrigger } from '../../utils/photo-details';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltip, MatTooltipModule } from '@angular/material/tooltip';
@@ -820,44 +821,29 @@ export class PhotoCardComponent {
    *  once the siblings it was picked over are visible beside it. */
   readonly burstFramesVisible = input(false);
   readonly personFilterId = input('');
-  /** 'hover' (default) | 'click' | 'off' | 'panel' — drives tooltip emission strategy.
-   *
-   *  'panel' feeds the gallery's docked rail. By default it responds to BOTH
-   *  gestures: it was asked for as "changes with the photo selected (click) or
-   *  hovered (hover)", and since the rail is parked rather than chasing the
-   *  cursor there is no reason to make that an either/or by default. It also
-   *  keeps the rail usable on a touch screen, where hover never fires.
-   *  panelActivation narrows this per-install/per-user. */
-  readonly tooltipMode = input<'hover' | 'click' | 'off' | 'panel'>('hover');
-  /** Which gesture(s) retarget the docked panel when tooltipMode is 'panel'.
-   *  Irrelevant for every other mode, which already has one fixed gesture.
-   *  Default 'both' preserves the original panel behaviour exactly. */
-  readonly panelActivation = input<'hover' | 'click' | 'both'>('both');
+  /** Where the photo's details appear ("Photo details"): 'off', a floating
+   *  'card', or the gallery's docked side 'panel'. */
+  readonly detailsPlace = input<DetailsPlace>('card');
+  /** What opens them ("Open with"): 'hover', 'click', or 'both'. One gesture
+   *  setting for the card and the panel alike. */
+  readonly detailsTrigger = input<DetailsTrigger>('hover');
+  private readonly gestures = computed(() => detailsGestures(this.detailsPlace(), this.detailsTrigger()));
 
-  /** Whether a mouse hover retargets the panel: always for 'hover', for
-   *  'panel' only when panelActivation allows hover. */
+  /** A mouse hover asks for the details only when the trigger allows hover. */
   private hoverDriven(): boolean {
-    const mode = this.tooltipMode();
-    if (mode === 'hover') return true;
-    if (mode === 'panel') return this.panelActivation() !== 'click';
-    return false;
+    return this.gestures().hover;
   }
 
-  /** Whether a mouse click retargets the panel: always for 'click', for
-   *  'panel' only when panelActivation allows click. */
+  /** A mouse click asks for the details only when the trigger allows click. */
   private clickDriven(): boolean {
-    const mode = this.tooltipMode();
-    if (mode === 'click') return true;
-    if (mode === 'panel') return this.panelActivation() !== 'hover';
-    return false;
+    return this.gestures().click;
   }
 
-  /** Keyboard selection always retargets 'click' and 'panel', regardless of
-   *  panelActivation -- a keyboard user has no hover to fall back on, so
-   *  narrowing this the same way as clickDriven() would strand them. */
+  /** Keyboard selection (Space) feeds the side panel whatever the trigger: a
+   *  keyboard user has no hover to fall back on, so narrowing it like
+   *  clickDriven() would strand them. A hover-only card keeps Space for selecting. */
   private keyboardDriven(): boolean {
-    const mode = this.tooltipMode();
-    return mode === 'click' || mode === 'panel';
+    return this.gestures().keyboard;
   }
 
   // Events

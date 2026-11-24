@@ -14,7 +14,7 @@ import { SortOptionIconPipe } from '../../shared/pipes/sort-option-icon.pipe';
 import { SortGroupIconPipe, SortGroupKeyPipe } from '../../shared/pipes/sort-group-key.pipe';
 import { useDesktopSignal, useHoverCapableSignal, DETAILS_RAIL_MIN_WIDTH_PX } from '../../shared/utils/media-query';
 import { GalleryFilters, GalleryStore } from './gallery.store';
-import { TILE_FITS, GalleryMode, PanelActivation, TooltipMode, inAlbum } from './gallery-filters.util';
+import { TILE_FITS, GalleryMode, DetailsPlace, DetailsTrigger, inAlbum } from './gallery-filters.util';
 import { closeOverlayDirectives } from '../../shared/utils/overlays';
 import { sortLabelKey, sortOptionLabelKey } from '../../shared/utils/sort-label';
 import { AuthService } from '../../core/services/auth.service';
@@ -35,16 +35,19 @@ import { GalleryReviewNavigationService } from './gallery-review-navigation.serv
     }
     @if (!portDisplay()) { <ng-container [ngTemplateOutlet]="layoutControls" [ngTemplateOutletContext]="{ $implicit: secondaryLayouts }" /> }
     @if (portDisplay()) {
-      <ng-container [ngTemplateOutlet]="choiceRow" [ngTemplateOutletContext]="{ id: 'tooltip-mode', icon: tooltipIcon(), label: I18N.gallery.tooltip_mode.label, value: tooltipModeLabel(), menu: tooltipModeMenu, tip: I18N.gallery.display_tips.tooltip_mode }" />
+      <ng-container [ngTemplateOutlet]="choiceRow" [ngTemplateOutletContext]="{ id: 'photo-details', icon: placeIcon(), label: I18N.gallery.photo_details.label, value: placeLabel(), menu: detailsPlaceMenu, tip: I18N.gallery.display_tips.photo_details }" />
+      @if (store.filters().details_place !== 'off') {
+        <ng-container [ngTemplateOutlet]="choiceRow" [ngTemplateOutletContext]="{ id: 'open-with', icon: triggerIcon(), label: I18N.gallery.photo_details.open_with, value: triggerLabel(), menu: detailsTriggerMenu, tip: I18N.gallery.display_tips.open_with }" />
+      }
       @if (store.galleryMode() === 'grid' && store.filters().hide_details) {
         <ng-container [ngTemplateOutlet]="choiceRow" [ngTemplateOutletContext]="{ id: 'tile-fit', icon: 'aspect_ratio', label: I18N.gallery.tile_fit.label, value: tileFitLabel(), menu: tileFitMenu, tip: I18N.gallery.display_tips.tile_fit }" />
       }
     } @else {
-      <button mat-button class="!min-h-11 !min-w-11 !w-11 !px-2 @[1120px]:!w-auto @[1120px]:!px-4"
-              [matMenuTriggerFor]="tooltipModeMenu" [matTooltip]="I18N.gallery.tooltip_mode.label | translate"
-              [attr.aria-label]="I18N.gallery.tooltip_mode.label | translate">
-        <mat-icon class="!m-0 @[1120px]:!mr-2">{{ tooltipIcon() }}</mat-icon>
-        <span class="hidden @[1120px]:inline">{{ I18N.gallery.tooltip_mode.label | translate }}</span>
+      <button mat-button data-photo-details class="!min-h-11 !min-w-11 !w-11 !px-2 @[1120px]:!w-auto @[1120px]:!px-4"
+              [matMenuTriggerFor]="detailsMenu" [matTooltip]="I18N.gallery.display_tips.photo_details | translate"
+              [attr.aria-label]="I18N.gallery.photo_details.label | translate">
+        <mat-icon class="!m-0 @[1120px]:!mr-2">{{ placeIcon() }}</mat-icon>
+        <span class="hidden @[1120px]:inline">{{ I18N.gallery.photo_details.label | translate }}</span>
       </button>
       @if (store.galleryMode() === 'grid' && store.filters().hide_details) {
         <button mat-button data-tile-fit class="!min-h-11 !min-w-11 !w-11 !px-2 @[1120px]:!w-auto @[1120px]:!px-4"
@@ -84,34 +87,55 @@ import { GalleryReviewNavigationService } from './gallery-review-navigation.serv
         <mat-icon>restart_alt</mat-icon><span>{{ I18N.gallery.reset_display | translate }}</span>
       </button>
     }
-    <mat-menu #tooltipModeMenu="matMenu">
-      @for (mode of tooltipModes(); track mode.id) {
-        <button mat-menu-item role="menuitemradio"
-                [disabled]="mode.id === 'hover' && (!canUseHoverTooltips() || !canHoverAtAll()) && store.filters().tooltip_mode !== 'hover'"
-                [attr.aria-checked]="store.filters().tooltip_mode === mode.id"
-                (click)="setPresentationFilter('tooltip_mode', mode.id)">
-          <mat-icon aria-hidden="true">{{ mode.icon }}</mat-icon>
+    <!-- Photo details: where they appear and what opens them, two independent settings shown together.
+         The toolbar opens both in one menu; the Display popover gives each its own row. -->
+    <mat-menu #detailsMenu="matMenu">
+      <div role="presentation" class="px-4 pt-2 pb-1 text-xs font-medium text-[var(--mat-sys-on-surface-variant)]">{{ I18N.gallery.photo_details.label | translate }}</div>
+      @for (place of detailsPlaces(); track place.id) {
+        <button mat-menu-item role="menuitemradio" [attr.data-details-place]="place.id" [attr.aria-checked]="store.filters().details_place === place.id"
+                (click)="setPresentationFilter('details_place', place.id)">
+          <mat-icon aria-hidden="true">{{ place.icon }}</mat-icon>
           <span class="flex items-center gap-4">
-            <span class="grow">{{ mode.label | translate }}</span>
-            @if (store.filters().tooltip_mode === mode.id) { <mat-icon aria-hidden="true">check</mat-icon> }
+            <span class="grow">{{ place.label | translate }}</span>
+            @if (store.filters().details_place === place.id) { <mat-icon aria-hidden="true">check</mat-icon> }
           </span>
         </button>
-        @if (mode.id === 'panel' && store.filters().tooltip_mode === 'panel') {
-          <button mat-menu-item [matMenuTriggerFor]="panelActivationMenu">
-            <mat-icon aria-hidden="true">{{ panelActivationIcon() }}</mat-icon>{{ I18N.gallery.panel_activation.label | translate }}
-          </button>
-        }
+      }
+      <div role="presentation" class="mt-1 border-t border-[var(--mat-sys-outline-variant)] px-4 pt-2 pb-1 text-xs font-medium text-[var(--mat-sys-on-surface-variant)]"
+           [class.opacity-60]="store.filters().details_place === 'off'">{{ I18N.gallery.photo_details.open_with | translate }}</div>
+      @for (trigger of detailsTriggers; track trigger.id) {
+        <button mat-menu-item role="menuitemradio" [attr.data-details-trigger]="trigger.id" [attr.aria-checked]="store.filters().details_trigger === trigger.id"
+                [disabled]="store.filters().details_place === 'off' || (trigger.id === 'hover' && !hoverTriggerAvailable() && store.filters().details_trigger !== 'hover')"
+                (click)="setPresentationFilter('details_trigger', trigger.id)">
+          <mat-icon aria-hidden="true">{{ trigger.icon }}</mat-icon>
+          <span class="flex items-center gap-4">
+            <span class="grow">{{ trigger.label | translate }}</span>
+            @if (store.filters().details_trigger === trigger.id) { <mat-icon aria-hidden="true">check</mat-icon> }
+          </span>
+        </button>
       }
     </mat-menu>
-    <mat-menu #panelActivationMenu="matMenu">
-      @for (mode of panelActivationModes; track mode.id) {
-        <button mat-menu-item role="menuitemradio" [attr.aria-checked]="store.filters().panel_activation === mode.id"
-                [disabled]="mode.id === 'hover' && !canHoverAtAll() && store.filters().panel_activation !== 'hover'"
-                (click)="setPresentationFilter('panel_activation', mode.id)">
-          <mat-icon aria-hidden="true">{{ mode.icon }}</mat-icon>
+    <mat-menu #detailsPlaceMenu="matMenu">
+      @for (place of detailsPlaces(); track place.id) {
+        <button mat-menu-item role="menuitemradio" [attr.data-details-place]="place.id" [attr.aria-checked]="store.filters().details_place === place.id"
+                (click)="setPresentationFilter('details_place', place.id)">
+          <mat-icon aria-hidden="true">{{ place.icon }}</mat-icon>
           <span class="flex items-center gap-4">
-            <span class="grow">{{ mode.label | translate }}</span>
-            @if (store.filters().panel_activation === mode.id) { <mat-icon aria-hidden="true">check</mat-icon> }
+            <span class="grow">{{ place.label | translate }}</span>
+            @if (store.filters().details_place === place.id) { <mat-icon aria-hidden="true">check</mat-icon> }
+          </span>
+        </button>
+      }
+    </mat-menu>
+    <mat-menu #detailsTriggerMenu="matMenu">
+      @for (trigger of detailsTriggers; track trigger.id) {
+        <button mat-menu-item role="menuitemradio" [attr.data-details-trigger]="trigger.id" [attr.aria-checked]="store.filters().details_trigger === trigger.id"
+                [disabled]="trigger.id === 'hover' && !hoverTriggerAvailable() && store.filters().details_trigger !== 'hover'"
+                (click)="setPresentationFilter('details_trigger', trigger.id)">
+          <mat-icon aria-hidden="true">{{ trigger.icon }}</mat-icon>
+          <span class="flex items-center gap-4">
+            <span class="grow">{{ trigger.label | translate }}</span>
+            @if (store.filters().details_trigger === trigger.id) { <mat-icon aria-hidden="true">check</mat-icon> }
           </span>
         </button>
       }
@@ -239,29 +263,31 @@ export class GalleryViewControlsComponent {
   protected readonly canDockDetails = this.railCapable.isDesktop;
   protected readonly canUseHoverTooltips = this.tooltipCapable.isDesktop;
   protected readonly canHoverAtAll = this.hoverCapable.isHoverCapable;
-  protected readonly tooltipModes = computed(() => {
-    const modes: { id: TooltipMode; label: string; icon: string }[] = [
-      { id: 'hover', label: I18N.gallery.tooltip_mode.hover, icon: 'chat_bubble_outline' },
-      { id: 'click', label: I18N.gallery.tooltip_mode.click, icon: 'touch_app' },
-      { id: 'panel', label: I18N.gallery.tooltip_mode.panel, icon: 'view_sidebar' },
-      { id: 'off', label: I18N.gallery.tooltip_mode.off, icon: 'visibility_off' },
-    ];
-    return modes.filter(mode => mode.id !== 'panel' || this.canDockDetails());
-  });
-  private readonly tooltipModeIcons: Record<TooltipMode, string> = { hover: 'chat_bubble_outline', click: 'touch_app', panel: 'view_sidebar', off: 'visibility_off' };
-  protected readonly tooltipIcon = computed(() => this.tooltipModeIcons[this.store.filters().tooltip_mode] ?? 'chat_bubble_outline');
-  private readonly tooltipModeLabels: Record<TooltipMode, string> = {
-    hover: I18N.gallery.tooltip_mode.hover, click: I18N.gallery.tooltip_mode.click, panel: I18N.gallery.tooltip_mode.panel, off: I18N.gallery.tooltip_mode.off,
-  };
-  protected readonly tooltipModeLabel = computed(() => this.tooltipModeLabels[this.store.filters().tooltip_mode] ?? I18N.gallery.tooltip_mode.off);
-  protected readonly tileFitLabel = computed(() => this.store.filters().tile_fit === 'natural' ? I18N.gallery.tile_fit.natural : I18N.gallery.tile_fit.square);
-  protected readonly panelActivationModes: { id: PanelActivation; label: string; icon: string }[] = [
-    { id: 'hover', label: I18N.gallery.panel_activation.hover, icon: 'chat_bubble_outline' },
-    { id: 'click', label: I18N.gallery.panel_activation.click, icon: 'touch_app' },
-    { id: 'both', label: I18N.gallery.panel_activation.both, icon: 'swap_horiz' },
+  private readonly placeChoices: readonly { id: DetailsPlace; label: string; icon: string }[] = [
+    { id: 'off', label: I18N.gallery.photo_details.off, icon: 'visibility_off' },
+    { id: 'card', label: I18N.gallery.photo_details.card, icon: 'chat_bubble_outline' },
+    { id: 'panel', label: I18N.gallery.photo_details.panel, icon: 'view_sidebar' },
   ];
-  protected readonly panelActivationIcon = computed(() =>
-    this.panelActivationModes.find(mode => mode.id === this.store.filters().panel_activation)?.icon ?? 'swap_horiz');
+  /** Side panel is offered only where the rail can dock; elsewhere a saved Side panel shows the card instead. */
+  protected readonly detailsPlaces = computed(() =>
+    this.placeChoices.filter(place => place.id !== 'panel' || this.canDockDetails() || this.store.filters().details_place === 'panel'));
+  protected readonly detailsTriggers: readonly { id: DetailsTrigger; label: string; icon: string }[] = [
+    { id: 'hover', label: I18N.gallery.photo_details.hover, icon: 'mouse' },
+    { id: 'click', label: I18N.gallery.photo_details.click, icon: 'touch_app' },
+    { id: 'both', label: I18N.gallery.photo_details.both, icon: 'swap_horiz' },
+  ];
+  private readonly currentPlace = computed(() =>
+    this.placeChoices.find(place => place.id === this.store.filters().details_place) ?? this.placeChoices[0]);
+  private readonly currentTrigger = computed(() =>
+    this.detailsTriggers.find(trigger => trigger.id === this.store.filters().details_trigger) ?? this.detailsTriggers[2]);
+  protected readonly placeIcon = computed(() => this.currentPlace().icon);
+  protected readonly placeLabel = computed(() => this.currentPlace().label);
+  protected readonly triggerIcon = computed(() => this.currentTrigger().icon);
+  protected readonly triggerLabel = computed(() => this.currentTrigger().label);
+  /** Hover can open details only with a pointer that hovers; the card also needs the desktop width it renders at. */
+  protected readonly hoverTriggerAvailable = computed(() =>
+    this.canHoverAtAll() && (this.store.filters().details_place !== 'card' || this.canUseHoverTooltips()));
+  protected readonly tileFitLabel = computed(() => this.store.filters().tile_fit === 'natural' ? I18N.gallery.tile_fit.natural : I18N.gallery.tile_fit.square);
   protected resetDisplay(): void {
     if (this.canAct()) void this.store.resetDisplay();
   }

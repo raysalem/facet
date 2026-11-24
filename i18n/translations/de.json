@@ -71,7 +71,8 @@
       "from": "Von",
       "to": "Bis",
       "loading": "Laden...",
-      "na": "k. A."
+      "na": "k. A.",
+      "resize_hint": "Zum Ändern der Breite ziehen. Mit Fokus gehen auch die Pfeiltasten, Pos1 und Ende."
     },
     "badges": {
       "best": "BESTE",
@@ -1243,17 +1244,16 @@
     "composition_range": "Kompositionsbereich",
     "hide_details": "Details ausblenden",
     "tooltip_mode": {
-      "label": "Tooltip",
-      "hover": "Hover",
-      "click": "Klick",
-      "panel": "Seitenleiste",
-      "off": "Aus",
       "panel_empty": "Fahre über ein Foto oder klicke es an, um seine Details hier zu sehen",
       "panel_deselect": "Auswahl aufheben",
       "details": "Fotodetails"
     },
-    "panel_activation": {
-      "label": "Panel-Aktivierung",
+    "photo_details": {
+      "label": "Fotodetails",
+      "off": "Aus",
+      "card": "Hover-Karte",
+      "panel": "Seitenleiste",
+      "open_with": "Öffnen mit",
       "hover": "Hover",
       "click": "Klick",
       "both": "Hover oder Klick"
@@ -1805,13 +1805,15 @@
       "hide_details": "Zeigt nur die Fotos, ohne die Angaben unter jedem Foto",
       "fast_scrolling": "Zeichnet nur die Zeilen nahe dem Bildschirm, damit große Galerien flüssig scrollen. Schalten Sie es aus, wenn das Layout Fehler zeigt.",
       "card_buttons": "Wählen Sie, welche Knöpfe eine Fotokarte beim Überfahren zeigt und in welcher Reihenfolge",
-      "tooltip_mode": "Wie sich die Details eines Fotos öffnen: beim Überfahren, per Klick, in der Seitenleiste oder gar nicht",
+      "photo_details": "Wo die Details eines Fotos erscheinen: in einer Karte neben dem Foto, in der Seitenleiste am Rand der Galerie oder gar nicht",
+      "open_with": "Was die Details eines Fotos öffnet: auf das Foto zeigen (Hover), es anklicken (Klick) oder beides (Hover oder Klick). Gilt für die Karte und die Seitenleiste gleichermaßen.",
       "tile_fit": "Schneidet Miniaturbilder quadratisch zu oder zeigt jedes Foto im Originalformat",
       "reset_display": "Stellt Standardlayout, Miniaturbildgröße und Fotodetails wieder her. Filter, Sortierung und Auswahl bleiben erhalten."
     },
     "rail": {
       "label": "Galeriebereiche",
       "showing": "Angezeigt",
+      "resize_showing": "Breite des Bereichs „Angezeigt“ ändern",
       "filters_one": "{count} Filter",
       "filters": "{count} Filter"
     }

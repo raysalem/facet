@@ -24,6 +24,8 @@ export class PanelWidth {
   readonly min: number;
   readonly max: number;
   readonly width = signal(0);
+  /** True while a pointer drags the handle, so the handle can stay lit when the pointer outruns it. */
+  readonly dragging = signal(false);
   private drag: { id: number; x: number; width: number; target: HTMLElement } | null = null;
   private frame: number | null = null;
   private pending: number | null = null;
@@ -61,6 +63,7 @@ export class PanelWidth {
     const target = event.currentTarget as HTMLElement;
     target.focus();
     this.drag = { id: event.pointerId, x: event.clientX, width: this.width(), target };
+    this.dragging.set(true);
     this.userSelect = document.body.style.userSelect;
     document.body.style.userSelect = 'none';
     try { target.setPointerCapture(event.pointerId); } catch { /* Synthetic pointer. */ }
@@ -87,6 +90,7 @@ export class PanelWidth {
     if (this.frame !== null) cancelAnimationFrame(this.frame);
     this.frame = null;
     if (!drag) { this.pending = null; return; }
+    this.dragging.set(false);
     document.body.style.userSelect = this.userSelect;
     if (!cancel && this.pending !== null) this.width.set(this.clamp(this.pending));
     this.pending = null;
