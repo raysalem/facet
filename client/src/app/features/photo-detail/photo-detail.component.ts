@@ -338,10 +338,10 @@ function inDetectedSet(photo: Photo): boolean {
         (memberOpened)="openSetMember($event)" />
 
       <!-- Main content: the image, the rail that picks one panel, and that panel -->
-      <div class="flex flex-col lg:flex-row lg:flex-1 lg:min-h-0 lg:overflow-hidden">
+      <div class="flex flex-col in-data-side-panels:flex-row in-data-side-panels:flex-1 in-data-side-panels:min-h-0 in-data-side-panels:overflow-hidden">
         <!-- Image panel -->
-        <div class="flex min-h-40 max-h-[62dvh] min-w-0 shrink-0 flex-col lg:max-h-none lg:min-h-0 lg:flex-1">
-        <div data-photo-canvas tabindex="0" role="group" [attr.aria-label]="I18N.photo_detail.inspection.title | translate" aria-describedby="photo-inspection-help" [appZoomPan]="p.path" #zoom="zoomPan" [style.aspect-ratio]="photoAspect()" class="group/photo focus-visible:!outline-2 focus-visible:!-outline-offset-4 focus-visible:!outline-white flex flex-auto min-h-0 items-center justify-center bg-[var(--facet-image-canvas)] relative overflow-hidden cursor-grab lg:!aspect-auto lg:flex-1">
+        <div class="flex min-h-40 max-h-[62dvh] min-w-0 shrink-0 flex-col in-data-side-panels:max-h-none in-data-side-panels:min-h-0 in-data-side-panels:flex-1 in-data-side-panels:min-w-[min(18rem,35vw)] in-data-side-panels:shrink">
+        <div data-photo-canvas tabindex="0" role="group" [attr.aria-label]="I18N.photo_detail.inspection.title | translate" aria-describedby="photo-inspection-help" [appZoomPan]="p.path" #zoom="zoomPan" [style.aspect-ratio]="photoAspect()" class="group/photo focus-visible:!outline-2 focus-visible:!-outline-offset-4 focus-visible:!outline-white flex flex-auto min-h-0 items-center justify-center bg-[var(--facet-image-canvas)] relative overflow-hidden cursor-grab in-data-side-panels:!aspect-auto in-data-side-panels:flex-1">
           @for (imagePhoto of [p]; track imagePhoto.path) {
           <!-- The collection already loads this thumbnail; keep it underneath
                the larger renditions so a cold image request doesn't flash black. -->
@@ -419,12 +419,12 @@ function inDetectedSet(photo: Photo): boolean {
              dock at the far right (moving a frame reloads it), so the panel slot is always the far-right column. -->
         <app-panel-rail data-photo-rail [rail]="rail" [tabs]="facetRailTabs" [label]="I18N.photo_detail.rail.label | translate" idPrefix="photo" />
 
-        <!-- Drag or arrow-key the panel's left edge to trade image room for detail (lg+, remembered). -->
+        <!-- Drag or arrow-key the panel's left edge to trade image room for detail (side panels, remembered). -->
         <app-panel-resize-handle data-inspector-resize [panel]="inspectorWidth" [label]="I18N.photo_detail.inspector_resize | translate"
-          [class.lg:!hidden]="rail.addonActive() || !rail.shownPage()" class="relative hidden lg:flex -mx-1.5" />
+          [class.in-data-side-panels:!hidden]="rail.addonActive() || !rail.shownPage()" class="relative hidden in-data-side-panels:flex -mx-1.5" />
 
         <!-- Info panel -->
-        <aside data-photo-inspector [attr.aria-label]="I18N.photo_detail.details | translate" [style.--facet-inspector-width]="inspectorWidth.width() + 'px'" [class.lg:!hidden]="rail.addonActive()" [class.!hidden]="!rail.shownPage()" [class.lg:flex]="rail.shownPage() === 'filter'" (keydown)="closePanels($event)" class="relative [overflow-wrap:anywhere] lg:flex-col lg:w-[var(--facet-inspector-width)] lg:shrink-0 lg:overflow-y-auto lg:border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-4 space-y-4 text-sm text-[var(--mat-sys-on-surface)]">
+        <aside data-photo-inspector [attr.aria-label]="I18N.photo_detail.details | translate" [style.--facet-inspector-width]="inspectorWidth.width() + 'px'" [class.in-data-side-panels:!hidden]="rail.addonActive()" [class.!hidden]="!rail.shownPage()" [class.in-data-side-panels:flex]="rail.shownPage() === 'filter'" (keydown)="closePanels($event)" class="relative [overflow-wrap:anywhere] in-data-side-panels:flex-col in-data-side-panels:basis-[var(--facet-inspector-width)] in-data-side-panels:min-w-[min(15rem,50vw)] in-data-side-panels:shrink in-data-side-panels:grow-0 in-data-side-panels:overflow-y-auto in-data-side-panels:border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-4 space-y-4 text-sm text-[var(--mat-sys-on-surface)]">
           <ng-template #categoryExplanation>
               <mat-form-field class="w-full" subscriptSizing="dynamic">
                 <mat-label>{{ I18N.photo.category_override.target_category_label | translate }}</mat-label>
@@ -458,19 +458,19 @@ function inDetectedSet(photo: Photo): boolean {
                   [attr.aria-label]="I18N.photo_detail.collection.next | translate" (click)="stepCollectionPhoto(1)"><mat-icon>chevron_right</mat-icon></button>
               </div>
             }
-            <button mat-icon-button data-close-panels class="!h-8 !w-8 !p-0 max-sm:!h-11 max-sm:!w-11 pointer-coarse:!h-11 pointer-coarse:!w-11 shrink-0"
-              [matTooltip]="I18N.ui.buttons.close_panels | translate" [attr.aria-label]="I18N.ui.buttons.close_panels | translate" (click)="rail.closeAll()">
-              <mat-icon class="!text-xl">close</mat-icon>
+            <button mat-icon-button data-collapse-panel class="!h-8 !w-8 !p-0 max-sm:!h-11 max-sm:!w-11 pointer-coarse:!h-11 pointer-coarse:!w-11 shrink-0"
+              [matTooltip]="I18N.ui.buttons.collapse_panel | translate" [attr.aria-label]="I18N.ui.buttons.collapse_panel | translate" (click)="rail.closeAll()">
+              <mat-icon class="!text-xl">last_page</mat-icon>
             </button>
           </div>
           <!-- Grade, "do I keep it": the decision first, then the scores that inform it, then the set to compare with. -->
           <section id="photo-panel-grade" data-photo-panel="grade" role="tabpanel" aria-labelledby="photo-rail-grade" [hidden]="rail.shownPage() !== 'grade'" class="space-y-4">
-            <!-- Account review controls. From lg up the strip sticks flush to the panel's top edge (-top-4 = the
+            <!-- Account review controls. With side panels the strip sticks flush to the panel's top edge (-top-4 = the
                  panel's p-4). It starts below the panel header (mt-2 cancels the header's -mb-2), never over it: pulled
                  up over the header it hid the lower half of the title, previous / next and the X, and took their
                  clicks (B52). pt-1 keeps the Favorite button's 48 px touch target inside the strip. -->
             @if (canReview()) {
-              <section data-photo-review aria-labelledby="photo-review-title" class="space-y-1 bg-[var(--mat-sys-surface-container-lowest)] lg:sticky lg:-top-4 lg:z-10 lg:-mx-4 lg:mt-2 lg:px-4 lg:pt-1 lg:pb-2">
+              <section data-photo-review aria-labelledby="photo-review-title" class="space-y-1 bg-[var(--mat-sys-surface-container-lowest)] in-data-side-panels:sticky in-data-side-panels:-top-4 in-data-side-panels:z-10 in-data-side-panels:-mx-4 in-data-side-panels:mt-2 in-data-side-panels:px-4 in-data-side-panels:pt-1 in-data-side-panels:pb-2">
                 <h2 id="photo-review-title" class="sr-only">{{ I18N.gallery.sidebar.tabs.review | translate }}</h2>
                 <!-- Like the gallery rail: no title or rule above the review controls, the favourite beside the stars. -->
                 <div data-photo-rating-row class="flex items-center gap-2">
@@ -542,7 +542,7 @@ function inDetectedSet(photo: Photo): boolean {
                       <mat-icon class="!text-base !w-4 !h-4 !leading-4">photo_library</mat-icon>
                     </button>
                   </div>
-                  <div data-photo-set-strip class="grid grid-cols-[repeat(auto-fill,minmax(4rem,1fr))] gap-2 lg:grid-cols-5">
+                  <div data-photo-set-strip class="grid grid-cols-[repeat(auto-fill,minmax(4rem,1fr))] gap-2 in-data-side-panels:grid-cols-5">
                     @for (member of setStripMembers(); track member.path) {
                       <button class="relative rounded-lg overflow-hidden aspect-square w-full min-w-0 cursor-pointer hover:opacity-80 transition-opacity ring-[var(--mat-sys-primary)]"
                               [class.ring-2]="member.path === p.path"
@@ -843,7 +843,7 @@ function inDetectedSet(photo: Photo): boolean {
               <app-photo-related-files [photo]="p" (logicalApplied)="onLogicalAssetApplied($event)" />
             </mat-accordion>
           </section>
-          <section id="photo-panel-filter" data-photo-panel="filter" role="tabpanel" aria-labelledby="photo-rail-filter" [hidden]="rail.shownPage() !== 'filter'" class="flex min-h-0 flex-col gap-3 lg:flex-1">
+          <section id="photo-panel-filter" data-photo-panel="filter" role="tabpanel" aria-labelledby="photo-rail-filter" [hidden]="rail.shownPage() !== 'filter'" class="flex min-h-0 flex-col gap-3 in-data-side-panels:flex-1">
             <!-- Showing: the content this photo is one of. Its name and how many filters define it, where you are
                  in it, then its photos; the filters themselves fold behind their count. -->
             @if (collectionSidebarAvailable()) {
@@ -897,7 +897,7 @@ function inDetectedSet(photo: Photo): boolean {
     }
   `,
   changeDetection: ChangeDetectionStrategy.Eager,
-  host: { class: 'flex flex-col h-full overflow-y-auto lg:overflow-y-hidden' },
+  host: { class: 'flex flex-col h-full overflow-y-auto in-data-side-panels:overflow-y-hidden' },
 })
 export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   /** The viewer's language, the argument of the date pipes. */

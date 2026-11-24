@@ -1594,7 +1594,7 @@ python facet.py --recompute-tags-vlm   # 用 VLM 标签模型重新打标签
       "hide_panoramas": true,
       "hide_details": true,
       "details_place": "panel",
-      "details_trigger": "both",
+      "details_trigger": "hover",
       "hide_rejected": true,
       "sort": "aggregate",
       "sort_direction": "DESC",
@@ -1683,8 +1683,8 @@ python facet.py --recompute-tags-vlm   # 用 VLM 标签模型重新打标签
 | `hide_brackets` | `true` | 默认只显示包围曝光组的基准曝光 |
 | `hide_panoramas` | `true` | 默认每组全景只显示一张代表帧 |
 | `hide_details` | `true` | 默认在卡片上隐藏照片详情 |
-| `details_place` | `"panel"` | 照片详情的显示位置（显示 > **照片详情**）：`"off"`、`"card"`（照片旁的卡片）或 `"panel"`（停靠的侧边面板） |
-| `details_trigger` | `"both"` | 打开方式（显示 > **打开方式**），卡片和面板通用：`"hover"`、`"click"` 或 `"both"`。旧键 `tooltip_mode` 和 `panel_activation` 仍会读取，且存在时优先（`hover`/`click` = 以该方式打开的卡片，`panel` = 按 `panel_activation` 打开的侧边面板，`off` = 关闭） |
+| `details_place` | `"panel"` | 照片详情的显示位置（显示 > **详情位置**）：`"panel"`（停靠的侧边面板）、`"card"`（照片旁的卡片）或 `"off"` |
+| `details_trigger` | `"hover"` | 显示 > **详情模式**，卡片和面板通用：`"hover"`（详情跟随指针；点击可固定一张照片）或 `"click"`（仅在点击照片时更换）。已保存的 `"both"`（原“悬停或点击”）按 `"hover"` 读取。旧键 `tooltip_mode` 和 `panel_activation` 仍会读取，且存在时优先（`hover`/`click` = 该模式的卡片，`panel` = 按 `panel_activation` 模式的侧边面板，`off` = 关闭） |
 | `hide_rejected` | `true` | 默认隐藏已淘汰照片 |
 | `gallery_mode` | `"mosaic"` | 默认的照片库布局（`"grid"` 或 `"mosaic"`） |
 | **allowed_origins** | | |

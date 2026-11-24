@@ -30,7 +30,7 @@ export async function openAlbum(page: Page, name: string): Promise<void> {
   await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
 }
 
-/** The rail's Showing tab and the panel it opens (from lg up). */
+/** The rail's Showing tab and the panel it opens (where the panels sit at the side: sm and up). */
 export function showingTab(page: Page): Locator {
   return page.getByRole('tablist', { name: 'Gallery panels' }).getByRole('tab', { name: 'Showing' });
 }
@@ -44,12 +44,12 @@ export async function openShowing(page: Page): Promise<void> {
   await expect(showingPanel(page).getByRole('combobox', { name: 'Tag' })).toBeVisible();
 }
 
-/** Show photo details in the floating card, opened by hover (Display > Photo details: Hover card, Open with: Hover). */
+/** Show photo details in the floating card, opened by hover (Display > Details location: Card, Details mode: Hover). */
 export async function useHoverCard(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Display' }).click();
-  await page.getByRole('button', { name: /^Photo details:/ }).click();
-  await page.getByRole('menuitemradio', { name: 'Hover card', exact: true }).click();
-  await page.getByRole('button', { name: /^Open with:/ }).click();
+  await page.getByRole('button', { name: /^Details location:/ }).click();
+  await page.getByRole('menuitemradio', { name: 'Card', exact: true }).click();
+  await page.getByRole('button', { name: /^Details mode:/ }).click();
   await page.getByRole('menuitemradio', { name: 'Hover', exact: true }).click();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('menuitemradio')).toHaveCount(0);
@@ -95,7 +95,7 @@ export async function expectTagKindOrder(page: Page, label: string): Promise<voi
   expect(new Set(tops).size, `${label}: each kind on its own row`).toBe(4);
 }
 
-/** The photo page tabs: a rail (icons stacked) from lg, a bar (icons in a row) below it, told by where the tabs sit. */
+/** The photo page tabs: a rail (icons stacked) from sm, a bar (icons in a row) below it, told by where the tabs sit. */
 export async function photoTabsLayout(page: Page): Promise<'column' | 'row'> {
   const tabs = page.getByRole('tablist', { name: 'Photo panels' }).getByRole('tab');
   const boxes = await Promise.all((await tabs.all()).map((t) => t.boundingBox()));

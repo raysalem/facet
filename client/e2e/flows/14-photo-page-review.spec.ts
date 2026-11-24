@@ -48,11 +48,11 @@ test('the Grade panel header stays clear of the review strip', async ({ page }) 
   });
 
   for (const width of [1180, 1480, 2950]) {
-    await test.step(`2. At ${width} px the header's Previous, Next and Close take their own clicks`, async () => {
+    await test.step(`2. At ${width} px the header's Previous, Next and Hide panel take their own clicks`, async () => {
       await page.setViewportSize({ width, height: 1100 });
       await expect.poll(() => page.evaluate(() => {
         const misses: string[] = [];
-        for (const name of ['data-panel-previous', 'data-panel-next', 'data-close-panels']) {
+        for (const name of ['data-panel-previous', 'data-panel-next', 'data-collapse-panel']) {
           const button = document.querySelector(`[${name}]`);
           if (!button) { misses.push(`${name} absent`); continue; }
           const box = button.getBoundingClientRect();

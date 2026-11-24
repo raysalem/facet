@@ -82,7 +82,8 @@
       "save": "Save",
       "saving": "Saving…",
       "load_more": "Load more",
-      "close_panels": "Close panels"
+      "collapse_panel": "Hide panel",
+      "expand_panel": "Show panel"
     },
     "sort": {
       "date": "Date"
@@ -1270,19 +1271,22 @@
     "composition_range": "Composition Range",
     "hide_details": "Hide Details",
     "tooltip_mode": {
-      "panel_empty": "Hover or click a photo to see its details here",
+      "panel_empty": "Point at a photo to see its details here",
+      "panel_empty_click": "Click a photo to see its details here",
       "panel_deselect": "Deselect",
       "details": "Photo details"
     },
     "photo_details": {
-      "label": "Photo details",
+      "label": "Details location",
       "off": "Off",
-      "card": "Hover card",
+      "card": "Card",
       "panel": "Side panel",
-      "open_with": "Open with",
+      "mode": "Details mode",
       "hover": "Hover",
       "click": "Click",
-      "both": "Hover or click"
+      "phone_panel": "Panel on phone",
+      "phone_sheet": "Bottom sheet",
+      "phone_side": "Side"
     },
     "hide_blinks": "Hide Blinks",
     "hide_bursts": "Best of Burst",
@@ -1830,10 +1834,11 @@
       "hide_details": "Show the photos alone, without the information under each photo",
       "fast_scrolling": "Draw only the rows near the screen, so long galleries scroll smoothly. Turn it off if the layout misbehaves.",
       "card_buttons": "Choose which buttons a photo card shows on hover, and in what order",
-      "photo_details": "Where a photo's details appear: in a card next to the photo, in the side panel at the edge of the gallery, or not at all",
-      "open_with": "What opens a photo's details: pointing at the photo (Hover), clicking it (Click), or either one (Hover or click). Applies to the card and the side panel alike.",
+      "photo_details": "Where a photo's details show: in the side panel, in a card beside the photo, or nowhere.",
+      "details_mode": "Hover shows the details of the photo under the pointer; Click changes them only when you click a photo.",
       "tile_fit": "Crop thumbnails to squares, or show each photo in its original aspect ratio",
-      "reset_display": "Restore the default layout, thumbnail size and photo details. Filters, sort and selection stay as they are."
+      "reset_display": "Restore the default layout, thumbnail size and photo details. Filters, sort and selection stay as they are.",
+      "phone_panel": "On a phone, panels open as a sheet from the bottom, or at the side as on a wider screen."
     },
     "rail": {
       "label": "Gallery panels",

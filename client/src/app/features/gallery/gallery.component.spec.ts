@@ -51,6 +51,7 @@ import { HeaderSlotService } from '../../core/services/header-slot.service';
 import { PageHelpService } from '../../core/services/page-help.service';
 import { privateImageSessionKey, resetPrivateImageSession } from '../../shared/utils/private-image-session';
 import { makePhoto } from '../../../testing/photo.fixture';
+import { PanelLayoutService } from '../../core/services/panel-layout.service';
 
 @Component({ template: 'Photo route' })
 class MenuPhotoRoute {}
@@ -83,10 +84,10 @@ const keydown = (target: Element, key: string, keyCode: number) => {
   return event;
 };
 
-/** Read the media queries a >=1280 px viewport answers yes to (stub matchMedia first): the details dock and the lg rail. */
+/** A wide viewport: the panels sit at the side (PanelLayoutService), and the lg media query (stub matchMedia first). */
 function widenRail(component: unknown): void {
-  const gallery = component as { railWide: { setup(): void }; lgDesktop: { setup(): void } };
-  gallery.railWide.setup();
+  TestBed.inject(PanelLayoutService).setWide(true);
+  const gallery = component as { lgDesktop: { setup(): void } };
   gallery.lgDesktop.setup();
 }
 
@@ -447,6 +448,8 @@ describe('GalleryComponent', () => {
       TestBed.tick();
       // After the first render: setup reads the real media query.
       (fixture.componentInstance as unknown as { lgDesktop: { setMatches(v: boolean): void } }).lgDesktop.setMatches(wide);
+      // The rail and its panels follow the side-panel layout (sm and up), which a wide viewport has too.
+      TestBed.inject(PanelLayoutService).setWide(wide);
       fixture.detectChanges();
       const root = fixture.nativeElement as HTMLElement;
       const markers = Array.from(root.querySelectorAll('[data-collection-header]')) as HTMLElement[];
@@ -475,8 +478,8 @@ describe('GalleryComponent', () => {
       expect(panel.hidden).toBe(true);
       expect(panel.querySelector('app-gallery-criteria')).not.toBeNull();
       expect(panel.querySelector('[data-filter-controls]')).not.toBeNull();
-      // Only the Filter tab without "Show details: Side panel" on a wide window.
-      expect([...root.querySelectorAll('app-panel-rail [data-rail-tab]')].map(tab => tab.getAttribute('data-rail-tab'))).toEqual(['filter']);
+      // Showing, then the photo tabs: the default Details location is the side panel, which docks wherever the rail does.
+      expect([...root.querySelectorAll('app-panel-rail [data-rail-tab]')].map(tab => tab.getAttribute('data-rail-tab'))).toEqual(['filter', 'grade', 'camera', 'content']);
       const tab = root.querySelector<HTMLButtonElement>('app-panel-rail [data-rail-tab="filter"]')!;
       expect(tab.getAttribute('aria-selected')).toBe('false');
       expect(tab.getAttribute('tabindex')).toBe('0');
@@ -501,7 +504,7 @@ describe('GalleryComponent', () => {
       try {
         const { fixture, root } = render(true);
         const panel = root.querySelector<HTMLElement>('[data-gallery-panel="filter"]')!;
-        expect(panel.style.width).toBe('320px');
+        expect(panel.style.flexBasis).toBe('320px');
         expect(panel.classList).not.toContain('w-80');
         const handle = panel.querySelector<HTMLElement>('app-panel-resize-handle')!;
         expect(handle.getAttribute('role')).toBe('separator');
@@ -511,11 +514,11 @@ describe('GalleryComponent', () => {
           handle.dispatchEvent(new PointerEvent(type, { clientX, pointerId: 3, isPrimary: true, button: 0, bubbles: true }));
         pointer('pointerdown', 900); pointer('pointermove', 820); pointer('pointerup', 820);
         fixture.detectChanges();
-        expect(panel.style.width).toBe('400px');
+        expect(panel.style.flexBasis).toBe('400px');
         expect(localStorage.getItem(KEY)).toBe('400');
         handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
         fixture.detectChanges();
-        expect(panel.style.width).toBe('560px');
+        expect(panel.style.flexBasis).toBe('560px');
         fixture.destroy();
       } finally {
         localStorage.removeItem(KEY);
@@ -572,12 +575,13 @@ describe('GalleryComponent', () => {
       TestBed.flushEffects(); fixture.detectChanges();
       expect(drawer.opened).toBe(true);
       const lg = (fixture.componentInstance as unknown as { lgDesktop: { setMatches(v: boolean): void } }).lgDesktop;
-      lg.setMatches(true); fixture.detectChanges(); TestBed.flushEffects(); fixture.detectChanges();
+      const layout = TestBed.inject(PanelLayoutService);
+      lg.setMatches(true); layout.setWide(true); fixture.detectChanges(); TestBed.flushEffects(); fixture.detectChanges();
       expect(drawer.opened).toBe(false);
       expect(root.querySelector<HTMLElement>('[data-gallery-panel="filter"]')!.hidden).toBe(false);
       // The drawer closing because the panel took over is not the user closing the filters.
       expect(mockStore.setFilterDrawerOpen).not.toHaveBeenCalledWith(false);
-      lg.setMatches(false); fixture.detectChanges(); TestBed.flushEffects(); fixture.detectChanges();
+      lg.setMatches(false); layout.setWide(false); fixture.detectChanges(); TestBed.flushEffects(); fixture.detectChanges();
       expect(drawer.opened).toBe(true);
       expect(root.querySelector('app-panel-rail')).toBeNull();
       fixture.destroy();
@@ -895,15 +899,15 @@ describe('GalleryComponent', () => {
     fixture.destroy();
   });
 
-  it('clears a parked tooltip when the docked-rail breakpoint flips panel mode', () => {
+  it('clears a parked tooltip when the side-panel breakpoint flips panel mode', () => {
     mockStore.filters.update((filters: GalleryFilters) => ({ ...filters, details_place: 'panel' }));
     const fixture = TestBed.createComponent(GalleryComponent);
-    const wide = signal(false);
-    Object.defineProperty(fixture.componentInstance['railWide'], 'isDesktop', { value: wide, configurable: true });
+    const layout = TestBed.inject(PanelLayoutService);
+    layout.setWide(false);
     fixture.detectChanges();
     expect(fixture.componentInstance.panelMode()).toBe(false);
     fixture.componentInstance['tooltipPhoto'].set({ path: '/a.jpg' } as never);
-    wide.set(true);
+    layout.setWide(true);
     fixture.detectChanges();
     expect(fixture.componentInstance.panelMode()).toBe(true);
     expect(fixture.componentInstance['tooltipPhoto']()).toBeNull();
@@ -1854,7 +1858,7 @@ describe('GalleryComponent', () => {
       mockStore.config.set({ features: { show_rating_controls: true } });
       // The docked rail would render a full details panel these path-only
       // stand-in photos cannot fill; the floating bubble is what is asserted on.
-      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'panel', details_trigger: 'both' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'panel', details_trigger: 'hover' });
       fixture = TestBed.createComponent(GalleryComponent);
       fixture.detectChanges();
       return [...fixture.nativeElement.querySelectorAll('app-photo-card')] as HTMLElement[];
@@ -1886,7 +1890,6 @@ describe('GalleryComponent', () => {
       }));
       renderPanel();
       const wide = fixture!.componentInstance as unknown as {
-        railWide: { setup(): void };
         showTooltip(e: unknown, p: unknown): void;
         tooltipPhoto(): unknown;
       };
@@ -3047,9 +3050,6 @@ describe('GalleryComponent', () => {
         expect(component['tooltipPhoto']()).toBe(photo);
       });
 
-      it('keeps the inspected photo and open rail when another page is appended', () => {
-        const photo = makePhoto({ path: '/a.jpg' });
-        mockStore.photos.set([photo]); TestBed.tick();
       it('a click on a photo shows its details in place of Showing; a hover never takes Showing over', () => {
         const photo = makePhoto({ path: '/a.jpg' });
         mockStore.photos.set([photo]); TestBed.tick();
@@ -3100,6 +3100,9 @@ describe('GalleryComponent', () => {
         });
       });
 
+      it('keeps the inspected photo and open rail when another page is appended', () => {
+        const photo = makePhoto({ path: '/a.jpg' });
+        mockStore.photos.set([photo]); TestBed.tick();
         component.showTooltip(hoverEvent, photo);
         mockStore.photos.set([photo, makePhoto({ path: '/b.jpg' })]); TestBed.tick();
         expect(component['tooltipPhoto']()?.path).toBe('/a.jpg');
@@ -3346,7 +3349,7 @@ describe('GalleryComponent', () => {
         expect(shown().querySelector('[data-testid="tooltip-tag"]')).not.toBeNull();
         expect(localStorage.getItem('facet_gallery_photo_tab')).toBe('content');
         // Closed with the X, the next photo to enter opens the tab picked last.
-        root.querySelector<HTMLButtonElement>('[data-details-rail] [data-close-panels]')!.click(); fixture.detectChanges();
+        root.querySelector<HTMLButtonElement>('[data-details-rail] [data-collapse-panel]')!.click(); fixture.detectChanges();
         expect(root.querySelector('[data-details-rail]')).toBeNull();
         fixture.componentInstance.showTooltip(hoverEvent, photo); fixture.detectChanges();
         expect(shown().dataset['photoTab']).toBe('content');
@@ -3437,8 +3440,7 @@ describe('GalleryComponent', () => {
 
       describe('rail rendered with a held photo', () => {
         interface RailInstance {
-          railWide: { setup(): void };
-          hasActivePhoto(): boolean;
+            hasActivePhoto(): boolean;
           setCursor(index: number): void;
         }
         let fixture: ComponentFixture<GalleryComponent>;
@@ -3470,7 +3472,7 @@ describe('GalleryComponent', () => {
 
         it('names the inspector owner under the tab name, with the X that folds the panels', () => {
           expect(rail.querySelector('[data-inspector-owner]')?.textContent).toContain('a.jpg');
-          expect(rail.querySelector('[data-close-panels]')).not.toBeNull();
+          expect(rail.querySelector('[data-collapse-panel]')).not.toBeNull();
         });
 
         it('Escape releases the photo and closes the photo tab, leaving an open add-on alone (rendered)', () => {
@@ -3665,7 +3667,7 @@ describe('GalleryComponent', () => {
       const pinned = () => (component as unknown as { tooltipPinned(): boolean }).tooltipPinned();
       const leave = () => (component as unknown as { onTooltipLeave(): void }).onTooltipLeave();
       beforeEach(() => {
-        mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'card', details_trigger: 'both' });
+        mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'card', details_trigger: 'hover' });
         TestBed.flushEffects();
       });
 
@@ -3738,7 +3740,7 @@ describe('GalleryComponent', () => {
     });
 
     it('changing only Open with keeps the side panel on its photo', () => {
-      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'panel', details_trigger: 'both' });
+      mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'panel', details_trigger: 'hover' });
       TestBed.flushEffects();
       component['tooltipPhoto'].set(photo);
       mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'panel', details_trigger: 'click' });

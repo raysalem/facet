@@ -67,7 +67,8 @@ import { PhotoSetKindIconPipe, PhotoSetKindLabelPipe } from '../../shared/pipes/
 import { AuthService } from '../../core/services/auth.service';
 import { StalenessGuardFactory } from '../../core/services/staleness-guard.service';
 import { ScanService } from '../../core/services/scan.service';
-import { useDesktopSignal, DETAILS_RAIL_MIN_WIDTH_PX, LG_BREAKPOINT_PX } from '../../shared/utils/media-query';
+import { useDesktopSignal, LG_BREAKPOINT_PX } from '../../shared/utils/media-query';
+import { PanelLayoutService } from '../../core/services/panel-layout.service';
 import { privateImageSessionKey } from '../../shared/utils/private-image-session';
 import { I18nService } from '../../core/services/i18n.service';
 import { PluralKeyPipe } from '../../shared/pipes/plural-key.pipe';
@@ -245,21 +246,22 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
     </ng-template>
 
 
-    <!-- lg and up: the grid area, then the rail and the panel it picks (Filter, the photo's Grade / Camera /
-         Content, or an add-on, whose panel is the shell's dock to the right, never moved). No panel by default,
-         so the grid keeps the width. -->
-    <div class="flex h-full min-h-0">
-    <div #noticeHost class="relative h-full min-w-0 flex-1">
+    <!-- Side panels (sm and up, or a phone set to Side): the grid area, then the rail and the panel it picks
+         (Showing, the photo's Grade / Camera / Content, or an add-on, whose panel is the shell's dock to the right,
+         never moved). No panel by default, so the grid keeps the width. The grid keeps a minimum width and a
+         panel shrinks toward its own minimum before the grid goes below that: a panel never wraps under it. -->
+    <div class="flex h-full min-h-0 overflow-hidden">
+    <div #noticeHost class="relative h-full min-w-[min(18rem,35vw)] flex-1">
     <mat-sidenav-container class="h-full !overflow-clip">
       <app-gallery-view-controls #collectionViewControls (slideshowRequested)="closeCollectionPopovers(true)" [portPrimary]="true" [portFilters]="true" [portDisplay]="true" class="contents" />
-      <app-gallery-filter-sidebar #collectionSettings [portSettings]="true" [closable]="!lgDesktop.isDesktop()"
+      <app-gallery-filter-sidebar #collectionSettings [portSettings]="true" [closable]="!sidePanels()"
          [layoutControls]="collectionViewControls.sidebarLayoutControls() ?? null"
          [displayExtras]="collectionViewControls.displayControls() ?? null" />
       <!-- Below lg only: the Filters drawer (over the grid on a phone, beside it on a tablet). From lg the
            filters are the rail's Filter panel and this drawer stays shut and empty. -->
       <mat-sidenav #filterDrawer [mode]="isDesktop() ? 'side' : 'over'" position="end" class="w-[min(320px,100vw)] p-0"
         (openedChange)="onFilterDrawerChange($event)">
-        @if (!lgDesktop.isDesktop()) {
+        @if (!sidePanels()) {
           <!-- Usually closed, and heavy enough that building it eagerly holds up the grid's first paint. -->
           @defer (on idle; when store.filterDrawerOpen()) {
             <ng-container [ngTemplateOutlet]="collectionSettings.bodyContent()" />
@@ -284,7 +286,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
               {{ (pinned() ? store.total() : store.photoTotal()) | pluralKey:I18N.gallery.photo_count_one:I18N.gallery.photo_count | translate:{ count: pinned() ? store.total() : store.photoTotal() } }}
             }
           </p>
-          @if (lgDesktop.isDesktop() && activeFilterCount()) {
+          @if (sidePanels() && activeFilterCount()) {
             <button type="button" data-collection-filter-summary class="m-0 cursor-pointer p-0 text-left text-xs leading-5 tabular-nums text-[var(--mat-sys-primary)] underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-[var(--mat-sys-primary)]"
               [attr.aria-expanded]="filterPanelOpen()" aria-controls="gallery-panel-filter" (click)="rail.open('filter')">{{ activeFilterCount() | pluralKey:I18N.gallery.rail.filters_one:I18N.gallery.rail.filters | translate:{ count: activeFilterCount() } }}</button>
           }
@@ -339,7 +341,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
         <!-- Below lg the criteria row stays under the header (not sticky: it can grow to several wrapped rows,
              which would bury the grid under the pinned chrome); from lg it is the rail's View panel. It carries
              the marker too, so the focus guards that treat the header as part of the gallery see it. -->
-        @if (!lgDesktop.isDesktop()) {
+        @if (!sidePanels()) {
           <app-gallery-criteria data-collection-header [portShortcuts]="true" [consolidatedSettings]="true" [searchPresented]="true"
               class="block min-w-0 border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] px-2 md:px-4 has-[>:not(:empty)]:border-b has-[>:not(:empty)]:pb-1" />
         }
@@ -980,7 +982,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
         </div>
       }
     </div>
-    @if (lgDesktop.isDesktop()) {
+    @if (sidePanels()) {
       <app-panel-rail data-gallery-rail [rail]="rail" [tabs]="railTabs()" [wide]="true" [label]="I18N.gallery.rail.label | translate" idPrefix="gallery" />
       <!-- Showing: what the grid holds (the collection and the filters that define it), and where to change it.
            The statement first, then the active filters, the filter controls, the album's rules last. A photo held
@@ -988,8 +990,8 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
            Both panels are relative + overflow-hidden: an sr-only label is absolutely placed, and without a positioned
            ancestor it escapes the inner scroller and stretches the shell's <main> into a scrollbar of its own. -->
       <aside id="gallery-panel-filter" data-gallery-panel="filter" role="tabpanel" aria-labelledby="gallery-rail-filter" [hidden]="!filterPanelOpen()" (keydown)="closePanels($event)"
-        [style.width.px]="showingWidth.width()"
-        class="relative flex shrink-0 flex-col overflow-hidden border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] text-sm">
+        [style.flex-basis.px]="showingWidth.width()"
+        class="relative flex min-w-[min(15rem,50vw)] shrink grow-0 flex-col overflow-hidden border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] text-sm">
         <!-- Drag or arrow-key the inner edge to widen the panel (remembered). Inside the panel: it clips its overflow. -->
         <app-panel-resize-handle class="absolute inset-y-0 left-0 flex" [panel]="showingWidth" [label]="I18N.gallery.rail.resize_showing | translate" />
         <div data-panel-header class="flex shrink-0 items-center gap-2 px-4 pt-2">
@@ -999,8 +1001,8 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
               {{ collectionTitle() }}@if (activeFilterCount()) { · {{ activeFilterCount() | pluralKey:I18N.gallery.rail.filters_one:I18N.gallery.rail.filters | translate:{ count: activeFilterCount() } }}}
             </p>
           </div>
-          <button mat-icon-button data-close-panels class="!h-8 !w-8 !p-0 shrink-0" [matTooltip]="I18N.ui.buttons.close_panels | translate"
-            [attr.aria-label]="I18N.ui.buttons.close_panels | translate" (click)="rail.closeAll()"><mat-icon class="!text-xl">close</mat-icon></button>
+          <button mat-icon-button data-collapse-panel class="!h-8 !w-8 !p-0 shrink-0" [matTooltip]="I18N.ui.buttons.collapse_panel | translate"
+            [attr.aria-label]="I18N.ui.buttons.collapse_panel | translate" (click)="rail.closeAll()"><mat-icon class="!text-xl">last_page</mat-icon></button>
         </div>
         <!-- While the album is read, the room its chip and rules take (92 px), so the filters below stay put (B49). -->
         <app-gallery-criteria data-collection-header [portShortcuts]="true" [consolidatedSettings]="true" [searchPresented]="true" [rulesLast]="true"
@@ -1014,11 +1016,11 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
         }
       </aside>
       <!-- The photo under the cursor (or the last one hovered), split like the photo page: Grade, Camera, Content.
-           Only with "Show details: Side panel" on a window wide enough for it. -->
+           Only with "Details location: Side panel". -->
       @if (detailsRailVisible()) {
         <aside data-details-rail data-gallery-panel="photo" tabindex="-1" (keydown.escape)="onRailEscape($event)" (keydown)="closePanels($event)" (focusout)="onGridFocusOut($event)"
-          [style.width.px]="detailsWidth.width()"
-          class="relative flex shrink-0 flex-col overflow-hidden border-l border-[var(--mat-sys-outline-variant)] bg-[var(--facet-rail-bg)]">
+          [style.flex-basis.px]="detailsWidth.width()"
+          class="relative flex min-w-[min(15rem,50vw)] shrink grow-0 flex-col overflow-hidden border-l border-[var(--mat-sys-outline-variant)] bg-[var(--facet-rail-bg)]">
           <app-panel-resize-handle class="absolute inset-y-0 left-0 flex" [panel]="detailsWidth" [label]="I18N.photo_detail.inspector_resize | translate" />
           <div data-panel-header class="flex shrink-0 items-center gap-2 border-b border-[var(--mat-sys-outline-variant)] px-4 py-2">
             <div class="min-w-0 flex-1">
@@ -1027,8 +1029,8 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
                 <p data-inspector-owner class="m-0 truncate text-xs text-[var(--mat-sys-on-surface-variant)]" [title]="owner.filename">{{ owner.filename }}</p>
               }
             </div>
-            <button mat-icon-button data-close-panels class="!h-8 !w-8 !p-0 shrink-0" [matTooltip]="I18N.ui.buttons.close_panels | translate"
-              [attr.aria-label]="I18N.ui.buttons.close_panels | translate" (click)="rail.closeAll()"><mat-icon class="!text-xl">close</mat-icon></button>
+            <button mat-icon-button data-collapse-panel class="!h-8 !w-8 !p-0 shrink-0" [matTooltip]="I18N.ui.buttons.collapse_panel | translate"
+              [attr.aria-label]="I18N.ui.buttons.collapse_panel | translate" (click)="rail.closeAll()"><mat-icon class="!text-xl">last_page</mat-icon></button>
           </div>
           @if (hasActivePhoto()) {
             <button mat-button data-rail-deselect class="!min-w-0 !px-0 shrink-0 self-start mx-4 mt-2" (click)="deselectFromRail()">
@@ -1048,7 +1050,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
                                      (personSelected)="store.updateFilter('person_id', $event)" />
                 } @else {
                   <div class="p-4 text-sm text-[var(--mat-sys-on-surface-variant)] text-center">
-                    {{ I18N.gallery.tooltip_mode.panel_empty | translate }}
+                    {{ (detailsTrigger() === 'click' ? I18N.gallery.tooltip_mode.panel_empty_click : I18N.gallery.tooltip_mode.panel_empty) | translate }}
                   </div>
                 }
               }
@@ -1256,8 +1258,8 @@ export class GalleryComponent implements OnInit, OnDestroy {
   protected readonly collectionBarHeight = signal(0);
   protected readonly collectionHeaderHeight = this.collectionBarHeight.asReadonly();
   /**
-   * The right rail (lg and up): Filter, the held photo's Grade / Camera / Content (with "Show details: Side
-   * panel"), or an add-on's panel; none by default so the grid keeps the width.
+   * The right rail (wherever the panels sit at the side): Showing, the held photo's Grade / Camera / Content (with
+   * "Details location: Side panel"), or an add-on's panel; none by default so the grid keeps the width.
    */
   protected readonly rail: AddonRail<GalleryTab> = new AddonRail<GalleryTab>({
     storageKey: 'facet_gallery_rail_tab', tabs: ['filter', ...PHOTO_TABS], defaultTab: null,
@@ -1292,7 +1294,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
    */
   private readonly filterPanelFollowsFlag = effect(() => {
     const open = this.store.filterDrawerOpen();
-    const wide = this.lgDesktop.isDesktop();
+    const wide = this.sidePanels();
     untracked(() => {
       if (!wide || this.pinned()) return;
       if (open && this.rail.tab() !== 'filter') this.rail.open('filter');
@@ -1302,7 +1304,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
   /** Tells the filter controls when they are on screen: the Showing panel from lg, the drawer below. */
   private readonly filterControlsShownFollows = (() => {
     effect(() => {
-      const shown = this.lgDesktop.isDesktop() ? this.filterPanelOpen() && !this.pinned() : this.store.filterDrawerOpen();
+      const shown = this.sidePanels() ? this.filterPanelOpen() && !this.pinned() : this.store.filterDrawerOpen();
       untracked(() => this.store.filterControlsShown.set(shown));
     });
     inject(DestroyRef).onDestroy(() => this.store.filterControlsShown.set(false));
@@ -1314,7 +1316,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
       untracked(() => {
         const changed = previous !== undefined && tab !== previous;
         previous = tab;
-        if (!changed || !this.lgDesktop.isDesktop() || this.pinned()) return;
+        if (!changed || !this.sidePanels() || this.pinned()) return;
         const open = tab === 'filter';
         if (this.store.filterDrawerOpen() !== open) this.store.setFilterDrawerOpen(open);
       });
@@ -1490,13 +1492,12 @@ export class GalleryComponent implements OnInit, OnDestroy {
   protected readonly isDesktop = this.desktop.isDesktop;
 
   /**
-   * Whether the viewport is wide enough to give up a 320px strip permanently.
-   *
-   * The details rail is not merely a desktop feature: at the md breakpoint the
-   * drawer would take more than a third of the window and leave the grid too
-   * narrow to browse, so it wants its own, higher bar.
+   * Whether the rail and its panels (Showing, the photo details, an add-on) sit at the side of the grid: from sm
+   * at every width, and on a phone set to Side. When room is short a panel narrows to its minimum and the grid
+   * gives way; it never drops below the grid. Otherwise (a phone's bottom sheet) the filters are a drawer and
+   * the details a floating card.
    */
-  private readonly railWide = useDesktopSignal({ breakpointPx: DETAILS_RAIL_MIN_WIDTH_PX });
+  protected readonly sidePanels = inject(PanelLayoutService).side;
 
   /** Whether the viewport is lg+ (1024px): the notice stack floats as cards above it and is one bar below it,
    *  and the criteria row only sticks under the header from there up. */
@@ -1522,9 +1523,9 @@ export class GalleryComponent implements OnInit, OnDestroy {
   /** The Showing and photo-details panels' user-set widths (drag or arrow-key their inner edge). */
   protected readonly showingWidth = new PanelWidth({ storageKey: 'facet_gallery_showing_width', defaultWidth: 320, min: 288, max: 560, side: 'right' });
   protected readonly detailsWidth = new PanelWidth({ storageKey: 'facet_gallery_details_width', defaultWidth: 320, min: 288, max: 560, side: 'right' });
-  /** "Photo details": where a photo's details appear — 'off' | 'card' | 'panel'. */
+  /** "Details location": where a photo's details appear — 'off' | 'card' | 'panel'. */
   readonly detailsPlace = computed(() => this.store.filters().details_place);
-  /** "Open with": what opens them — 'hover' | 'click' | 'both', for the card and the panel alike. */
+  /** "Details mode": 'hover' (the details follow the pointer; a click holds a photo) or 'click', for the card and the panel alike. */
   readonly detailsTrigger = computed(() => this.store.filters().details_trigger);
   /** The path of the photo whose floating card a click (or Space) opened. Such a
    *  card is pinned: it stays when the pointer leaves, takes pointer events, and a
@@ -1552,8 +1553,8 @@ export class GalleryComponent implements OnInit, OnDestroy {
   /** Whether tooltip is fully disabled (off mode) — used for skipping rendering and hover handlers */
   readonly tooltipDisabled = computed(() => this.detailsPlace() === 'off' || (this.selectingPhotos() && !this.isDesktop()));
 
-  /** Docked rail needs real width, not merely "not a phone". */
-  readonly panelMode = computed(() => this.detailsPlace() === 'panel' && this.railWide.isDesktop());
+  /** The details dock in the side panel wherever the panels sit at the side; a phone's bottom sheet shows the card. */
+  readonly panelMode = computed(() => this.detailsPlace() === 'panel' && this.sidePanels());
 
   /** An assistant-pinned list is shown: the filter controls are hidden so no edit can drop it. */
   protected readonly pinned = computed(() => this.store.pinnedPaths() !== null);
@@ -1696,8 +1697,8 @@ export class GalleryComponent implements OnInit, OnDestroy {
   protected readonly noticeRightPx = computed(() => {
     // ResizeObserver can retain the previous side-drawer inset after a viewport
     // or presentation change. An over drawer never reserves photo-canvas width.
-    // From lg the rail's panels sit outside the notice host, so only the md-to-lg side drawer takes room.
-    const reservesSpace = this.isDesktop() && !this.lgDesktop.isDesktop() && this.store.filterDrawerOpen();
+    // With side panels the rail's panels sit outside the notice host; a side drawer only on a phone, never at md.
+    const reservesSpace = this.isDesktop() && !this.sidePanels() && this.store.filterDrawerOpen();
     return (reservesSpace ? this.noticeInsetPx() : 0) + this.floatMarginPx();
   });
 
@@ -2178,7 +2179,6 @@ export class GalleryComponent implements OnInit, OnDestroy {
     // rail's open panel, the header measured the full width, showed its wide one-row controls and then folded
     // them to the compact ones once the panel took its 320 px, moving the grid under it.
     this.desktop.setup();
-    this.railWide.setup();
     this.lgDesktop.setup();
     let previousMode: string | null = null;
     effect(() => {
@@ -2274,7 +2274,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
     // Sync store.filterDrawerOpen signal → mat-sidenav, below lg only (from lg the flag is the Filter panel).
     effect(() => {
       // The persisted flag is left alone while pinned: the drawer only stays shut.
-      const open = this.store.filterDrawerOpen() && !this.pinned() && !this.lgDesktop.isDesktop();
+      const open = this.store.filterDrawerOpen() && !this.pinned() && !this.sidePanels();
       const drawer = this.filterDrawer();
       if (!drawer) return;
       if (open) drawer.open();
@@ -2572,7 +2572,6 @@ export class GalleryComponent implements OnInit, OnDestroy {
     this.saveViewSnapshot();
     this.resizeObserver?.disconnect();
     this.desktop.cleanup();
-    this.railWide.cleanup();
     this.lgDesktop.cleanup();
   }
 
@@ -2696,8 +2695,8 @@ export class GalleryComponent implements OnInit, OnDestroy {
     // would make the sync effect close the drawer, whose pending open would then
     // reopen it -- an endless open/close loop.
     if (open !== this.filterDrawer()?.opened) return;
-    // From lg the drawer is shut because the Filter panel took over, not because the user closed the filters.
-    if (this.lgDesktop.isDesktop()) return;
+    // With side panels the drawer is shut because Showing took over, not because the user closed the filters.
+    if (this.sidePanels()) return;
     // A close caused by the pin is not the user's choice; keep the persisted flag.
     if (this.pinned()) return;
     this.store.setFilterDrawerOpen(open);

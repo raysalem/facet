@@ -8,6 +8,7 @@ import { MatTooltip } from '@angular/material/tooltip';
 import { MatMenuTrigger } from '@angular/material/menu';
 import { Event, NavigationCancel, NavigationCancellationCode, NavigationEnd, NavigationError, NavigationSkipped, NavigationStart, Router } from '@angular/router';
 import { Subject } from 'rxjs';
+import { PanelLayoutService } from '../../core/services/panel-layout.service';
 import { GalleryViewControlsComponent } from './gallery-view-controls.component';
 import { GalleryStore, DEFAULT_FILTERS, ViewerConfig } from './gallery.store';
 import { I18nService } from '../../core/services/i18n.service';
@@ -152,8 +153,9 @@ describe('GalleryViewControlsComponent', () => {
       host.componentInstance.template = fixture.componentInstance.displayControls()!;
       host.detectChanges();
       const tip = (selector: string) => host.debugElement.query(By.css(selector)).injector.get(MatTooltip).message;
-      expect(tip('[data-choice="photo-details"]')).toBe(I18N.gallery.display_tips.photo_details);
-      expect(tip('[data-choice="open-with"]')).toBe(I18N.gallery.display_tips.open_with);
+      expect(tip('[data-choice="details-location"]')).toBe(I18N.gallery.display_tips.photo_details);
+      expect(tip('[data-choice="details-mode"]')).toBe(I18N.gallery.display_tips.details_mode);
+      expect(tip('[data-choice="phone-panel"]')).toBe(I18N.gallery.display_tips.phone_panel);
       expect(tip('[data-choice="tile-fit"]')).toBe(I18N.gallery.display_tips.tile_fit);
       expect(tip('[data-reset-display]')).toBe(I18N.gallery.display_tips.reset_display);
     });
@@ -188,8 +190,9 @@ describe('GalleryViewControlsComponent', () => {
       expect(label.classList.contains('!inline')).toBe(forced);
     });
 
-    it('rehosts Photo details, Open with and Tile fit as labelled choice rows showing the current value', () => {
+    it('rehosts Details location, Details mode and Tile fit as labelled choice rows showing the current value', () => {
       const { fixture, store } = render();
+      TestBed.inject(PanelLayoutService).setWide(true);
       fixture.componentRef.setInput('portDisplay', true);
       store.filters.update(filters => ({ ...filters, details_place: 'card', details_trigger: 'click', hide_details: true, tile_fit: 'natural' }));
       store.galleryMode.set('grid');
@@ -198,14 +201,18 @@ describe('GalleryViewControlsComponent', () => {
       host.componentInstance.template = fixture.componentInstance.displayControls()!;
       host.detectChanges();
       const rows = () => Array.from((host.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('[data-choice]'));
-      expect(rows().map(row => row.getAttribute('data-choice'))).toEqual(['photo-details', 'open-with', 'tile-fit']);
+      expect(rows().map(row => row.getAttribute('data-choice'))).toEqual(['details-location', 'details-mode', 'tile-fit']);
       expect(rows().map(row => row.querySelector('[data-value]')!.textContent!.trim()))
         .toEqual([I18N.gallery.photo_details.card, I18N.gallery.photo_details.click, I18N.gallery.tile_fit.natural]);
       expect(rows().every(row => row.getAttribute('aria-haspopup') === 'menu')).toBe(true);
-      // Off has nothing to open, so its Open with row goes away (the saved trigger is kept).
+      // Off has nothing to open, so its Details mode row goes away (the saved mode is kept).
       store.filters.update(filters => ({ ...filters, details_place: 'off' }));
       host.detectChanges();
-      expect(rows().map(row => row.getAttribute('data-choice'))).toEqual(['photo-details', 'tile-fit']);
+      expect(rows().map(row => row.getAttribute('data-choice'))).toEqual(['details-location', 'tile-fit']);
+      // On a phone (below sm) the Panel on phone row joins them.
+      TestBed.inject(PanelLayoutService).setWide(false);
+      host.detectChanges();
+      expect(rows().map(row => row.getAttribute('data-choice'))).toEqual(['details-location', 'phone-panel', 'tile-fit']);
     });
 
     it.each([[true, 'grid', true], [false, 'grid', false], [true, 'mosaic', false], [true, 'list', false]] as const)(
@@ -399,8 +406,9 @@ describe('GalleryViewControlsComponent', () => {
       expect(label()).not.toContain('sort_options.date_added_library');
     });
 
-    it('shows Photo details and Open with together in one menu, each with its current value checked', async () => {
+    it('shows Details location and Details mode together in one menu, each with its current value checked', async () => {
       const { fixture, root, store } = render();
+      TestBed.inject(PanelLayoutService).setWide(true);
       store.filters.update(filters => ({ ...filters, details_place: 'card', details_trigger: 'click' }));
       fixture.detectChanges();
       const triggers = Array.from(byLabel(root, I18N.gallery.photo_details.label)) as HTMLButtonElement[];
@@ -408,12 +416,12 @@ describe('GalleryViewControlsComponent', () => {
       await openMenu(fixture, triggers[0]);
       const items = menuItems();
       expect(items.map(item => item.getAttribute('data-details-place') ?? item.getAttribute('data-details-trigger')))
-        .toEqual(['off', 'card', 'hover', 'click', 'both']);
-      expect(items.map(item => item.getAttribute('aria-checked'))).toEqual(['false', 'true', 'false', 'true', 'false']);
-      expect(document.querySelector('.mat-mdc-menu-panel')!.textContent).toContain(I18N.gallery.photo_details.open_with);
+        .toEqual(['panel', 'card', 'off', 'hover', 'click']);
+      expect(items.map(item => item.getAttribute('aria-checked'))).toEqual(['false', 'true', 'false', 'false', 'true']);
+      expect(document.querySelector('.mat-mdc-menu-panel')!.textContent).toContain(I18N.gallery.photo_details.mode);
       items[4].click();
-      expect(store.updateFilter).toHaveBeenLastCalledWith('details_trigger', 'both');
-      items[0].click();
+      expect(store.updateFilter).toHaveBeenLastCalledWith('details_trigger', 'click');
+      items[2].click();
       expect(store.updateFilter).toHaveBeenLastCalledWith('details_place', 'off');
     });
 
@@ -423,9 +431,9 @@ describe('GalleryViewControlsComponent', () => {
       fixture.detectChanges();
       await openMenu(fixture, byLabel(root, I18N.gallery.photo_details.label)[0] as HTMLButtonElement);
       const triggers = menuItems().filter(item => item.hasAttribute('data-details-trigger')) as HTMLButtonElement[];
-      expect(triggers.map(item => item.disabled)).toEqual([true, true, true]);
-      expect(triggers.map(item => item.getAttribute('aria-checked'))).toEqual(['false', 'true', 'false']);
-      triggers[2].click();
+      expect(triggers.map(item => item.disabled)).toEqual([true, true]);
+      expect(triggers.map(item => item.getAttribute('aria-checked'))).toEqual(['false', 'true']);
+      triggers[0].click();
       expect(store.updateFilter).not.toHaveBeenCalled();
     });
 
@@ -627,21 +635,19 @@ describe('GalleryViewControlsComponent', () => {
       expect(byLabel(root, I18N.gallery.filters)).toHaveLength(1);
       expect(store.setFilterDrawerOpen).not.toHaveBeenCalled();
     });
-    it.each([false, true])('offers the side panel only where it can dock (%s)', async dock => {
+    it.each([false, true])('offers the side panel only where the panels sit at the side (%s)', async dock => {
       const { fixture, root, store } = render();
-      const controls = fixture.componentInstance as unknown as { railCapable: { setMatches(value: boolean): void } };
       store.filters.update(filters => ({ ...filters, details_place: 'card' }));
-      controls.railCapable.setMatches(dock);
+      TestBed.inject(PanelLayoutService).setWide(dock);
       fixture.detectChanges();
       await openMenu(fixture, root.querySelector<HTMLButtonElement>(`[aria-label="${I18N.gallery.photo_details.label}"]`)!);
       expect(menuItems().some(item => item.getAttribute('data-details-place') === 'panel')).toBe(dock);
     });
 
-    it('keeps a saved Side panel listed, and checked, on a window too narrow to dock it', async () => {
+    it("keeps a saved Side panel listed, and checked, on a phone's bottom sheet", async () => {
       const { fixture, root, store } = render();
-      const controls = fixture.componentInstance as unknown as { railCapable: { setMatches(value: boolean): void } };
       store.filters.update(filters => ({ ...filters, details_place: 'panel' }));
-      controls.railCapable.setMatches(false);
+      TestBed.inject(PanelLayoutService).setWide(false);
       fixture.detectChanges();
       await openMenu(fixture, root.querySelector<HTMLButtonElement>(`[aria-label="${I18N.gallery.photo_details.label}"]`)!);
       expect(menuItems().find(item => item.getAttribute('data-details-place') === 'panel')?.getAttribute('aria-checked')).toBe('true');

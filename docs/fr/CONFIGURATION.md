@@ -1597,7 +1597,7 @@ Affichage et comportement de la galerie web.
       "hide_panoramas": true,
       "hide_details": true,
       "details_place": "panel",
-      "details_trigger": "both",
+      "details_trigger": "hover",
       "hide_rejected": true,
       "sort": "aggregate",
       "sort_direction": "DESC",
@@ -1686,8 +1686,8 @@ Affichage et comportement de la galerie web.
 | `hide_brackets` | `true` | Afficher uniquement l'exposition de base de chaque bracketing par défaut |
 | `hide_panoramas` | `true` | N'afficher qu'une image représentative par panorama par défaut |
 | `hide_details` | `true` | Masquer les détails des photos sur les cartes par défaut |
-| `details_place` | `"panel"` | Où apparaissent les détails de la photo (Affichage > **Détails de la photo**) : `"off"`, `"card"` (une carte à côté de la photo) ou `"panel"` (le panneau latéral ancré) |
-| `details_trigger` | `"both"` | Ce qui les ouvre (Affichage > **Ouvrir avec**), pour la carte comme pour le panneau : `"hover"`, `"click"` ou `"both"`. Les anciennes clés `tooltip_mode` et `panel_activation` sont toujours lues et l'emportent si elles sont présentes (`hover`/`click` = carte ouverte ainsi, `panel` = panneau latéral selon `panel_activation`, `off` = désactivé) |
+| `details_place` | `"panel"` | Où apparaissent les détails de la photo (Affichage > **Emplacement des détails**) : `"panel"` (le panneau latéral ancré), `"card"` (une carte à côté de la photo) ou `"off"` |
+| `details_trigger` | `"hover"` | Affichage > **Mode des détails**, pour la carte comme pour le panneau : `"hover"` (les détails suivent le pointeur ; un clic retient une photo) ou `"click"` (ils ne changent qu'au clic sur une photo). Un `"both"` enregistré (l'ancien Survol ou clic) est lu comme `"hover"`. Les anciennes clés `tooltip_mode` et `panel_activation` sont toujours lues et l'emportent si elles sont présentes (`hover`/`click` = carte dans ce mode, `panel` = panneau latéral dans le mode de `panel_activation`, `off` = désactivé) |
 | `hide_rejected` | `true` | Masquer les photos rejetées par défaut |
 | `gallery_mode` | `"mosaic"` | Disposition de galerie par défaut (`"grid"` ou `"mosaic"`) |
 | **allowed_origins** | | |

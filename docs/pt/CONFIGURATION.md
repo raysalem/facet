@@ -1593,7 +1593,7 @@ Exibição e comportamento da galeria web.
       "hide_panoramas": true,
       "hide_details": true,
       "details_place": "panel",
-      "details_trigger": "both",
+      "details_trigger": "hover",
       "hide_rejected": true,
       "sort": "aggregate",
       "sort_direction": "DESC",
@@ -1682,8 +1682,8 @@ Exibição e comportamento da galeria web.
 | `hide_brackets` | `true` | Mostra apenas a exposição base de cada bracketing por padrão |
 | `hide_panoramas` | `true` | Mostrar por padrão apenas um quadro representativo por panorâmica |
 | `hide_details` | `true` | Oculta os detalhes da foto nos cartões por padrão |
-| `details_place` | `"panel"` | Onde aparecem os detalhes da foto (Visualização > **Detalhes da foto**): `"off"`, `"card"` (um cartão ao lado da foto) ou `"panel"` (o painel lateral fixado) |
-| `details_trigger` | `"both"` | O que os abre (Visualização > **Abrir com**), para o cartão e o painel: `"hover"`, `"click"` ou `"both"`. As chaves anteriores `tooltip_mode` e `panel_activation` continuam sendo lidas e prevalecem quando presentes (`hover`/`click` = cartão aberto assim, `panel` = painel lateral com `panel_activation`, `off` = desligado) |
+| `details_place` | `"panel"` | Onde aparecem os detalhes da foto (Visualização > **Local dos detalhes**): `"panel"` (o painel lateral fixado), `"card"` (um cartão ao lado da foto) ou `"off"` |
+| `details_trigger` | `"hover"` | Visualização > **Modo dos detalhes**, para o cartão e o painel: `"hover"` (os detalhes seguem o ponteiro; um clique fixa uma foto) ou `"click"` (só mudam ao clicar numa foto). Um `"both"` salvo (o antigo Passar o mouse ou clicar) é lido como `"hover"`. As chaves anteriores `tooltip_mode` e `panel_activation` continuam sendo lidas e prevalecem quando presentes (`hover`/`click` = cartão nesse modo, `panel` = painel lateral no modo de `panel_activation`, `off` = desligado) |
 | `hide_rejected` | `true` | Oculta fotos rejeitadas por padrão |
 | `gallery_mode` | `"mosaic"` | Layout padrão da galeria (`"grid"` ou `"mosaic"`) |
 | **allowed_origins** | | |

@@ -38,6 +38,21 @@ describe('AddonRail', () => {
     expect(localStorage.getItem(KEY)).toBe('');
   });
 
+  it('Show panel brings back the panel last on screen, or the first offered when that one is gone', () => {
+    const rail = TestBed.runInInjectionContext(() => new AddonRail<'a' | 'b'>({ storageKey: KEY, tabs: ['a', 'b'], defaultTab: null }));
+    TestBed.tick();
+    rail.reopen(['a', 'b']); TestBed.tick();
+    expect(rail.tab()).toBe('a');
+    rail.select('b'); TestBed.tick();
+    rail.closeAll(); TestBed.tick();
+    expect(rail.tab()).toBeNull();
+    rail.reopen(['a', 'b']); TestBed.tick();
+    expect(rail.tab()).toBe('b');
+    rail.closeAll(); TestBed.tick();
+    rail.reopen(['a']); TestBed.tick();
+    expect(rail.tab()).toBe('a');
+  });
+
   it('selects an add-on panel opened anywhere, hides the dock while none of it shows, and closes on a second click', () => {
     const rail = create(null);
     TestBed.tick();

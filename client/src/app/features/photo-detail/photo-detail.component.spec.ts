@@ -357,9 +357,10 @@ describe('PhotoDetailComponent', () => {
   });
 
   describe('right rail', () => {
-    // The rail's tab semantics are the lg column's (below lg an add-on is a plain toggle): see panel-rail's spec.
+    // The rail's tab semantics are the side column's (on a phone's bottom sheet an add-on is a plain toggle): see
+    // panel-rail's spec. A wide viewport: lg, and sm, where the panels sit at the side.
     beforeEach(() => vi.stubGlobal('matchMedia', (media: string) => ({
-      matches: media === '(min-width: 1024px)', media, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {},
+      matches: media === '(min-width: 1024px)' || media === '(min-width: 640px)', media, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {},
     })));
     afterEach(() => vi.unstubAllGlobals());
     async function render(photo = makePhoto({ path: samplePhoto.path })) {
@@ -475,10 +476,10 @@ describe('PhotoDetailComponent', () => {
       // Opened from anywhere (the toolbar, the puzzle menu): its tab is selected and the dock shows.
       expect(astro.getAttribute('aria-selected')).toBe('true');
       expect(panels.dockHidden()).toBe(false);
-      expect(root.querySelector('[data-photo-inspector]')!.classList).toContain('lg:!hidden');
+      expect(root.querySelector('[data-photo-inspector]')!.classList).toContain('in-data-side-panels:!hidden');
       tab('content').click(); view.detectChanges(); TestBed.flushEffects(); view.detectChanges();
       expect(panels.dockHidden()).toBe(true);
-      expect(root.querySelector('[data-photo-inspector]')!.classList).not.toContain('lg:!hidden');
+      expect(root.querySelector('[data-photo-inspector]')!.classList).not.toContain('in-data-side-panels:!hidden');
       expect(panel('content').hidden).toBe(false);
       const open = vi.spyOn(panels, 'openForCurrentView');
       astro.click(); view.detectChanges(); TestBed.flushEffects();
@@ -507,7 +508,7 @@ describe('PhotoDetailComponent', () => {
       const root = view.nativeElement as HTMLElement;
       expect(root.querySelector('[data-rail-addon="astro"]')!.getAttribute('aria-selected')).toBe('true');
       expect(panels.dockHidden()).toBe(false);
-      expect(root.querySelector('[data-photo-inspector]')!.classList).toContain('lg:!hidden');
+      expect(root.querySelector('[data-photo-inspector]')!.classList).toContain('in-data-side-panels:!hidden');
       view.destroy();
     });
 
@@ -520,11 +521,17 @@ describe('PhotoDetailComponent', () => {
       const close = vi.spyOn(panels, 'close');
       const aside = root.querySelector<HTMLElement>('[data-photo-inspector]')!;
       expect(aside.querySelector('[data-panel-header] h2')!.textContent!.trim()).toBe('photo_detail.rail.grade');
-      root.querySelector<HTMLButtonElement>('[data-close-panels]')!.click(); view.detectChanges(); TestBed.flushEffects();
+      root.querySelector<HTMLButtonElement>('[data-collapse-panel]')!.click(); view.detectChanges(); TestBed.flushEffects();
       expect(aside.classList).toContain('!hidden');
       expect(root.querySelector('[data-rail-tab][aria-selected="true"]')).toBeNull();
       expect(localStorage.getItem('facet_photo_rail_tab')).toBe('');
       expect(close).not.toHaveBeenCalled();
+      // The collapsed rail offers Show panel, which brings back the panel last shown.
+      root.querySelector<HTMLButtonElement>('[data-rail-expand]')!.click(); view.detectChanges(); TestBed.flushEffects();
+      expect(aside.classList).not.toContain('!hidden');
+      expect(panel('grade').hidden).toBe(false);
+      expect(root.querySelector('[data-rail-expand]')).toBeNull();
+      root.querySelector<HTMLButtonElement>('[data-collapse-panel]')!.click(); view.detectChanges(); TestBed.flushEffects();
       tab('camera').click(); view.detectChanges(); TestBed.flushEffects();
       expect(aside.classList).not.toContain('!hidden');
       expect(panel('camera').hidden).toBe(false);
@@ -564,11 +571,11 @@ describe('PhotoDetailComponent', () => {
 
     it('starts at 320px, widens as its left-edge handle moves left, and remembers a committed width', async () => {
       const { view, aside, handle } = await render();
-      expect(aside.className).toContain('lg:w-[var(--facet-inspector-width)]');
+      expect(aside.className).toContain('in-data-side-panels:basis-[var(--facet-inspector-width)]');
       expect(width(aside)).toBe('320px');
       expect(handle.getAttribute('role')).toBe('separator');
       expect(handle.getAttribute('aria-label')).toBe('photo_detail.inspector_resize');
-      expect(handle.className).toContain('hidden lg:flex');
+      expect(handle.className).toContain('hidden in-data-side-panels:flex');
       expect(handle.classList).toContain('w-3');
       // Discoverable: a resize cursor, a how-to tooltip and a visible grip, not a bare transparent strip.
       expect(handle.classList).toContain('cursor-col-resize');
@@ -1086,8 +1093,8 @@ describe('PhotoDetailComponent', () => {
     for (let i = 1; i < fields.length; i++) {
       expect(fields[i - 1].compareDocumentPosition(fields[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
-    expect(aside.querySelector('[data-photo-review]')!.className).toContain('lg:sticky');
-    expect(aside.querySelector('[data-photo-set-strip]')!.className).toContain('lg:grid-cols-5');
+    expect(aside.querySelector('[data-photo-review]')!.className).toContain('in-data-side-panels:sticky');
+    expect(aside.querySelector('[data-photo-set-strip]')!.className).toContain('in-data-side-panels:grid-cols-5');
     // Date and category share one line in Content. Camera shows the capture settings once, as the EXIF table at the
     // panel's text size: no summary line repeats them above it.
     const when = aside.querySelector<HTMLElement>('[data-photo-when]')!;

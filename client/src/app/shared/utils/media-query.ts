@@ -7,13 +7,11 @@ export const DEFAULT_BREAKPOINT_PX = 768;
 export const LG_BREAKPOINT_PX = 1024;
 
 /**
- * Narrowest viewport that can spare a permanent ~320px details rail (Tailwind `xl`).
- *
- * Shared so the gallery's rail and the header menu that offers it agree: a menu
- * entry that switches to a mode the viewport cannot render is worse than no
- * entry at all.
+ * Narrowest viewport whose side panels (the gallery's rail and its panels, the photo page's inspector,
+ * the add-on dock) sit beside the content: Tailwind `sm`. Below it is a phone, where the panels open as
+ * a bottom sheet unless the phone setting puts them at the side (PanelLayoutService).
  */
-export const DETAILS_RAIL_MIN_WIDTH_PX = 1280;
+export const SIDE_PANELS_MIN_WIDTH_PX = 640;
 
 /**
  * The query a finger or stylus answers, and a mouse does not.

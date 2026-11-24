@@ -37,6 +37,8 @@ export class AddonRail<T extends string> {
   readonly tab = signal<string | null>(null);
   /** The page panel shown when no add-on is, and below lg where add-ons keep their own dock. */
   readonly pageTab = signal<T | null>(null);
+  /** The panel last on screen (page tab or `addon:<id>`), so a collapsed rail can bring it back with one click. */
+  readonly lastOpen = signal<string | null>(null);
   /** The page panel on screen: none while everything is closed. */
   readonly shownPage = computed(() => this.tab() === null ? null : this.pageTab());
   /** The add-on service, resolved only once this page needs it (a page with no add-on never starts it). */
@@ -121,6 +123,7 @@ export class AddonRail<T extends string> {
     });
     effect(() => {
       const tab = this.tab();
+      if (tab !== null) untracked(() => this.lastOpen.set(tab));
       try { localStorage.setItem(options.storageKey, tab ?? ''); } catch { /* Storage blocked: the pick holds for this page only. */ }
     });
     inject(DestroyRef).onDestroy(() => this.release());
@@ -171,6 +174,20 @@ export class AddonRail<T extends string> {
     if (this.panels.panel()?.addon.id !== addon.id) void this.panels.openForCurrentView(addon);
     else if (this.options.defaultTab === null && this.tab() === tab) this.tab.set(this.pageTab());
     else this.tab.set(tab);
+  }
+
+  /**
+   * Bring the collapsed rail's panel back: the one last on screen when it is still offered (`available`, the
+   * page tabs the rail shows now), else the first of them. An add-on comes back through its own open.
+   */
+  reopen(available: readonly string[]): void {
+    const last = this.lastOpen();
+    if (last?.startsWith(ADDON_PREFIX)) {
+      const addon = this.addons().find(entry => ADDON_PREFIX + entry.id === last);
+      if (addon && this.usable(addon.id)) { this.selectAddon(addon); return; }
+    }
+    const tab = (last && available.includes(last) ? last : available[0]) as T | undefined;
+    if (tab !== undefined) this.open(tab);
   }
 
   /** Close every panel to the side, and the add-on's too; clicking an icon brings one back. */
