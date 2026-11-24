@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, effect, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import type { PhotoAlbum } from '../../core/api/types';
 import { I18N } from '../../core/i18n/keys';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
@@ -9,7 +10,7 @@ import { PhotoPanelReader } from './photo-panel-reader';
 /** The albums containing a photo, read as soon as the photo shows (no panel to open); renders nothing when there are none. */
 @Component({
   selector: 'app-photo-albums',
-  imports: [RouterLink, MatIconModule, TranslatePipe],
+  imports: [RouterLink, MatIconModule, MatTooltipModule, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block min-w-0' },
   template: `
@@ -22,9 +23,11 @@ import { PhotoPanelReader } from './photo-panel-reader';
               <li class="min-w-0 max-w-full">
                 <a [routerLink]="['/album', album.id]" data-album-chip
                    [attr.aria-label]="album.is_smart ? (I18N.photo_detail.labelled_value | translate:{ label: (I18N.albums.smart_album | translate), value: album.name }) : null"
+                   [matTooltip]="album.is_smart ? (I18N.albums.smart_tooltip | translate) : ''" [matTooltipDisabled]="!album.is_smart"
                    class="inline-flex min-h-8 max-w-full items-center gap-1 rounded-full border border-[var(--mat-sys-outline-variant)] px-3 text-xs no-underline hover:bg-[var(--mat-sys-surface-container)] focus-visible:outline-2 [@media(pointer:coarse)]:min-h-11">
+                  <!-- The sparkle marks a smart album (it follows saved rules, here often a folder); the tooltip says so. -->
                   @if (album.is_smart) {
-                    <mat-icon aria-hidden="true" class="!h-4 !w-4 shrink-0 !text-base">auto_awesome</mat-icon>
+                    <mat-icon data-smart-album aria-hidden="true" class="!h-4 !w-4 shrink-0 !text-base">auto_awesome</mat-icon>
                   }
                   <bdi class="truncate">{{ album.name }}</bdi>
                 </a>
