@@ -20,7 +20,7 @@ describe('AddonRail', () => {
       { provide: AuthService, useValue: { hasFeature: () => false } },
     ] });
   });
-  afterEach(() => { localStorage.removeItem(KEY); TestBed.resetTestingModule(); });
+  afterEach(() => { localStorage.removeItem(KEY); localStorage.removeItem(KEY + '_last'); TestBed.resetTestingModule(); });
 
   const create = (defaultTab: 'view' | null) =>
     TestBed.runInInjectionContext(() => new AddonRail<'view'>({ storageKey: KEY, tabs: ['view'], defaultTab }));
@@ -51,6 +51,19 @@ describe('AddonRail', () => {
     rail.closeAll(); TestBed.tick();
     rail.reopen(['a']); TestBed.tick();
     expect(rail.tab()).toBe('a');
+  });
+
+  it('remembers the panel last shown across a reload, so Show panel after one brings it back (B54)', () => {
+    const make = () => TestBed.runInInjectionContext(() => new AddonRail<'a' | 'b'>({ storageKey: KEY, tabs: ['a', 'b'], defaultTab: null }));
+    const rail = make();
+    rail.select('b'); TestBed.tick();
+    rail.closeAll(); TestBed.tick();
+    const again = make();
+    TestBed.tick();
+    expect(again.tab()).toBeNull();
+    again.reopen(['a', 'b']); TestBed.tick();
+    expect(again.tab()).toBe('b');
+    localStorage.removeItem(KEY + '_last');
   });
 
   it('selects an add-on panel opened anywhere, hides the dock while none of it shows, and closes on a second click', () => {

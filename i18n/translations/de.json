@@ -1810,7 +1810,7 @@
       "fast_scrolling": "Zeichnet nur die Zeilen nahe dem Bildschirm, damit große Galerien flüssig scrollen. Schalten Sie es aus, wenn das Layout Fehler zeigt.",
       "card_buttons": "Wählen Sie, welche Knöpfe eine Fotokarte beim Überfahren zeigt und in welcher Reihenfolge",
       "photo_details": "Wo die Details eines Fotos erscheinen: in der Seitenleiste, in einer Karte neben dem Foto oder gar nicht.",
-      "details_mode": "Hover zeigt die Details des Fotos unter dem Zeiger; Klick ändert sie nur, wenn Sie ein Foto anklicken.",
+      "details_mode": "Ein Klick öffnet die Details; mit Hover folgen sie dann dem Zeiger, mit Klick wechseln sie erst beim nächsten Klick.",
       "tile_fit": "Schneidet Miniaturbilder quadratisch zu oder zeigt jedes Foto im Originalformat",
       "reset_display": "Stellt Standardlayout, Miniaturbildgröße und Fotodetails wieder her. Filter, Sortierung und Auswahl bleiben erhalten.",
       "phone_panel": "Auf einem Telefon öffnen sich Leisten als Blatt von unten oder seitlich wie auf einem breiteren Bildschirm."

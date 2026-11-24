@@ -1,4 +1,5 @@
-import { DEFAULT_BREAKPOINT_PX } from '../../shared/utils/media-query';
+import { SIDE_PANELS_MIN_WIDTH_PX } from '../../shared/utils/media-query';
+import { PHONE_PANEL_KEY } from '../../core/services/panel-layout.service';
 import { LogicalAssetApplied } from '../../shared/models/logical-asset-change';
 import { LogicalReviewAction, LogicalReviewService, LogicalReviewState, LogicalReviewWriteError } from '../../core/services/logical-review.service';
 import { Injectable, inject, signal, computed, effect, untracked, DestroyRef } from '@angular/core';
@@ -593,9 +594,12 @@ export class GalleryStore {
   readonly hasMore = signal(false);
   readonly config = signal<ViewerConfig | null>(null);
   // On a phone the drawer is a full-screen overlay, so a state saved on a wide screen must not reopen it over the grid.
+  /** Restored open only where the filters are a side panel (Showing): sm and up, or a phone set to Side
+   *  (PanelLayoutService); on a phone's bottom sheet they are a drawer over the page, which must not reopen. */
   readonly filterDrawerOpen = signal(
     localStorage.getItem(DRAWER_STATE_KEY) === 'true'
-    && (typeof window.matchMedia !== 'function' || window.matchMedia(`(min-width: ${DEFAULT_BREAKPOINT_PX}px)`).matches),
+    && (typeof window.matchMedia !== 'function' || window.matchMedia(`(min-width: ${SIDE_PANELS_MIN_WIDTH_PX}px)`).matches
+      || localStorage.getItem(PHONE_PANEL_KEY) === 'side'),
   );
   readonly slideshowActive = signal(false);
   readonly cardWidth = signal(parseInt(localStorage.getItem(CARD_WIDTH_KEY) ?? '', 10) || 0);

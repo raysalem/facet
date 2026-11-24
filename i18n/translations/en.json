@@ -1835,7 +1835,7 @@
       "fast_scrolling": "Draw only the rows near the screen, so long galleries scroll smoothly. Turn it off if the layout misbehaves.",
       "card_buttons": "Choose which buttons a photo card shows on hover, and in what order",
       "photo_details": "Where a photo's details show: in the side panel, in a card beside the photo, or nowhere.",
-      "details_mode": "Hover shows the details of the photo under the pointer; Click changes them only when you click a photo.",
+      "details_mode": "A click opens the details; with Hover they then follow the pointer, with Click they change only on the next click.",
       "tile_fit": "Crop thumbnails to squares, or show each photo in its original aspect ratio",
       "reset_display": "Restore the default layout, thumbnail size and photo details. Filters, sort and selection stay as they are.",
       "phone_panel": "On a phone, panels open as a sheet from the bottom, or at the side as on a wider screen."

@@ -25,6 +25,7 @@ import { CaptureDatePipe } from '../../shared/pipes/capture-date.pipe';
 import { PhotoAssessmentComponent } from '../../shared/components/photo-assessment/photo-assessment.component';
 import { CAMERA_METRICS, GRADE_METRICS, METRICS_TABS, type MetricsPanel, type MetricsTab } from '../../core/services/metrics-tab-state.service';
 import { tagKinds } from '../../shared/utils/tag-kinds';
+import { placeCard, type PlacementBox } from './card-placement';
 
 export type TooltipSection = 'all' | 'grade' | 'camera' | 'content';
 
@@ -71,19 +72,20 @@ const KEY_SCORES = [
            that way). Docking overrides it through style bindings instead. -->
       <div #root
         class="fixed z-[1000] pointer-events-none flex flex-col p-3 rounded shadow-lg"
-        [class.max-h-[calc(100vh-2rem)]]="!docked()"
+        [style.max-height]="docked() ? null : sheet() ? '60dvh' : 'calc(100vh - ' + (minTop() + 16) + 'px)'"
         [class.overflow-y-auto]="!docked()"
         [style.position]="docked() ? 'static' : null"
         [style.pointer-events]="showInteractiveControls() ? 'auto' : null"
-        [style.width]="docked() ? '100%' : null"
-        [style.max-width]="docked() ? null : 'min(640px, calc(100vw - 2rem))'"
+        [style.width]="docked() || sheet() ? '100%' : null"
+        [style.max-width]="docked() ? null : sheet() ? 'none' : 'min(640px, calc(100vw - 2rem))'"
         [style.padding]="docked() ? '16px' : null"
         [style.background]="docked() ? 'transparent' : 'var(--facet-tooltip-bg)'"
         [style.border]="docked() ? 'none' : '1px solid var(--facet-tooltip-border)'"
-        [style.border-radius]="docked() ? '0' : null"
+        [style.border-radius]="docked() ? '0' : sheet() ? '12px 12px 0 0' : null"
         [style.box-shadow]="docked() ? 'none' : null"
-        [style.left.px]="docked() ? null : left()"
-        [style.top.px]="docked() ? null : top()"
+        [style.left.px]="docked() ? null : sheet() ? 0 : left()"
+        [style.top.px]="docked() || sheet() ? null : top()"
+        [style.bottom]="sheet() ? 'calc(4.5rem + env(safe-area-inset-bottom))' : null"
       >
         <!-- Zone A: Image + Scoring sections. The floating tooltip puts a
              portrait photo beside its numbers to stay within the viewport; the
@@ -410,6 +412,12 @@ export class PhotoTooltipComponent {
   readonly x = input(0);
   readonly y = input(0);
   readonly flipped = input(false);
+  /** A phone's bottom sheet: the card spans the screen's width along its bottom, above the selection bar. */
+  readonly sheet = input(false);
+  /** The photo the floating card belongs to (its box on screen), so the card can stay beside it. */
+  readonly anchor = input<PlacementBox | null>(null);
+  /** The floating card's highest top edge (the gallery passes the bottom of its toolbar). */
+  readonly minTop = input(16);
   /**
    * Render docked in a column instead of floating at (x, y).
    *
@@ -510,16 +518,29 @@ export class PhotoTooltipComponent {
   private readonly measured = signal({ width: 0, height: 0 });
   private readonly viewport = signal({ width: window.innerWidth, height: window.innerHeight });
 
+  /** Where the card goes once its real size is known: beside its photo (`anchor`), never over it, never above
+   *  `minTop`. Content that arrives late (the image, the set, the histogram) grows the card, and a plain clamp
+   *  to the viewport then slid it over its own photo, so the click that closes it could not reach the photo. */
+  private readonly placement = computed(() => {
+    const anchor = this.anchor();
+    const { width, height } = this.measured();
+    return anchor && width && !this.docked() && !this.sheet() ? placeCard(anchor, width, height, this.viewport(), this.minTop()) : null;
+  });
+
   /** Top edge kept inside the viewport (16px margin) once the height is known. */
   protected readonly top = computed(() => {
+    const placed = this.placement();
+    if (placed) return placed.y;
     const y = this.y();
     const h = this.measured().height;
     if (!h) return y;
-    return Math.max(16, Math.min(y, this.viewport().height - h - 16));
+    return Math.max(this.minTop(), Math.min(y, this.viewport().height - h - 16));
   });
 
   /** Left edge kept inside the viewport (16px margin) once the width is known. */
   protected readonly left = computed(() => {
+    const placed = this.placement();
+    if (placed) return placed.x;
     const x = this.x();
     const w = this.measured().width;
     if (!w) return x;

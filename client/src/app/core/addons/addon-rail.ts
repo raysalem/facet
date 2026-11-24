@@ -20,6 +20,8 @@ export interface AddonRailOptions<T extends string> {
 }
 
 const ADDON_PREFIX = 'addon:';
+/** Suffix of the storage key that remembers the panel last on screen, for Show panel after a reload. */
+const LAST_SUFFIX = '_last';
 
 /**
  * A page's right rail: it picks one of the page's own panels or an add-on's panel. The add-on's frame lives
@@ -37,7 +39,8 @@ export class AddonRail<T extends string> {
   readonly tab = signal<string | null>(null);
   /** The page panel shown when no add-on is, and below lg where add-ons keep their own dock. */
   readonly pageTab = signal<T | null>(null);
-  /** The panel last on screen (page tab or `addon:<id>`), so a collapsed rail can bring it back with one click. */
+  /** The panel last on screen (page tab or `addon:<id>`), so a collapsed rail can bring it back with one click;
+   *  remembered across a reload beside the picked tab. */
   readonly lastOpen = signal<string | null>(null);
   /** The page panel on screen: none while everything is closed. */
   readonly shownPage = computed(() => this.tab() === null ? null : this.pageTab());
@@ -121,10 +124,14 @@ export class AddonRail<T extends string> {
       const shown = this.addonActive();
       if (this.active && this.panels.panel()) untracked(() => this.panels.addonShown.set(shown));
     });
+    try { this.lastOpen.set(localStorage.getItem(options.storageKey + LAST_SUFFIX) || null); } catch { /* none */ }
     effect(() => {
       const tab = this.tab();
       if (tab !== null) untracked(() => this.lastOpen.set(tab));
-      try { localStorage.setItem(options.storageKey, tab ?? ''); } catch { /* Storage blocked: the pick holds for this page only. */ }
+      try {
+        localStorage.setItem(options.storageKey, tab ?? '');
+        if (tab !== null) localStorage.setItem(options.storageKey + LAST_SUFFIX, tab);
+      } catch { /* Storage blocked: the pick holds for this page only. */ }
     });
     inject(DestroyRef).onDestroy(() => this.release());
   }

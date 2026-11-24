@@ -420,11 +420,11 @@ function inDetectedSet(photo: Photo): boolean {
         <app-panel-rail data-photo-rail [rail]="rail" [tabs]="facetRailTabs" [label]="I18N.photo_detail.rail.label | translate" idPrefix="photo" />
 
         <!-- Drag or arrow-key the panel's left edge to trade image room for detail (side panels, remembered). -->
-        <app-panel-resize-handle data-inspector-resize [panel]="inspectorWidth" [label]="I18N.photo_detail.inspector_resize | translate"
+        <app-panel-resize-handle data-inspector-resize [panel]="inspectorWidth" [measure]="inspectorEl" [label]="I18N.photo_detail.inspector_resize | translate"
           [class.in-data-side-panels:!hidden]="rail.addonActive() || !rail.shownPage()" class="relative hidden in-data-side-panels:flex -mx-1.5" />
 
         <!-- Info panel -->
-        <aside data-photo-inspector [attr.aria-label]="I18N.photo_detail.details | translate" [style.--facet-inspector-width]="inspectorWidth.width() + 'px'" [class.in-data-side-panels:!hidden]="rail.addonActive()" [class.!hidden]="!rail.shownPage()" [class.in-data-side-panels:flex]="rail.shownPage() === 'filter'" (keydown)="closePanels($event)" class="relative [overflow-wrap:anywhere] in-data-side-panels:flex-col in-data-side-panels:basis-[var(--facet-inspector-width)] in-data-side-panels:min-w-[min(15rem,50vw)] in-data-side-panels:shrink in-data-side-panels:grow-0 in-data-side-panels:overflow-y-auto in-data-side-panels:border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-4 space-y-4 text-sm text-[var(--mat-sys-on-surface)]">
+        <aside #inspectorEl data-photo-inspector [attr.aria-label]="I18N.photo_detail.details | translate" [style.--facet-inspector-width]="inspectorWidth.width() + 'px'" [class.in-data-side-panels:!hidden]="rail.addonActive()" [class.!hidden]="!rail.shownPage()" [class.in-data-side-panels:flex]="rail.shownPage() === 'filter'" (keydown)="closePanels($event)" class="relative [overflow-wrap:anywhere] in-data-side-panels:flex-col in-data-side-panels:basis-[var(--facet-inspector-width)] in-data-side-panels:min-w-[min(15rem,50vw)] in-data-side-panels:shrink in-data-side-panels:grow-0 in-data-side-panels:overflow-y-auto in-data-side-panels:border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-4 space-y-4 text-sm text-[var(--mat-sys-on-surface)]">
           <ng-template #categoryExplanation>
               <mat-form-field class="w-full" subscriptSizing="dynamic">
                 <mat-label>{{ I18N.photo.category_override.target_category_label | translate }}</mat-label>
@@ -446,11 +446,13 @@ function inDetectedSet(photo: Photo): boolean {
               }
           </ng-template>
           <!-- The open panel's name and the X that folds every panel (and an add-on's) to the side. -->
-          <div data-panel-header class="-mb-2 flex items-center gap-2">
-            <h2 class="m-0 min-w-0 flex-1 truncate text-sm font-medium">{{ shownPanelLabel() | translate }}</h2>
+          <!-- A phone set to Side gives the panel about 200 px: the title and Hide panel keep the first row and the
+               collection's previous / next wrap to a row of their own, so nothing runs past the screen edge. -->
+          <div data-panel-header class="-mb-2 flex flex-wrap items-center gap-x-2">
+            <h2 class="m-0 min-w-0 flex-1 truncate text-sm font-medium max-sm:in-data-side-panels:order-1 max-sm:in-data-side-panels:min-w-16">{{ shownPanelLabel() | translate }}</h2>
             <!-- Previous / next in the collection on every panel (#386); Showing carries its own beside the list. -->
             @if (collectionNavigation().visible && rail.shownPage() !== 'filter') {
-              <div data-panel-collection-nav role="group" [attr.aria-label]="I18N.photo_detail.collection.title | translate" class="flex shrink-0 items-center">
+              <div data-panel-collection-nav role="group" [attr.aria-label]="I18N.photo_detail.collection.title | translate" class="flex shrink-0 items-center max-sm:in-data-side-panels:order-3 max-sm:in-data-side-panels:basis-full">
                 <button mat-icon-button data-panel-previous class="!h-8 !w-8 !p-0 max-sm:!h-11 max-sm:!w-11 pointer-coarse:!h-11 pointer-coarse:!w-11" [disabled]="!collectionNavigation().previous || store.loading()"
                   [attr.aria-label]="I18N.photo_detail.collection.previous | translate" (click)="stepCollectionPhoto(-1)"><mat-icon>chevron_left</mat-icon></button>
                 <span data-panel-position class="text-xs tabular-nums">{{ I18N.photo_detail.collection.position | translate:{ position: collectionNavigation().position, total: store.total() } }}</span>
@@ -458,8 +460,8 @@ function inDetectedSet(photo: Photo): boolean {
                   [attr.aria-label]="I18N.photo_detail.collection.next | translate" (click)="stepCollectionPhoto(1)"><mat-icon>chevron_right</mat-icon></button>
               </div>
             }
-            <button mat-icon-button data-collapse-panel class="!h-8 !w-8 !p-0 max-sm:!h-11 max-sm:!w-11 pointer-coarse:!h-11 pointer-coarse:!w-11 shrink-0"
-              [matTooltip]="I18N.ui.buttons.collapse_panel | translate" [attr.aria-label]="I18N.ui.buttons.collapse_panel | translate" (click)="rail.closeAll()">
+            <button mat-icon-button data-collapse-panel class="!h-8 !w-8 !p-0 max-sm:!h-11 max-sm:!w-11 pointer-coarse:!h-11 pointer-coarse:!w-11 shrink-0 max-sm:in-data-side-panels:order-2"
+              [matTooltip]="I18N.ui.buttons.collapse_panel | translate" [attr.aria-label]="I18N.ui.buttons.collapse_panel | translate" (click)="hidePanels()">
               <mat-icon class="!text-xl">last_page</mat-icon>
             </button>
           </div>
@@ -994,6 +996,11 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   /** The open page panel's name, for the panel header. */
   protected readonly shownPanelLabel = computed(() => this.facetRailTabs.find(tab => tab.id === this.rail.shownPage())?.label ?? '');
   private readonly railElement = viewChild<PanelRailComponent, ElementRef<HTMLElement>>(PanelRailComponent, { read: ElementRef });
+  /** Hide panel: every panel folds to the rail and the focus goes to its Show panel, not to the page. */
+  protected hidePanels(): void {
+    this.rail.closeAll();
+    afterNextRender(() => this.railElement()?.nativeElement.querySelector<HTMLElement>('[data-rail-expand]')?.focus(), { injector: this.injector });
+  }
 
   /** Escape in a panel folds every panel to the side; the focus goes back to the rail. */
   protected closePanels(event: KeyboardEvent): void {

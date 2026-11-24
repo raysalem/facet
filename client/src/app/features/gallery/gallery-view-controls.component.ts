@@ -31,7 +31,7 @@ import { GalleryReviewNavigationService } from './gallery-review-navigation.serv
   template: `
     <ng-template #displayControls>
     @if (auth.isEdition() && store.config()?.features?.show_rating_controls) {
-      <mat-checkbox data-review-advance [checked]="reviewNavigation.enabled()" [matTooltip]="I18N.gallery.review_navigation.help | translate"
+      <mat-checkbox data-review-advance [checked]="reviewNavigation.enabled()" [matTooltip]="I18N.gallery.review_navigation.help | translate" matTooltipPosition="left"
                     (change)="setReviewAdvance($event)">{{ I18N.gallery.review_navigation.advance | translate }}</mat-checkbox>
     }
     @if (!portDisplay()) { <ng-container [ngTemplateOutlet]="layoutControls" [ngTemplateOutletContext]="{ $implicit: secondaryLayouts }" /> }
@@ -63,7 +63,7 @@ import { GalleryReviewNavigationService } from './gallery-review-navigation.serv
       }
     }
     <ng-template #choiceRow let-id="id" let-icon="icon" let-label="label" let-value="value" let-menu="menu" let-tip="tip">
-      <button type="button" matRipple [attr.data-choice]="id" aria-haspopup="menu" [matMenuTriggerFor]="menu" [matTooltip]="tip | translate"
+      <button type="button" matRipple [attr.data-choice]="id" aria-haspopup="menu" [matMenuTriggerFor]="menu" [matTooltip]="tip | translate" matTooltipPosition="left"
               class="flex w-full min-h-10 items-center gap-3 rounded-md px-2 py-1 text-left hover:bg-[var(--mat-sys-surface-container-high)] focus-visible:outline-2 focus-visible:outline-[var(--mat-sys-primary)]"
               [attr.aria-label]="I18N.gallery.sidebar.review.value_aria | translate:{ label: (label | translate), value: (value | translate) }">
         <mat-icon class="!text-xl !w-5 !h-5 !leading-5 shrink-0 opacity-80">{{ icon }}</mat-icon>
@@ -81,13 +81,13 @@ import { GalleryReviewNavigationService } from './gallery-review-navigation.serv
       }
     </mat-menu>
     <button mat-button class="!min-h-11 !min-w-11" [class.!w-full]="portDisplay()" [class.!justify-start]="portDisplay()" (click)="toggleSlideshow()"
-            [matTooltip]="I18N.slideshow.start | translate" [attr.aria-label]="I18N.slideshow.start | translate">
+            [matTooltip]="I18N.slideshow.start | translate" [matTooltipPosition]="portDisplay() ? 'left' : 'below'" [attr.aria-label]="I18N.slideshow.start | translate">
       <mat-icon [style.color]="store.slideshowActive() ? 'var(--mat-sys-primary)' : ''">slideshow</mat-icon>
       @if (portDisplay()) { <span>{{ I18N.slideshow.start | translate }}</span> }
     </button>
     @if (portDisplay()) {
       <button mat-button data-reset-display class="!min-h-11 !w-full !justify-start" (click)="resetDisplay()"
-              [matTooltip]="I18N.gallery.display_tips.reset_display | translate" [attr.aria-label]="I18N.gallery.reset_display | translate">
+              [matTooltip]="I18N.gallery.display_tips.reset_display | translate" matTooltipPosition="left" [attr.aria-label]="I18N.gallery.reset_display | translate">
         <mat-icon>restart_alt</mat-icon><span>{{ I18N.gallery.reset_display | translate }}</span>
       </button>
     }

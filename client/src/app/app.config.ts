@@ -13,6 +13,7 @@ import { provideHttpClient, withInterceptors, withXhr } from '@angular/common/ht
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { MAT_DATE_LOCALE, provideNativeDateAdapter } from '@angular/material/core';
 import { MAT_SNACK_BAR_DEFAULT_OPTIONS, MatSnackBarConfig } from '@angular/material/snack-bar';
+import { MAT_TOOLTIP_DEFAULT_OPTIONS, type MatTooltipDefaultOptions } from '@angular/material/tooltip';
 
 import { routes } from './app.routes';
 import { GalleryReuseStrategy } from './core/gallery-reuse.strategy';
@@ -36,6 +37,10 @@ export const appConfig: ApplicationConfig = {
     provideAnimations(),
     { provide: MAT_DATE_LOCALE, useValue: 'en-GB' },
     { provide: MAT_SNACK_BAR_DEFAULT_OPTIONS, useValue: { panelClass: [SNACKBAR_LIFT_CLASS] } satisfies MatSnackBarConfig },
+    // A tooltip never takes the pointer: Material keeps an interactive tooltip open while the pointer is on it,
+    // so one left over a neighbouring control (Card buttons over Details location, a rail tab over Display)
+    // swallowed the click meant for that control.
+    { provide: MAT_TOOLTIP_DEFAULT_OPTIONS, useValue: { showDelay: 0, hideDelay: 0, touchendHideDelay: 1500, disableTooltipInteractivity: true } satisfies MatTooltipDefaultOptions },
     provideNativeDateAdapter(),
     { provide: ErrorHandler, useClass: GlobalErrorHandler },
     provideAgentTools(),

@@ -1810,7 +1810,7 @@
       "fast_scrolling": "Disegna solo le righe vicine allo schermo, così le gallerie lunghe scorrono fluide. Disattivalo se il layout dà problemi.",
       "card_buttons": "Scegli quali pulsanti mostra una scheda al passaggio del mouse, e in che ordine",
       "photo_details": "Dove compaiono i dettagli di una foto: nel pannello laterale, in una scheda accanto alla foto o da nessuna parte.",
-      "details_mode": "Hover mostra i dettagli della foto sotto il puntatore; Clic li cambia solo quando fai clic su una foto.",
+      "details_mode": "Un clic apre i dettagli; con Hover poi seguono il puntatore, con Clic cambiano solo al clic successivo.",
       "tile_fit": "Ritaglia le miniature a quadrato, o mostra ogni foto nelle sue proporzioni originali",
       "reset_display": "Ripristina layout, dimensione delle miniature e dettagli delle foto predefiniti. Filtri, ordinamento e selezione restano invariati.",
       "phone_panel": "Sul telefono i pannelli si aprono come un foglio dal basso, oppure di lato come su uno schermo più largo."

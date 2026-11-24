@@ -899,17 +899,61 @@ describe('GalleryComponent', () => {
     fixture.destroy();
   });
 
+  it('a click-pinned card closes on a click outside it and on Clear, never on a click inside it (B54)', () => {
+    mockStore.filters.update((filters: GalleryFilters) => ({ ...filters, details_place: 'card', details_trigger: 'hover' }));
+    const fixture = TestBed.createComponent(GalleryComponent);
+    fixture.detectChanges();
+    const gallery = fixture.componentInstance;
+    const photo = makePhoto({ path: '/a.jpg' });
+    const pin = () => { gallery['pinnedTooltipPath'].set(photo.path); gallery['tooltipPhoto'].set(photo); };
+    const inside = document.createElement('app-photo-tooltip');
+    const child = inside.appendChild(document.createElement('span'));
+    document.body.appendChild(inside);
+    pin();
+    gallery['onDocumentPointerDown']({ target: child } as unknown as PointerEvent);
+    expect(gallery['tooltipPhoto']()).toBe(photo);
+    gallery['onDocumentPointerDown']({ target: document.body } as unknown as PointerEvent);
+    expect(gallery['tooltipPhoto']()).toBeNull();
+    pin();
+    gallery['clearSelection']();
+    expect(gallery['tooltipPhoto']()).toBeNull();
+    inside.remove();
+    fixture.destroy();
+  });
+
+  it('on a phone (touch, Bottom sheet) a tap shows the details in the sheet and selecting keeps them on (B54)', () => {
+    mockStore.filters.update((filters: GalleryFilters) => ({ ...filters, details_place: 'panel', details_trigger: 'hover' }));
+    const fixture = TestBed.createComponent(GalleryComponent);
+    fixture.componentInstance['isTouchDevice'].set(true);
+    fixture.detectChanges();
+    const gallery = fixture.componentInstance;
+    const photo = makePhoto({ path: '/a.jpg' });
+    expect(gallery['phoneSheet']()).toBe(true);
+    gallery.showTooltip({ type: 'mouseenter', currentTarget: null } as unknown as MouseEvent, photo);
+    expect(gallery['tooltipPhoto']()).toBeNull();
+    gallery.showTooltip({ type: 'click', currentTarget: null } as unknown as MouseEvent, photo);
+    expect(gallery['tooltipPhoto']()).toBe(photo);
+    mockStore.selectionCount.set(1);
+    expect(gallery.tooltipDisabled()).toBe(false);
+    // The explicit Select mode keeps a tap for picking photos.
+    gallery['selectionAffordance'].set(true);
+    expect(gallery.tooltipDisabled()).toBe(true);
+    mockStore.selectionCount.set(0);
+    fixture.destroy();
+  });
+
   it('clears a parked tooltip when the side-panel breakpoint flips panel mode', () => {
     mockStore.filters.update((filters: GalleryFilters) => ({ ...filters, details_place: 'panel' }));
     const fixture = TestBed.createComponent(GalleryComponent);
     const layout = TestBed.inject(PanelLayoutService);
-    layout.setWide(false);
-    fixture.detectChanges();
-    expect(fixture.componentInstance.panelMode()).toBe(false);
-    fixture.componentInstance['tooltipPhoto'].set({ path: '/a.jpg' } as never);
     layout.setWide(true);
     fixture.detectChanges();
     expect(fixture.componentInstance.panelMode()).toBe(true);
+    fixture.componentInstance['tooltipPhoto'].set({ path: '/a.jpg' } as never);
+    // A phone's bottom sheet: the floating stand-in must not show the panel's photo at a stale spot.
+    layout.setWide(false);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.panelMode()).toBe(false);
     expect(fixture.componentInstance['tooltipPhoto']()).toBeNull();
     fixture.destroy();
   });
@@ -2978,7 +3022,10 @@ describe('GalleryComponent', () => {
   });
 
   describe('docked details panel (details_place = panel)', () => {
-    const hoverEvent = { currentTarget: null } as unknown as MouseEvent;
+    /** A click (or Space) on a photo: what opens the side panel. */
+    const pickEvent = { type: 'click', currentTarget: null } as unknown as MouseEvent;
+    /** The pointer entering a photo: it never opens the side panel, it only retargets an open one (B54). */
+    const pointEvent = { type: 'mouseenter', currentTarget: null } as unknown as MouseEvent;
 
     /** Force the rail's width gate on, the way a >=1280px viewport would. */
     function widenForRail() {
@@ -2990,6 +3037,8 @@ describe('GalleryComponent', () => {
 
     beforeEach(() => {
       mockStore.filters.set({ ...DEFAULT_FILTERS, details_place: 'panel' });
+      // An open panel is remembered across a reload; each case starts with it closed.
+      for (const key of ['facet_gallery_rail_tab', 'facet_gallery_rail_tab_last', 'facet_gallery_details_photo']) localStorage.removeItem(key);
     });
 
     afterEach(() => vi.unstubAllGlobals());
@@ -3037,7 +3086,7 @@ describe('GalleryComponent', () => {
 
       it('hovering a photo feeds the rail without any placement maths', () => {
         const photo = { path: '/a.jpg' } as never;
-        component.showTooltip(hoverEvent, photo);
+        component.showTooltip(pickEvent, photo);
         expect(component['tooltipPhoto']()).toBe(photo);
         expect(component['tooltipX']()).toBe(0);
         expect(component['tooltipY']()).toBe(0);
@@ -3045,7 +3094,7 @@ describe('GalleryComponent', () => {
 
       it('keeps the last photo when the cursor leaves the grid', () => {
         const photo = { path: '/a.jpg' } as never;
-        component.showTooltip(hoverEvent, photo);
+        component.showTooltip(pickEvent, photo);
         component.hideTooltip();
         expect(component['tooltipPhoto']()).toBe(photo);
       });
@@ -3055,12 +3104,75 @@ describe('GalleryComponent', () => {
         mockStore.photos.set([photo]); TestBed.tick();
         const rail = component['rail'];
         rail.open('filter');
-        component.showTooltip(hoverEvent, photo);
+        component.showTooltip(pointEvent, photo);
         expect(rail.tab()).toBe('filter');
         // Before the fix the click changed nothing on screen: Showing stayed, so the details seemed gone.
         component['toggleSelection'](photo, new MouseEvent('click'), 0);
         expect(rail.tab()).toBe('grade');
         expect(component.detailsRailVisible()).toBe(true);
+      });
+
+      it('a hover never opens the side panel, nor a cursor move; it only retargets an open one (B54)', () => {
+        const [a, b] = [makePhoto({ path: '/a.jpg' }), makePhoto({ path: '/b.jpg' })];
+        mockStore.photos.set([a, b]); TestBed.tick();
+        component.showTooltip(pointEvent, a);
+        component['setCursor'](1);
+        component['setCursor'](-1);
+        expect(component.detailsRailVisible()).toBe(false);
+        component.showTooltip(pickEvent, a);
+        expect(component.detailsRailVisible()).toBe(true);
+        component.showTooltip(pointEvent, b);
+        expect(component['tooltipPhoto']()?.path).toBe('/b.jpg');
+        // Hidden again, a hover leaves it hidden.
+        component['rail'].closeAll();
+        component.showTooltip(pointEvent, a);
+        expect(component.detailsRailVisible()).toBe(false);
+      });
+
+      it('a double click opens the photo its first click hit when the second landed on another card (B54)', async () => {
+        const [a, b] = [makePhoto({ path: '/a.jpg' }), makePhoto({ path: '/b.jpg' })];
+        mockStore.photos.set([a, b]); TestBed.tick();
+        const open = vi.spyOn(component as unknown as { downloadPhoto(photo: Photo): void }, 'downloadPhoto').mockImplementation(() => {});
+        const host = document.body.appendChild(document.createElement('app-gallery'));
+        const at = { clientX: 40, clientY: 50 };
+        const second = (target: Element) => {
+          const event = new MouseEvent('click', { ...at, detail: 2, bubbles: true, cancelable: true });
+          Object.defineProperty(event, 'target', { value: target });
+          component['onDoubleClickCapture'](event);
+          return event;
+        };
+        mockStore.toggleSelection.mockClear();
+        // The first click selects A; the grid moves; the next two land on B (the second of them is the double's).
+        component['toggleSelection'](a, new MouseEvent('click', { ...at, detail: 1 }), 0);
+        component['toggleSelection'](b, new MouseEvent('click', { ...at, detail: 1 }), 1);
+        const event = second(host);
+        expect(event.defaultPrevented).toBe(true);
+        await new Promise(resolve => setTimeout(resolve));
+        expect(open).toHaveBeenCalledExactlyOnceWith(a);
+        // Every toggle the clicks made is put back.
+        expect(mockStore.toggleSelection.mock.calls.map((call: unknown[]) => (call[0] as Photo).path)).toEqual(['/a.jpg', '/b.jpg', '/a.jpg', '/b.jpg']);
+        // The card's own dblclick after it opens nothing more.
+        component['openFromDoubleClick'](b);
+        expect(open).toHaveBeenCalledOnce();
+        // A click elsewhere on the page, or long after, is not a double click.
+        open.mockClear();
+        component['toggleSelection'](a, new MouseEvent('click', { clientX: 400, clientY: 400, detail: 1 }), 0);
+        expect(second(host).defaultPrevented).toBe(false);
+        host.remove();
+      });
+
+      it('Escape outside a text field hides the open side panel (B54)', () => {
+        const photo = makePhoto({ path: '/a.jpg' });
+        mockStore.photos.set([photo]); TestBed.tick();
+        component.showTooltip(pickEvent, photo);
+        expect(component.detailsRailVisible()).toBe(true);
+        const field = document.createElement('input');
+        document.body.appendChild(field);
+        field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+        expect(component.detailsRailVisible()).toBe(true);
+        field.remove();
+        component['onGalleryShortcut'](new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+        expect(component.detailsRailVisible()).toBe(false);
       });
 
       it('a click never replaces an add-on panel the user opened', () => {
@@ -3103,7 +3215,7 @@ describe('GalleryComponent', () => {
       it('keeps the inspected photo and open rail when another page is appended', () => {
         const photo = makePhoto({ path: '/a.jpg' });
         mockStore.photos.set([photo]); TestBed.tick();
-        component.showTooltip(hoverEvent, photo);
+        component.showTooltip(pickEvent, photo);
         mockStore.photos.set([photo, makePhoto({ path: '/b.jpg' })]); TestBed.tick();
         expect(component['tooltipPhoto']()?.path).toBe('/a.jpg');
         expect(component.detailsRailVisible()).toBe(true);
@@ -3130,7 +3242,7 @@ describe('GalleryComponent', () => {
           });
           mockStore.photos.set([a, b]);
           click(a, 0);
-          component.showTooltip(hoverEvent, a as never);
+          component.showTooltip(pickEvent, a as never);
         });
 
         it('releases A when a second click actually deselects A', () => {
@@ -3138,7 +3250,7 @@ describe('GalleryComponent', () => {
           click(a, 0);
           expect(mockStore.selectedPaths().has(a.path)).toBe(false);
           expect(hasActivePhoto()).toBe(false);
-          component.showTooltip(hoverEvent, b as never);
+          component.showTooltip(pickEvent, b as never);
           expect(panelPhoto()).toBe(b);
         });
 
@@ -3148,7 +3260,7 @@ describe('GalleryComponent', () => {
           expect(hasActivePhoto()).toBe(false);
           expect(mockStore.selectedPaths().has(a.path)).toBe(true);
           expect(mockStore.selectedPaths().has(b.path)).toBe(false);
-          component.showTooltip(hoverEvent, a as never);
+          component.showTooltip(pickEvent, a as never);
           expect(panelPhoto()).toBe(a);
         });
 
@@ -3161,24 +3273,24 @@ describe('GalleryComponent', () => {
         });
 
         it('hovering another photo does not retarget the rail', () => {
-          component.showTooltip(hoverEvent, b as never);
+          component.showTooltip(pickEvent, b as never);
           expect(panelPhoto()).toBe(a);
         });
 
         it('Deselect drops the cursor and the selection, keeps the photo until the next hover', () => {
           mockStore.selectedPaths.set(new Set([a.path]));
-          component.showTooltip(hoverEvent, b as never);
+          component.showTooltip(pickEvent, b as never);
           release();
           expect(hasActivePhoto()).toBe(false);
           expect(mockStore.toggleSelection).toHaveBeenLastCalledWith(a);
           expect(panelPhoto()).toBe(a);
-          component.showTooltip(hoverEvent, b as never);
+          component.showTooltip(pickEvent, b as never);
           expect(panelPhoto()).toBe(b);
         });
 
         it('a new pin empties the rail and drops the cursor, so nothing of the previous view carries over', () => {
           TestBed.tick();
-          component.showTooltip(hoverEvent, a as never);
+          component.showTooltip(pickEvent, a as never);
           expect(panelPhoto()).toBe(a);
           mockStore.pinnedPaths.set(['/a.jpg']);
           TestBed.tick();
@@ -3189,7 +3301,7 @@ describe('GalleryComponent', () => {
 
         it('a plain filter reload with no pin leaves the held photo alone', () => {
           TestBed.tick();
-          component.showTooltip(hoverEvent, a as never);
+          component.showTooltip(pickEvent, a as never);
           mockStore.pinnedPaths.set(null);
           TestBed.tick();
           expect(component['tooltipPhoto']()).toBe(a);
@@ -3206,7 +3318,7 @@ describe('GalleryComponent', () => {
         it('Escape in the grid releases the photo like Deselect, then clears the rest of the selection', () => {
           mockStore.selectedPaths.set(new Set([a.path, b.path]));
           mockStore.selectionCount.set(2);
-          component.showTooltip(hoverEvent, b as never);
+          component.showTooltip(pickEvent, b as never);
           press('Escape');
           expect(hasActivePhoto()).toBe(false);
           expect(mockStore.toggleSelection).toHaveBeenLastCalledWith(a);
@@ -3312,7 +3424,7 @@ describe('GalleryComponent', () => {
         expect(fixture.componentInstance.detailsRailVisible()).toBe(false);
         expect(root.querySelector('[data-details-rail]')).toBeNull();
         const open = vi.spyOn(drawer, 'open');
-        fixture.componentInstance.showTooltip(hoverEvent, photo);
+        fixture.componentInstance.showTooltip(pickEvent, photo);
         fixture.detectChanges();
         expect(fixture.componentInstance.detailsRailVisible()).toBe(true);
         expect(root.querySelector('[data-details-rail] [data-photo-tab="grade"] app-photo-tooltip')).not.toBeNull();
@@ -3322,7 +3434,7 @@ describe('GalleryComponent', () => {
         // Hovering off the grid and across the next card never closes or reopens the panel.
         fixture.componentInstance.hideTooltip();
         fixture.detectChanges();
-        fixture.componentInstance.showTooltip(hoverEvent, makePhoto({ path: '/b.jpg' }));
+        fixture.componentInstance.showTooltip(pickEvent, makePhoto({ path: '/b.jpg' }));
         fixture.componentInstance.hideTooltip();
         fixture.detectChanges();
         expect(fixture.componentInstance.detailsRailVisible()).toBe(true);
@@ -3337,7 +3449,7 @@ describe('GalleryComponent', () => {
         widenRail(fixture.componentInstance);
         fixture.detectChanges();
         const root = fixture.nativeElement as HTMLElement;
-        fixture.componentInstance.showTooltip(hoverEvent, photo);
+        fixture.componentInstance.showTooltip(pickEvent, photo);
         fixture.detectChanges();
         const shown = () => root.querySelector<HTMLElement>('[data-details-rail] [data-photo-tab]:not([hidden])')!;
         expect(shown().dataset['photoTab']).toBe('grade');
@@ -3351,7 +3463,7 @@ describe('GalleryComponent', () => {
         // Closed with the X, the next photo to enter opens the tab picked last.
         root.querySelector<HTMLButtonElement>('[data-details-rail] [data-collapse-panel]')!.click(); fixture.detectChanges();
         expect(root.querySelector('[data-details-rail]')).toBeNull();
-        fixture.componentInstance.showTooltip(hoverEvent, photo); fixture.detectChanges();
+        fixture.componentInstance.showTooltip(pickEvent, photo); fixture.detectChanges();
         expect(shown().dataset['photoTab']).toBe('content');
         fixture.destroy();
         localStorage.removeItem('facet_gallery_photo_tab');
@@ -3369,7 +3481,7 @@ describe('GalleryComponent', () => {
         const instance = fixture.componentInstance as unknown as { setCursor(index: number): void; hasActivePhoto(): boolean; panelPhoto(): { path: string } | null };
         widenRail(instance);
         fixture.detectChanges();
-        fixture.componentInstance.showTooltip(hoverEvent, a);
+        fixture.componentInstance.showTooltip(pickEvent, a);
         fixture.detectChanges();
         // A hover leaving the grid keeps the panel and its photo.
         fixture.componentInstance.hideTooltip();
@@ -3399,7 +3511,7 @@ describe('GalleryComponent', () => {
         widenRail(fixture.componentInstance);
         document.body.appendChild(fixture.nativeElement);
         fixture.detectChanges();
-        fixture.componentInstance.showTooltip(hoverEvent, a);
+        fixture.componentInstance.showTooltip(pickEvent, a);
         fixture.detectChanges();
         const rail = fixture.nativeElement.querySelector('[data-details-rail]') as HTMLElement;
         rail.focus();
@@ -3420,6 +3532,7 @@ describe('GalleryComponent', () => {
         const fixture = TestBed.createComponent(GalleryComponent);
         widenRail(fixture.componentInstance);
         fixture.componentInstance['setCursor'](0);
+        fixture.componentInstance['openRail']();
         fixture.detectChanges();
         expect(fixture.componentInstance.detailsRailVisible()).toBe(true);
         mockStore.filterDrawerOpen.set(true);
@@ -3428,7 +3541,7 @@ describe('GalleryComponent', () => {
         expect((fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('[data-gallery-panel="filter"]')!.hidden).toBe(false);
         const showing = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('[data-gallery-panel="filter"]')!;
         const before = showing.querySelector('[data-showing-statement]')!.textContent;
-        fixture.componentInstance.showTooltip(hoverEvent, mockStore.photos()[0]);
+        fixture.componentInstance.showTooltip(pointEvent, mockStore.photos()[0]);
         fixture.detectChanges();
         expect(fixture.componentInstance.detailsRailVisible()).toBe(false);
         // Showing is about the grid's content, not the held photo: the statement stays, no photo is named in it.
@@ -3459,6 +3572,7 @@ describe('GalleryComponent', () => {
           widenRail(instance);
           fixture.detectChanges();
           instance.setCursor(0);
+          fixture.componentInstance['openRail']();
           fixture.detectChanges();
           expect(instance.hasActivePhoto()).toBe(true);
           rail = fixture.nativeElement.querySelector('[data-details-rail]') as HTMLElement;
@@ -3514,7 +3628,7 @@ describe('GalleryComponent', () => {
           (rail.querySelector('[data-rail-deselect]') as HTMLButtonElement).click();
           fixture.detectChanges();
           expect(fixture.componentInstance.detailsRailVisible()).toBe(false);
-          fixture.componentInstance.showTooltip(hoverEvent, mockStore.photos()[0]);
+          fixture.componentInstance.showTooltip(pickEvent, mockStore.photos()[0]);
           fixture.detectChanges();
           expect(fixture.componentInstance.detailsRailVisible()).toBe(true);
         });
@@ -3540,6 +3654,7 @@ describe('GalleryComponent', () => {
       it('yields the panel place to Filter while it is open', () => {
         mockStore.photos.set([{ path: '/a.jpg' }]);
         component['setCursor'](0);
+        component['openRail']();
         TestBed.tick();
         expect(component.detailsRailVisible()).toBe(true);
         mockStore.filterDrawerOpen.set(true);

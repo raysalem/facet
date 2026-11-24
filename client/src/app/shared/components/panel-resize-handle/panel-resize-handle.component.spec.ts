@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { I18nService } from '../../../core/services/i18n.service';
 import { PanelWidth } from '../../utils/panel-width';
 import { PanelResizeHandleComponent } from './panel-resize-handle.component';
@@ -74,6 +75,17 @@ describe('PanelResizeHandleComponent', () => {
     expect(handle.getAttribute('data-dragging')).toBeNull();
     expect(handle.getAttribute('aria-valuenow')).toBe('420');
     expect(localStorage.getItem(KEY)).toBe('420');
+  });
+
+  it('announces the width on screen when the layout narrows the panel, and a key moves from there (B54)', () => {
+    const { fixture, handle } = render();
+    const component = fixture.debugElement.query(By.directive(PanelResizeHandleComponent)).componentInstance as unknown as { rendered: { set(v: number): void } };
+    component.rendered.set(300);
+    fixture.detectChanges();
+    expect(handle.getAttribute('aria-valuenow')).toBe('300');
+    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    fixture.detectChanges();
+    expect(fixture.componentInstance.width.width()).toBe(288);
   });
 
   it('a new panel starts at the remembered width', () => {

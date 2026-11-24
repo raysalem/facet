@@ -1080,7 +1080,7 @@ type RatingOption = 'any' | '1' | '2' | '3' | '4' | '5' | 'zero';
           </div>
           @if (sliderConfig(); as sc) {
             <div class="flex items-center gap-2">
-              <span class="text-sm text-[var(--mat-sys-on-surface-variant)] shrink-0" [matTooltip]="I18N.gallery.display_tips.thumbnail_size | translate">{{ I18N.gallery.thumbnail_size | translate }}</span>
+              <span class="text-sm text-[var(--mat-sys-on-surface-variant)] shrink-0" [matTooltip]="I18N.gallery.display_tips.thumbnail_size | translate" matTooltipPosition="left">{{ I18N.gallery.thumbnail_size | translate }}</span>
               <span id="display-tip-thumbnail-size" class="sr-only">{{ I18N.gallery.display_tips.thumbnail_size | translate }}</span>
               <mat-slider [min]="thumbnailSliderMin()" [max]="sc.max_px" [step]="sc.step_px" class="flex-1">
                 <input matSliderThumb aria-describedby="display-tip-thumbnail-size" [value]="store.cardWidth()" (input)="store.setCardWidth(+$any($event.target).value)" [attr.aria-label]="I18N.gallery.thumbnail_size | translate" />
@@ -1094,7 +1094,7 @@ type RatingOption = 'any' | '1' | '2' | '3' | '4' | '5' | 'zero';
       <!-- View (display preferences, not filters): the tab's only section, so no panel around it -->
         <div data-section="view" class="flex flex-col gap-2 px-1 pt-1 pb-2">
           <mat-checkbox data-face-outline-toggle [checked]="faceOutlines.enabled()" (change)="faceOutlines.setEnabled($event.checked)"
-            aria-describedby="display-tip-face-outlines" [matTooltip]="I18N.gallery.display_tips.face_outlines | translate">{{ I18N.gallery.face_outlines | translate }}</mat-checkbox>
+            aria-describedby="display-tip-face-outlines" [matTooltip]="I18N.gallery.display_tips.face_outlines | translate" matTooltipPosition="left">{{ I18N.gallery.face_outlines | translate }}</mat-checkbox>
           <span id="display-tip-face-outlines" class="sr-only">{{ I18N.gallery.display_tips.face_outlines | translate }}</span>
           @if (store.galleryMode() !== 'mosaic') {
             <mat-checkbox
@@ -1106,10 +1106,10 @@ type RatingOption = 'any' | '1' | '2' | '3' | '4' | '5' | 'zero';
           <mat-checkbox
             [checked]="store.virtualScroll()"
             (change)="store.setVirtualScroll($event.checked)"
-            [matTooltip]="I18N.gallery.display_tips.fast_scrolling | translate"
+            [matTooltip]="I18N.gallery.display_tips.fast_scrolling | translate" matTooltipPosition="left"
           >{{ I18N.gallery.sidebar.virtual_scroll | translate }}</mat-checkbox>
           <button mat-button data-card-actions class="!min-h-11 !w-full !justify-start" (click)="openCardActionsDialog()"
-                  [matTooltip]="I18N.gallery.display_tips.card_buttons | translate">
+                  [matTooltip]="I18N.gallery.display_tips.card_buttons | translate" matTooltipPosition="left">
             <mat-icon>tune</mat-icon>{{ I18N.gallery.card_actions.open | translate }}
           </button>
         </div>
