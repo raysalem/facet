@@ -10,7 +10,6 @@ import { PhotoProvenanceComponent } from './photo-provenance.component';
 import { PhotoRelatedFilesComponent } from './photo-related-files.component';
 import { PhotoAlbumsComponent } from './photo-albums.component';
 import { TimelineFeedCache } from '../timeline/timeline-feed-cache.service';
-import { ContextHelpComponent } from '../../shared/components/context-help/context-help.component';
 import { Component, inject, signal, computed, linkedSignal, effect, untracked, OnInit, HostListener, DestroyRef, ElementRef, viewChild, ChangeDetectionStrategy, Injector, afterNextRender } from '@angular/core';
 import { Location, NgTemplateOutlet } from '@angular/common';
 import { ActivatedRoute, Router, NavigationStart, NavigationEnd } from '@angular/router';
@@ -38,8 +37,6 @@ import { PhotoObjectLayerComponent } from './photo-object-layer.component';
 import { PhotoAnnotationLayerComponent } from './photo-annotation-layer.component';
 import { PhotoAnnotationsState } from './photo-annotations.state';
 import { FixedPipe } from '../../shared/pipes/fixed.pipe';
-import { IsLensNamePipe } from '../../shared/pipes/is-lens-name.pipe';
-import { ShutterSpeedPipe } from '../../shared/pipes/shutter-speed.pipe';
 import { CaptureDatePipe } from '../../shared/pipes/capture-date.pipe';
 import { RenditionReadoutComponent } from '../../shared/components/rendition-readout/rendition-readout.component';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
@@ -139,7 +136,7 @@ function inDetectedSet(photo: Photo): boolean {
 
 @Component({
   selector: 'app-photo-detail',
-  imports: [ControlPopoverComponent, PhotoCollectionSidebarComponent, ContextHelpComponent, PhotoProvenanceComponent, PhotoRelatedFilesComponent, PhotoAlbumsComponent, IsLensNamePipe,
+  imports: [ControlPopoverComponent, PhotoCollectionSidebarComponent, PhotoProvenanceComponent, PhotoRelatedFilesComponent, PhotoAlbumsComponent,
     StackNavigatorComponent, NgTemplateOutlet, PanelRailComponent,
     ZoomPanDirective,
     PhotoObjectLayerComponent,
@@ -156,7 +153,7 @@ function inDetectedSet(photo: Photo): boolean {
     MatSelectModule,
     MatProgressSpinnerModule,
     MatSnackBarModule,
-    FixedPipe, ShutterSpeedPipe, MatExpansionModule,
+    FixedPipe, MatExpansionModule,
     CaptureDatePipe, RenditionReadoutComponent,
     TranslatePipe, PluralKeyPipe,
     ThumbnailUrlPipe,
@@ -569,30 +566,9 @@ function inDetectedSet(photo: Photo): boolean {
               }
             }
           </section>
-          <!-- Camera, "how was it shot": the capture line, then EXIF, Technical and the histogram with its clipping. -->
+          <!-- Camera, "how was it shot": EXIF (the capture settings, once, at the panel's text size), Technical and the histogram with its clipping. -->
           <section id="photo-panel-camera" data-photo-panel="camera" role="tabpanel" aria-labelledby="photo-rail-camera" [hidden]="rail.shownPage() !== 'camera'" class="space-y-4">
-            <div data-photo-capture class="text-xs text-[var(--mat-sys-on-surface-variant)]">
-            @if (p.camera_model || (p.lens_model | isLensName) || p.focal_length || p.f_stop || p.shutter_speed || p.iso || (p.image_width && p.image_height)) {
-              <!-- Each item's "·" sits in the gap before it, so the one that would open a wrapped line is clipped. -->
-              <div data-photo-exposure role="group" [attr.aria-label]="I18N.photo_detail.capture_settings | translate" class="overflow-x-clip">
-                <div class="-ms-3 flex flex-wrap items-center tabular-nums [&>span]:relative [&>span]:ms-3 [&>span]:before:absolute [&>span]:before:-start-2 [&>span]:before:content-['·']">
-                @if (p.camera_model) { <span>{{ p.camera_model }}</span> }
-                @if (p.lens_model && (p.lens_model | isLensName)) { <span>{{ p.lens_model }}</span> }
-                @if (p.focal_length) { <span>{{ p.focal_length }}mm</span> }
-                @if (p.f_stop) { <span>f/{{ p.f_stop }}</span> }
-                @if (p.shutter_speed | shutterSpeed; as shutter) { <span>{{ shutter }}</span> }
-                @if (p.iso) { <span>ISO {{ p.iso }}</span> }
-                @if (p.image_width && p.image_height) {
-                  <span class="inline-flex items-center gap-0.5 whitespace-nowrap">
-                    <span data-photo-dimensions>{{ p.image_width }} × {{ p.image_height }}</span>
-                    <app-context-help class="-my-1.5" [label]="I18N.gallery.compare.rendition.sources" [keys]="[I18N.photo_detail.rendition.note]" [iconOnly]="true" />
-                  </span>
-                }
-                </div>
-              </div>
-            }
-            </div>
-            <app-photo-metrics-tabs panel="camera" [sections]="CAMERA_METRICS" [assessment]="false" [photo]="p" [ranges]="store.metricRangesByColumn()"
+            <app-photo-metrics-tabs panel="camera" class="text-xs" [sections]="CAMERA_METRICS" [assessment]="false" [dimensionsHelp]="true" [photo]="p" [ranges]="store.metricRangesByColumn()"
                                     [populated]="store.config()?.populated_scores"
                                     [histogramHeight]="HISTOGRAM_PANEL_HEIGHT"
                                     [histogramDefaultMode]="histogramDefaultMode()"
