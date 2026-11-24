@@ -1572,9 +1572,16 @@ export class GalleryComponent implements OnInit, OnDestroy {
    */
   readonly detailsRailVisible = computed(() => this.panelMode() && isPhotoTab(this.rail.tab()));
 
-  /** A photo enters the panel: it opens the last photo tab, but only while no other panel (Filter, an add-on) is up. */
-  private openRail(): void {
-    if (this.panelMode() && this.rail.tab() === null) this.rail.open(this.lastPhotoTab);
+  /**
+   * A photo enters the panel: it opens the last photo tab while no panel is up. A click (or Space) on a photo
+   * is an explicit ask for its details, so it also takes the place of Showing; a hover never does, and an
+   * add-on's panel is never replaced. Without this a click with Showing open (opened by Filters, or left open
+   * and restored on reload) changed nothing on screen: the details panel seemed gone for good.
+   */
+  private openRail(explicit = false): void {
+    if (!this.panelMode()) return;
+    const tab = this.rail.tab();
+    if (tab === null || (explicit && tab === 'filter')) this.rail.open(this.lastPhotoTab);
   }
 
   /** A view or collection reset drops the hovered photo; its tab closes with it unless the keyboard cursor still holds one. */
@@ -2724,9 +2731,9 @@ export class GalleryComponent implements OnInit, OnDestroy {
     const selected = this.viewScoped() ? !this.excludedPaths().has(photo.path) : this.selectedPaths().has(photo.path);
     if (this.panelMode() && !selected) {
       this.tooltipPhoto.set(photo);
-      this.openRail();
       this.setCursor(-1);
     } else this.setCursor(index);
+    this.openRail(true);
     this.focusCard(index);
   }
 
@@ -3484,7 +3491,24 @@ export class GalleryComponent implements OnInit, OnDestroy {
   protected onGridFocusOut(event: FocusEvent): void {
     const next = event.relatedTarget as HTMLElement | null;
     if (next?.closest('[role="grid"], [data-photo-collection], [data-collection-header], [data-selection-bar], [data-details-rail], .cdk-overlay-container')) return;
-    this.setCursor(-1);
+    const card = (event.target as HTMLElement | null)?.closest?.('app-photo-card');
+    if (next || !card) {
+      this.setCursor(-1);
+      return;
+    }
+    // Focus went nowhere from a card. Either the user left (a click on the page's empty space), or the grid
+    // re-rendered the card under the focus: the details panel opening narrows the grid, the virtual rows are
+    // rebuilt with fewer columns, and the focused card is destroyed (the browser reports the blur while it
+    // is still attached). That is not leaving. Clearing the cursor there dropped the photo just clicked, and
+    // the hover on whichever card then slid under the pointer took the panel over: the clicked photo was
+    // never the one shown. Decide once the render is done: a detached card keeps the cursor and its new
+    // card takes the focus back.
+    const revision = this.cursorRevision;
+    queueMicrotask(() => {
+      if (revision !== this.cursorRevision) return;
+      if (card.isConnected) this.setCursor(-1);
+      else if (this.hasActivePhoto()) this.focusCard(this.activeIndex(), false, false);
+    });
   }
 
   /** Whether the cursor is actually standing on a photo that is on screen.

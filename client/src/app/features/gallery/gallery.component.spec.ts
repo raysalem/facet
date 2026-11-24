@@ -3050,6 +3050,56 @@ describe('GalleryComponent', () => {
       it('keeps the inspected photo and open rail when another page is appended', () => {
         const photo = makePhoto({ path: '/a.jpg' });
         mockStore.photos.set([photo]); TestBed.tick();
+      it('a click on a photo shows its details in place of Showing; a hover never takes Showing over', () => {
+        const photo = makePhoto({ path: '/a.jpg' });
+        mockStore.photos.set([photo]); TestBed.tick();
+        const rail = component['rail'];
+        rail.open('filter');
+        component.showTooltip(hoverEvent, photo);
+        expect(rail.tab()).toBe('filter');
+        // Before the fix the click changed nothing on screen: Showing stayed, so the details seemed gone.
+        component['toggleSelection'](photo, new MouseEvent('click'), 0);
+        expect(rail.tab()).toBe('grade');
+        expect(component.detailsRailVisible()).toBe(true);
+      });
+
+      it('a click never replaces an add-on panel the user opened', () => {
+        const photo = makePhoto({ path: '/a.jpg' });
+        mockStore.photos.set([photo]); TestBed.tick();
+        const rail = component['rail'];
+        rail.tab.set('addon:astro');
+        component['toggleSelection'](photo, new MouseEvent('click'), 0);
+        expect(rail.tab()).toBe('addon:astro');
+      });
+
+      describe('a focused card the grid re-renders (the panel opening narrows it)', () => {
+        const photos = [makePhoto({ path: '/a.jpg' }), makePhoto({ path: '/b.jpg' })];
+        let card: HTMLElement;
+        beforeEach(() => {
+          mockStore.photos.set(photos); TestBed.tick();
+          card = document.createElement('app-photo-card');
+          document.body.appendChild(card);
+          component['setCursor'](1);
+        });
+        afterEach(() => card.remove());
+        const blur = () => component['onGridFocusOut']({ target: card, relatedTarget: null } as unknown as FocusEvent);
+
+        it('keeps the clicked photo when the card was destroyed under the focus', async () => {
+          blur();
+          card.remove();
+          await Promise.resolve();
+          // Clearing it here let the card that slid under the pointer take the panel: the wrong photo showed.
+          expect(component['hasActivePhoto']()).toBe(true);
+          expect(component['panelPhoto']()?.path).toBe('/b.jpg');
+        });
+
+        it('still drops the cursor when focus really left the grid for nowhere', async () => {
+          blur();
+          await Promise.resolve();
+          expect(component['hasActivePhoto']()).toBe(false);
+        });
+      });
+
         component.showTooltip(hoverEvent, photo);
         mockStore.photos.set([photo, makePhoto({ path: '/b.jpg' })]); TestBed.tick();
         expect(component['tooltipPhoto']()?.path).toBe('/a.jpg');
