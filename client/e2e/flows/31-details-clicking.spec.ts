@@ -34,9 +34,15 @@ function random(seed: number): () => number {
 
 /** Where a control is now: its centre, read once, before the hand moves. */
 async function centre(target: Locator): Promise<{ x: number; y: number }> {
-  await expect(target).toBeVisible();
-  const box = (await target.boundingBox())!;
-  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  // The grid can re-render the card between the check and the read (a reload, a panel narrowing it): read again.
+  let box: Awaited<ReturnType<Locator['boundingBox']>> = null;
+  await expect.poll(async () => {
+    await expect(target).toBeVisible();
+    box = await target.boundingBox();
+    return box !== null;
+  }, { message: 'the target has a box on screen' }).toBe(true);
+  const { x, y, width, height } = box!;
+  return { x: x + width / 2, y: y + height / 2 };
 }
 
 /** A hand's click: travel at about hand speed (16 ms per step) to where the target was, press, release. */
@@ -244,13 +250,16 @@ test.describe('hand clicks on a moving gallery (B54)', () => {
         await page.goto(`/?${query}`);
         await expect(photoButton(page, 'IMG_0300.jpg')).toBeVisible();
         // Read where the photos are now (a panel left open is remembered across the reload).
-        const cells = await page.getByRole('gridcell').evaluateAll(all => all.map(cell => {
+        const read = () => page.getByRole('gridcell').evaluateAll(all => all.map(cell => {
           const button = cell.querySelector('[role=button]')!; const r = button.getBoundingClientRect();
           // Only a photo whose centre is really on screen (not under a notice card or the selection bar).
           const x = r.x + r.width / 2, y = r.y + r.height / 2;
           const onTop = button.contains(document.elementFromPoint(x, y));
           return { name: button.getAttribute('aria-label')!.split(',')[0], x, y, bottom: r.bottom, top: r.y, onTop };
         }).filter(cell => cell.onTop && cell.top > 110 && cell.bottom < innerHeight - 4));
+        // The grid may still be laying out right after the reload: wait until it shows a few rows.
+        await expect.poll(async () => (await read()).length, { message: 'photos laid out' }).toBeGreaterThan(5);
+        const cells = await read();
         const lastRow = Math.max(...cells.map(cell => cell.top));
         const target = which === 'last row' ? cells.filter(cell => cell.top === lastRow).at(-1)! : cells.find(cell => cell.name === which) ?? cells[3];
         await page.mouse.move(target.x, target.y, { steps: 10 });
@@ -302,20 +311,21 @@ test.describe('hand clicks on a moving gallery (B54)', () => {
   });
 });
 
+/** The photos on screen now, with the part of each that shows (the bottom row is cut by the window's edge). */
+const onScreen = (page: Page) => page.getByRole('gridcell').evaluateAll(all => all.map(cell => {
+  const button = cell.querySelector('[role=button]')!; const r = button.getBoundingClientRect();
+  const shown = Math.min(r.bottom, innerHeight - 70) - r.y;
+  return { name: button.getAttribute('aria-label')!.split(',')[0], x: r.x + r.width / 2, y: r.y + Math.max(8, Math.min(r.height / 2, shown / 2)), top: r.y, bottom: r.bottom };
+}).filter(cell => cell.top > 115 && cell.top < innerHeight - 70));
+const pressAt = async (page: Page, x: number, y: number) => {
+  await page.mouse.move(x, y, { steps: 12 });
+  await page.mouse.down();
+  await page.mouse.up();
+};
+
+
 // B55 fixed scenarios: each fails without its fix.
 test.describe('round 3 (B55)', () => {
-  /** The photos on screen now, with the part of each that shows (the bottom row is cut by the window's edge). */
-  const onScreen = (page: Page) => page.getByRole('gridcell').evaluateAll(all => all.map(cell => {
-    const button = cell.querySelector('[role=button]')!; const r = button.getBoundingClientRect();
-    const shown = Math.min(r.bottom, innerHeight - 70) - r.y;
-    return { name: button.getAttribute('aria-label')!.split(',')[0], x: r.x + r.width / 2, y: r.y + Math.max(8, Math.min(r.height / 2, shown / 2)), top: r.y, bottom: r.bottom };
-  }).filter(cell => cell.top > 115 && cell.top < innerHeight - 70));
-  const pressAt = async (page: Page, x: number, y: number) => {
-    await page.mouse.move(x, y, { steps: 12 });
-    await page.mouse.down();
-    await page.mouse.up();
-  };
-
   test('R1: in Hover mode a click holds the panel on its photo while the grid scrolls under the still pointer', async ({ page }) => {
     await freshGallery(page, 1180, undefined, 880);
     await hand(page, photoButton(page, 'IMG_0300.jpg'));
@@ -407,6 +417,75 @@ test.describe('round 3 (B55)', () => {
     await page.waitForTimeout(400);
     await page.keyboard.press('Escape');
     await expect(detailsPanel(page)).toHaveCount(0);
+  });
+});
+
+// B55 round 4: each fails without its fix.
+test.describe('round 4 (B55)', () => {
+  /** The photo whose card is at a point of the screen. */
+  const photoAt = (page: Page, x: number, y: number) => page.evaluate(([px, py]) =>
+    document.elementFromPoint(px, py)?.closest('[role=gridcell]')?.querySelector('[role=button]')?.getAttribute('aria-label')?.split(',')[0] ?? null, [x, y]);
+  /** A photo in the middle of the screen, and a point inside it. */
+  const middlePhoto = async (page: Page) => {
+    const name = await photoAt(page, 400, 450);
+    const box = (await photoButton(page, name!).boundingBox())!;
+    return { name: name!, x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  };
+  const cardName = (page: Page) => floatingCard(page).locator('.truncate > span.truncate').first();
+
+  for (const [place, how] of [['card', 'wheel'], ['panel', 'PageDown']] as const) {
+    test(`V1c: after a scroll under a still pointer, a small real move shows the photo now under it (${place}, ${how})`, async ({ page }) => {
+      await freshGallery(page, 1180, `details_place=${place}&details_trigger=hover`, 880);
+      const start = await middlePhoto(page);
+      if (place === 'panel') {
+        // Click it twice: the panel is open and holds nothing, so it follows the hover.
+        await pressAt(page, start.x, start.y);
+        await expectPanelHolds(page, start.name, 'opened');
+        await page.mouse.down();
+        await page.mouse.up();
+        await page.waitForTimeout(700);
+      } else {
+        await page.mouse.move(start.x, start.y, { steps: 12 });
+        await expect(cardName(page)).toHaveText(start.name);
+      }
+      if (how === 'wheel') await page.mouse.wheel(0, 260);
+      else {
+        await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+        await page.keyboard.press('PageDown');
+      }
+      await page.waitForTimeout(900);
+      const now = await photoAt(page, start.x, start.y);
+      expect(now, 'another photo under the pointer after the scroll').not.toBe(start.name);
+      // The hand moves 6 px, staying inside that photo.
+      await page.mouse.move(start.x + 5, start.y + 3, { steps: 6 });
+      expect(await photoAt(page, start.x + 5, start.y + 3)).toBe(now);
+      if (place === 'panel') await expect(owner(page), 'the panel names the photo under the pointer').toHaveText(now!);
+      else await expect(cardName(page), 'the card names the photo under the pointer').toHaveText(now!);
+    });
+  }
+
+  test('N1: a pinned card with no room for all of it is made smaller, never cut, and shows the file name', async ({ page }) => {
+    await freshGallery(page, 800, 'details_place=card&details_trigger=click', 900);
+    const cells = (await onScreen(page)).filter(cell => cell.bottom < 880);
+    for (const cell of cells) {
+      await pressAt(page, cell.x, cell.y);
+      await expect(floatingCard(page)).toBeVisible();
+      await page.waitForTimeout(250);
+      const cut = await floatingCard(page).evaluate(el => el.scrollHeight - el.clientHeight);
+      expect(cut, `${cell.name}: the card is cut by ${cut} px`).toBeLessThanOrEqual(2);
+      await expect(cardName(page), `${cell.name}: the file name shows`).toBeInViewport({ ratio: 1 });
+      await pressAt(page, cell.x, cell.y);
+      await expect(floatingCard(page)).toHaveCount(0);
+    }
+  });
+
+  test('a click shows the card in a narrow window with a mouse (640 to 767 px)', async ({ page }) => {
+    for (const width of [640, 700, 767]) {
+      await freshGallery(page, width, 'details_place=card&details_trigger=click', 880);
+      const cell = (await onScreen(page))[0];
+      await pressAt(page, cell.x, cell.y);
+      await expect(cardName(page), `${width} px`).toHaveText(cell.name);
+    }
   });
 });
 

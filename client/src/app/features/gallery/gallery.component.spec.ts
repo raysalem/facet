@@ -3190,6 +3190,32 @@ describe('GalleryComponent', () => {
         expect(component['tooltipPhoto']()?.path).toBe('/b.jpg');
       });
 
+      it('after a still-pointer enter, the first real move inside that photo takes it; jitter and leaving do not (B55 V1c)', () => {
+        const [a, b] = [makePhoto({ path: '/a.jpg' }), makePhoto({ path: '/b.jpg' })];
+        mockStore.photos.set([a, b]); TestBed.tick();
+        component.showTooltip(pickEvent, a);
+        const cardB = document.createElement('div');
+        const inside = document.createElement('span');
+        cardB.appendChild(inside);
+        document.body.appendChild(cardB);
+        const move = (x: number, y: number, target: EventTarget) => component['notePointer']({ type: 'pointermove', clientX: x, clientY: y, target } as unknown as PointerEvent);
+        move(300.4, 500.6, inside);
+        component.showTooltip({ type: 'mouseenter', clientX: 300, clientY: 501, currentTarget: cardB } as unknown as MouseEvent, b);
+        expect(component['tooltipPhoto']()?.path).toBe('/a.jpg');
+        move(301.5, 501.2, inside);
+        expect(component['tooltipPhoto']()?.path).toBe('/a.jpg');
+        move(305, 503, inside);
+        expect(component['tooltipPhoto']()?.path).toBe('/b.jpg');
+        // Leaving the photo before moving drops the pending enter.
+        component['tooltipPhoto'].set(a);
+        move(305, 503, inside);
+        component.showTooltip({ type: 'mouseenter', clientX: 305, clientY: 503, currentTarget: cardB } as unknown as MouseEvent, b);
+        move(320, 503, document.body);
+        move(330, 503, inside);
+        expect(component['tooltipPhoto']()?.path).toBe('/a.jpg');
+        cardB.remove();
+      });
+
       it('a click never replaces an add-on panel the user opened', () => {
         const photo = makePhoto({ path: '/a.jpg' });
         mockStore.photos.set([photo]); TestBed.tick();

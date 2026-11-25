@@ -41,6 +41,9 @@ const ALBUM_FOLD = ':album';
 const HOVER_CAP = 4;
 
 const SET_INFO_DWELL_MS = 300;
+/** What a compact floating card keeps below its picture: the file name, the date, the category and score, the
+ *  stars (with the card's padding). A picture shorter than 72 px is left out. */
+const COMPACT_TEXT_PX = 150;
 
 /** The scores the floating bubble keeps: one per question a glance asks -- is it
  *  pleasing, well composed, sharp, well exposed. */
@@ -100,7 +103,7 @@ const KEY_SCORES = [
                rounded corners show on every orientation. In the docked rail it
                takes the rail's width, so a portrait photo is as large as the column
                allows; only a very tall one is capped and contained. -->
-          @if (shows().content) {
+          @if (shows().content && compactImageHeight() !== 0) {
           <img
             [src]="p.path | thumbnailUrl:640:p.preview_revision"
             [alt]="p.filename"
@@ -111,6 +114,7 @@ const KEY_SCORES = [
             [class.w-full]="docked()"
             [class.object-contain]="docked()"
             [class.max-h-[75dvh]]="docked()"
+            [style.max-height.px]="compactImageHeight()"
           />
           }
 
@@ -153,14 +157,14 @@ const KEY_SCORES = [
             }
 
             <!-- Caption (after score) -->
-            @if ((p.caption_translated || p.caption) && shows().content) {
+            @if ((p.caption_translated || p.caption) && shows().content && compactRoom() === null) {
               <!-- w-0 + min-w-full: the caption wraps inside the width the photo and
                    scores already give the bubble instead of widening it. -->
               <div class="w-0 min-w-full text-xs italic text-[var(--facet-tooltip-text-muted)] mb-1.5">{{ p.caption_translated || p.caption }}</div>
             }
 
             <!-- Narrative moment (with confidence) -->
-            @if ((p.narrative_moment | momentLabel) && shows().content) {
+            @if ((p.narrative_moment | momentLabel) && shows().content && compactRoom() === null) {
               @let ml = p.narrative_moment | momentLabel;
               <div class="text-xs mb-1.5 flex items-center gap-1.5">
                 <span class="text-[var(--mat-sys-primary)] font-medium">✦ {{ ml }}</span>
@@ -192,12 +196,13 @@ const KEY_SCORES = [
                 <ng-container [ngTemplateOutlet]="captureLine" [ngTemplateOutletContext]="{ $implicit: p }" />
               }
             }
-            @if (!isLandscape() && !docked()) {
+            @if (!isLandscape() && !docked() && compactRoom() === null) {
               <ng-container [ngTemplateOutlet]="details" />
             }
           </div>
         </div>
-        @if (isLandscape() || docked()) {
+        <!-- A compact card (no room for all of it) keeps the name, the date, the scores and the capture line. -->
+        @if ((isLandscape() || docked()) && compactRoom() === null) {
           <ng-container [ngTemplateOutlet]="details" />
         }
 
@@ -527,7 +532,31 @@ export class PhotoTooltipComponent {
   protected readonly placement = computed(() => {
     const anchor = this.anchor();
     const { width, height } = this.measured();
-    return anchor && width && !this.docked() && !this.sheet() ? placeCard(anchor, width, height, this.bounds()) : null;
+    const full = Math.max(height, this.fullHeight());
+    return anchor && width && !this.docked() && !this.sheet() ? placeCard(anchor, width, full, this.bounds()) : null;
+  });
+
+  /** The whole card's height for the current photo, measured while it is shown whole; kept while it is compact,
+   *  so making it compact cannot flip it back and forth. */
+  private readonly fullHeight = signal(0);
+
+  /** When the whole card does not fit where it goes (a narrow window, a photo in the middle column), the room it
+   *  has: the picture shrinks, or goes, so the file name and the key facts show rather than a clipped card (N1). */
+  protected readonly compactRoom = computed(() => {
+    const placed = this.placement();
+    const full = this.fullHeight();
+    return placed && full > placed.maxHeight + 1 ? placed.maxHeight : null;
+  });
+
+  /** A compact card's height without its picture, measured once it is compact. */
+  private readonly compactText = signal(0);
+
+  /** The picture's height cap in a compact card, 0 when there is no room for it beside the name and key facts. */
+  protected readonly compactImageHeight = computed(() => {
+    const room = this.compactRoom();
+    if (room === null) return null;
+    const left = room - (this.compactText() || COMPACT_TEXT_PX) - 2;
+    return left >= 72 ? left : 0;
   });
 
   /** Top edge kept inside the viewport (16px margin) once the height is known. */
@@ -557,6 +586,19 @@ export class PhotoTooltipComponent {
       this.photo(); this.docked(); this.pinned(); this.personLinks();
       untracked(() => this.closeOverlays());
     });
+    // Another photo is another card: measure it whole again.
+    effect(() => {
+      this.photo();
+      untracked(() => {
+        this.fullHeight.set(0);
+        this.compactText.set(0);
+        // Its size may not change (a capped box stays capped), so the observer would not tell: measure once drawn.
+        requestAnimationFrame(() => {
+          const el = this.rootEl()?.nativeElement;
+          if (el && !this.docked() && this.compactRoom() === null) this.fullHeight.set(Math.max(el.getBoundingClientRect().height, el.scrollHeight));
+        });
+      });
+    });
     this.destroyRef.onDestroy(() => { this.destroyed = true; });
     const onResize = () => this.viewport.set({ width: window.innerWidth, height: window.innerHeight });
     window.addEventListener('resize', onResize);
@@ -567,12 +609,17 @@ export class PhotoTooltipComponent {
       const measure = () => {
         const r = el.getBoundingClientRect();
         this.measured.set({ width: r.width, height: r.height });
+        if (untracked(() => this.compactRoom()) === null) this.fullHeight.set(Math.max(r.height, el.scrollHeight));
+        else this.compactText.set(el.scrollHeight - (el.querySelector('img')?.getBoundingClientRect().height ?? 0));
         this.viewport.set({ width: window.innerWidth, height: window.innerHeight });
       };
       measure();
       const observer = new ResizeObserver(measure);
       observer.observe(el);
-      onCleanup(() => observer.disconnect());
+      // A compact card's content changes inside a box whose size may not: watch the content too.
+      const content = new ResizeObserver(measure);
+      for (const child of Array.from(el.children)) content.observe(child);
+      onCleanup(() => { observer.disconnect(); content.disconnect(); });
     });
     effect(onCleanup => {
       const p = this.photo();

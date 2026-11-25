@@ -1558,8 +1558,12 @@ export class GalleryComponent implements OnInit, OnDestroy {
     this.selectionAffordance() || (this.selectingPhotos() && !this.isDesktop()),
   );
   protected readonly cardDetailsPlace = computed<DetailsPlace>(() =>
-    this.selectingPhotos() && !this.isDesktop() && !this.detailsOnTap() ? 'off' : this.detailsPlace(),
+    this.selectingPhotos() && this.selectionHidesDetails() && !this.detailsOnTap() ? 'off' : this.detailsPlace(),
   );
+  /** Below md, picking photos turns the details off (a tap only picks), except in a window wide enough for side
+   *  panels driven by a mouse: there a click selects and shows its card, as above md (from 640 to 767 px a click
+   *  showed no card). */
+  private readonly selectionHidesDetails = computed(() => !this.isDesktop() && (!this.sidePanels() || this.isTouchDevice()));
 
   /** Whether to hide photo details below the thumbnails */
   readonly effectiveHideDetails = computed(() => this.store.filters().hide_details);
@@ -1595,7 +1599,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
     });
   })();
   /** Whether tooltip is fully disabled (off mode) — used for skipping rendering and hover handlers */
-  readonly tooltipDisabled = computed(() => this.detailsPlace() === 'off' || (this.selectingPhotos() && !this.isDesktop() && !this.detailsOnTap()));
+  readonly tooltipDisabled = computed(() => this.detailsPlace() === 'off' || (this.selectingPhotos() && this.selectionHidesDetails() && !this.detailsOnTap()));
   /** A phone's bottom sheet (a touch screen below sm, Panel on phone: Bottom sheet): a tap on a photo shows its
    *  details in a sheet along the bottom of the screen, as well as selecting it (B54); a tap elsewhere, Escape or
    *  Clear closes it. A narrow window with a mouse keeps the floating card. */
@@ -3120,8 +3124,23 @@ export class GalleryComponent implements OnInit, OnDestroy {
   /** When the user last scrolled on purpose (wheel, touch, a scroll key). */
   private userScrollAt = -Infinity;
 
+  /** A hover ignored because the pointer had not moved (B55): the photo then under the pointer gets no other
+   *  enter, so the first real move inside it takes it (V1c). Only set while such an enter is pending. */
+  private pendingHover: { photo: Photo; target: HTMLElement; from: { x: number; y: number } } | null = null;
+
   private notePointer(event: PointerEvent): void {
     this.lastPointer = { x: event.clientX, y: event.clientY };
+    const pending = this.pendingHover;
+    if (!pending || event.type !== 'pointermove') return;
+    if (!pending.target.isConnected || !pending.target.contains(event.target as Node | null)) {
+      this.pendingHover = null;
+      return;
+    }
+    // More than a hand's tremor (1 to 2 px jitter keeps the details where they are).
+    if (Math.hypot(event.clientX - pending.from.x, event.clientY - pending.from.y) <= 2) return;
+    this.pendingHover = null;
+    // A hover of that photo, now the pointer has really moved; `target` stands in for the enter's own element.
+    this.showTooltip(new MouseEvent('mouseenter', { clientX: event.clientX, clientY: event.clientY }), pending.photo, pending.target);
   }
 
   /** A hover that is not the pointer moving: a card slid under a still pointer (the grid scrolled to clear the
@@ -3313,9 +3332,16 @@ export class GalleryComponent implements OnInit, OnDestroy {
     this.photoActions.embedMetadata(photo);
   }
 
-  showTooltip(event: MouseEvent, photo: Photo): void {
+  showTooltip(event: MouseEvent, photo: Photo, target?: HTMLElement): void {
     const place = this.detailsPlace();
-    if (place === 'off' || this.hoverWithoutMove(event)) return;
+    if (place === 'off') return;
+    if (!target && this.hoverWithoutMove(event)) {
+      const at = this.lastPointer;
+      const element = event.currentTarget as HTMLElement | null;
+      this.pendingHover = element && at ? { photo, target: element, from: at } : null;
+      return;
+    }
+    this.pendingHover = null;
     // The rail is parked, so none of the placement maths below applies to it.
     // Only while it is actually shown, though: with the mode selected on a
     // viewport too narrow for the rail, skipping the maths left the floating
@@ -3357,7 +3383,8 @@ export class GalleryComponent implements OnInit, OnDestroy {
       return;
     }
     this.pinnedTooltipPath.set(byClick ? photo.path : null);
-    const card = (event.currentTarget as HTMLElement)?.closest('.relative.rounded-lg') as HTMLElement ?? event.currentTarget as HTMLElement;
+    const source = target ?? event.currentTarget as HTMLElement;
+    const card = source?.closest('.relative.rounded-lg') as HTMLElement ?? source;
     const rect = card.getBoundingClientRect();
     const padding = 16;
     const isLandscape = aspectOf(photo) > 1;
