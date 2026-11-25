@@ -38,16 +38,19 @@ export const COMPACT_CARD = { width: 272, height: 230 } as const;
  * The size the whole card needs at this window height: a landscape photo's picture above the facts, a portrait
  * one's beside them. A fixed function of the photo's shape and the window, never of the rendered card.
  */
-export function fullCardSize(landscape: boolean, aspect: number, windowHeight: number, maxWidth: number): { width: number; height: number } {
+export function fullCardSize(landscape: boolean, aspect: number, windowHeight: number, maxWidth: number, captionChars = 0): { width: number; height: number } {
   const naturalHeight = aspect > 1 ? 640 / aspect : 640;
+  // The caption wraps in the facts column: about 6.5 px a character, 16 px a line, plus its margin.
+  const caption = (column: number) => captionChars ? Math.ceil(captionChars * 6.5 / Math.max(120, column)) * 16 + 6 : 0;
   if (landscape) {
     const imageHeight = Math.min(naturalHeight, windowHeight * 0.35);
+    const width = Math.min(maxWidth, Math.ceil(imageHeight * aspect) + 24);
     // 260 = scores (~160) + EXIF line (~60) + tags (~40)
-    return { width: Math.min(maxWidth, Math.ceil(imageHeight * aspect) + 24), height: Math.ceil(imageHeight) + 260 };
+    return { width, height: Math.ceil(imageHeight) + 260 + caption(width - 24) };
   }
   const imageHeight = Math.min(naturalHeight, windowHeight * 0.5);
   // 260 + 12 + 24: the facts column beside the picture, the gap and the padding; 100 = EXIF line + tags
-  return { width: Math.min(maxWidth, Math.ceil(imageHeight * aspect) + 296), height: Math.max(Math.ceil(imageHeight), 300) + 100 };
+  return { width: Math.min(maxWidth, Math.ceil(imageHeight * aspect) + 296), height: Math.max(Math.ceil(imageHeight), 300 + caption(260)) + 100 };
 }
 
 export function placeCard(photo: PlacementBox, width: number, height: number, area: PlacementBox, margin = 16): CardPlacement {

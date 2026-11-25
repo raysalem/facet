@@ -507,9 +507,6 @@ test.describe('round 5 (B57)', () => {
       // Every photo on screen, about 4.5 s each.
       test.setTimeout(180_000);
       await freshGallery(page, width, 'details_place=card&details_trigger=click', 880);
-      // From 1024 px the notice stack folds on its own after 6 s, a real change of the card's area that places
-      // it again once; wait for it so only the card itself is under test.
-      if (width >= 1024) await page.waitForTimeout(6500);
       if (showing) {
         await hand(page, page.getByRole('button', { name: 'Filters', exact: true }));
         await expect(showingPanel(page)).toBeVisible();

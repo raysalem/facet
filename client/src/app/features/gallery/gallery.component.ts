@@ -99,6 +99,9 @@ import { PageHelpService } from '../../core/services/page-help.service';
 import { MAX_COMPARE_QUEUE } from './comparison-slots.util';
 import { HistogramMode, isHistogramMode } from '../../shared/utils/histogram';
 
+/** The folded notice pill's height: the band the floating card keeps clear of at the grid's lower right. */
+const NOTICE_PILL_PX = 44;
+
 /** Keys that scroll the grid: a scroll right after one is the user's own. */
 const SCROLL_KEYS = new Set(['PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown', ' ']);
 
@@ -3113,8 +3116,8 @@ export class GalleryComponent implements OnInit, OnDestroy {
       ['scroll', event => this.onScrollCapture(event)],
       ['wheel', () => { this.userScrollAt = performance.now(); }],
       ['touchmove', () => { this.userScrollAt = performance.now(); }],
-      ['animationend', event => this.onNoticesSettled(event)],
-      ['transitionend', event => this.onNoticesSettled(event)],
+      ['animationend', event => this.onBarSettled(event)],
+      ['transitionend', event => this.onBarSettled(event)],
     ];
     for (const [type, listener] of listeners) doc.addEventListener(type, listener, true);
     inject(DestroyRef).onDestroy(() => { for (const [type, listener] of listeners) doc.removeEventListener(type, listener, true); });
@@ -3394,13 +3397,13 @@ export class GalleryComponent implements OnInit, OnDestroy {
     const host = this.noticeHost()?.nativeElement.getBoundingClientRect();
     const header = this.collectionHeader()?.nativeElement.getBoundingClientRect();
     const bar = this.selectionBar()?.nativeElement.getBoundingClientRect();
-    // The notice stack floats over the grid's lower right; the card keeps clear of it too.
     let bottom = window.innerHeight;
     if (bar && bar.height) bottom = Math.min(bottom, bar.top - 8);
-    // The visible notice cards and pill (not their stack's box, which can span the whole height).
-    const notices = [...(this.noticeHost()?.nativeElement.querySelectorAll<HTMLElement>('[data-gallery-notices] > *') ?? [])]
-      .map(notice => notice.getBoundingClientRect()).filter(rect => rect.height > 0 && rect.width > 0);
-    if (notices.length) bottom = Math.min(bottom, Math.min(...notices.map(rect => rect.top)) - 8);
+    // The notice stack floats over the grid's lower right. The card keeps clear of its folded pill, a fixed band
+    // whether the stack is folded or open: the stack folds on its own (after 6 s from 1024 px, and when the window
+    // narrows), and following it changed a pinned card while nothing moved (B57). Open, the cards above the pill
+    // may lie under the card for those seconds.
+    if (this.noticeStackVisible() && host) bottom = Math.min(bottom, host.bottom - this.noticeBottomPx() - NOTICE_PILL_PX - 8);
     return {
       left: host ? Math.max(0, host.left) : 0,
       right: host && host.width ? Math.min(window.innerWidth, host.right) : window.innerWidth,
@@ -3446,7 +3449,8 @@ export class GalleryComponent implements OnInit, OnDestroy {
     const area = this.cardArea();
     const thumb = card.querySelector('img');
     const aspect = thumb?.naturalWidth && thumb.naturalHeight ? thumb.naturalWidth / thumb.naturalHeight : aspectOf(photo);
-    const full = fullCardSize(aspectOf(photo) > 1, aspect, window.innerHeight, area.right - area.left - 32);
+    const caption = (photo.caption_translated || photo.caption || '').length;
+    const full = fullCardSize(aspectOf(photo) > 1, aspect, window.innerHeight, area.right - area.left - 32, caption);
     let width = full.width;
     let placed = placeCard(rect, full.width, full.height, area);
     const compact = placed.maxHeight < full.height;
@@ -3460,9 +3464,9 @@ export class GalleryComponent implements OnInit, OnDestroy {
     this.tooltipFrame.set({ width, maxHeight: placed.maxHeight, compact });
   }
 
-  /** The notice stack finished folding, unfolding or moving: the card's area has its final bottom now (B57). */
-  private onNoticesSettled(event: Event): void {
-    if (!(event.target as Element | null)?.closest?.('[data-gallery-notices], [data-gallery-notices-pill]')) return;
+  /** The selection bar finished rising or leaving: the card's area has its final bottom now (B57). */
+  private onBarSettled(event: Event): void {
+    if (!this.selectionBar()?.nativeElement.contains(event.target as Node | null)) return;
     if (this.tooltipPhoto() && !this.panelMode()) requestAnimationFrame(() => this.replaceCard());
   }
 
@@ -3476,9 +3480,8 @@ export class GalleryComponent implements OnInit, OnDestroy {
     this.containerWidth();
     this.rail.tab();
     this.selectingPhotos();
-    this.noticesCollapsed();
-    this.noticesSignature();
     this.noticeStackVisible();
+    this.noticeBottomPx();
     untracked(() => { if (this.tooltipPhoto() && !this.panelMode()) requestAnimationFrame(() => this.replaceCard()); });
   });
 
