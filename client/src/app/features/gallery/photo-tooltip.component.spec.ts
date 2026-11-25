@@ -4,7 +4,7 @@ import { Component, signal, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
 import { of, Subject } from 'rxjs';
 import { PhotoTooltipComponent, type TooltipSection } from './photo-tooltip.component';
-import type { PlacementBox } from './card-placement';
+import type { CardFrame } from './card-placement';
 import { CategoryLabelPipe } from '../../shared/pipes/category-label.pipe';
 import { ApiService } from '../../core/services/api.service';
 import { I18nService } from '../../core/services/i18n.service';
@@ -22,14 +22,14 @@ import { OverlayContainer } from '@angular/cdk/overlay';
   template: `<app-photo-tooltip [photo]="photo()" [x]="x()" [y]="y()" [flipped]="flipped()"
                                  [pinned]="pinned()" [docked]="docked()" [personLinks]="personLinks()"
                                  [explainable]="explainable()" (explain)="explained = explained + 1" [section]="section()"
-                                 [addonNames]="addonNames()" [area]="area()" />`,
+                                 [addonNames]="addonNames()" [frame]="frame()" />`,
 })
 class TestHostComponent {
   photo = signal<Photo | null>(null);
   x = signal(0);
   y = signal(0);
   flipped = signal(false);
-  area = signal<PlacementBox | null>(null);
+  frame = signal<CardFrame | null>(null);
   pinned = signal(false);
   docked = signal(false);
   personLinks = signal(true);
@@ -68,11 +68,12 @@ describe('PhotoTooltipComponent', () => {
     const card = () => root.querySelector<HTMLElement>('app-photo-tooltip > div')!;
     const capture = () => root.querySelector<HTMLElement>('[data-capture-line]')!;
     fixture.detectChanges();
-    // At most 640 px, and never wider than the grid area it is placed in (the window here) less its margins.
-    expect(card().style.maxWidth).toContain('640px');
-    fixture.componentInstance.area.set({ left: 0, top: 0, right: 400, bottom: 800 });
+    // At most 640 px on its own; placed by the gallery, the width and height cap it was given.
+    expect(card().style.maxWidth).toBe('640px');
+    fixture.componentInstance.frame.set({ width: 368, maxHeight: 300, compact: false });
     fixture.detectChanges();
-    expect(card().style.maxWidth).toContain('368px');
+    expect(card().style.maxWidth).toBe('368px');
+    expect(card().style.maxHeight).toBe('300px');
     // The capture line cannot stretch the floating card: geometry in e2e flow 07-layout-geometry (step 5).
     fixture.componentInstance.docked.set(true);
     fixture.detectChanges();

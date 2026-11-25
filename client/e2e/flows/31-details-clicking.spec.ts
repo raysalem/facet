@@ -489,6 +489,55 @@ test.describe('round 4 (B55)', () => {
   });
 });
 
+// B57 (round 5): each fails without its fix.
+test.describe('round 5 (B57)', () => {
+  /** The pinned card's box, sampled every 50 ms for 3 s with nothing touched: every distinct box seen. */
+  const boxesWhileStill = async (page: Page) => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 60; i++) {
+      const box = await floatingCard(page).boundingBox();
+      seen.add(box ? [box.x, box.y, box.width, box.height].map(Math.round).join(',') : 'none');
+      await page.waitForTimeout(50);
+    }
+    return [...seen];
+  };
+
+  for (const [width, showing] of [[640, false], [1180, true]] as const) {
+    test(`K1: a pinned card does not change while nothing moves (${width} px, ${showing ? 'Showing open' : 'no panel'})`, async ({ page }) => {
+      // Every photo on screen, about 4.5 s each.
+      test.setTimeout(180_000);
+      await freshGallery(page, width, 'details_place=card&details_trigger=click', 880);
+      // From 1024 px the notice stack folds on its own after 6 s, a real change of the card's area that places
+      // it again once; wait for it so only the card itself is under test.
+      if (width >= 1024) await page.waitForTimeout(6500);
+      if (showing) {
+        await hand(page, page.getByRole('button', { name: 'Filters', exact: true }));
+        await expect(showingPanel(page)).toBeVisible();
+      }
+      const cells = (await onScreen(page)).filter(cell => cell.bottom < 860);
+      for (const cell of cells) {
+        await page.keyboard.press('Escape');
+        if (showing && !(await showingPanel(page).isVisible())) await hand(page, page.getByRole('button', { name: 'Filters', exact: true }));
+        await pressAt(page, cell.x, cell.y);
+        if (!(await floatingCard(page).isVisible())) continue;
+        await page.mouse.move(2, 870, { steps: 4 });
+        await page.waitForTimeout(600);
+        const boxes = await boxesWhileStill(page);
+        expect(boxes, `${cell.name}: the card's box over 3 s`).toHaveLength(1);
+      }
+    });
+  }
+
+  test('K2: Card and Hover in a 700 px window with a mouse: a hover shows the card, a click pins it', async ({ page }) => {
+    await freshGallery(page, 700, 'details_place=card&details_trigger=hover', 880);
+    const [first, second] = await onScreen(page);
+    await page.mouse.move(first.x, first.y, { steps: 12 });
+    await expect(floatingCard(page).locator('.truncate > span.truncate').first(), 'hover').toHaveText(first.name);
+    await pressAt(page, second.x, second.y);
+    await expect(floatingCard(page).locator('.truncate > span.truncate').first(), 'click').toHaveText(second.name);
+  });
+});
+
 test('every side panel hides to the rail with one click and comes back with one, remembered', async ({ page }) => {
   await freshGallery(page, 1180);
 

@@ -1,4 +1,4 @@
-import { placeCard } from './card-placement';
+import { fullCardSize, placeCard } from './card-placement';
 
 describe('placeCard', () => {
   // The grid's part of a 1180 x 880 window: below the toolbar (117), left of a 364 px rail and panel, above a
@@ -28,5 +28,21 @@ describe('placeCard', () => {
       expect(covers(photo, at, 600, 250)).toBe(false);
       expect(inside(at, 600, 250)).toBe(true);
     }
+  });
+
+  it('its height cap never lets a taller card cover its photo or leave the area', () => {
+    for (const photo of [box(16, 125), box(586, 125), box(300, 125), box(300, 575), box(300, 400)]) {
+      const at = placeCard(photo, 600, 250, area);
+      // A card as tall as its cap still keeps off its photo and inside the area.
+      expect(covers(photo, at, 600, at.maxHeight)).toBe(false);
+      expect(at.y + at.maxHeight).toBeLessThanOrEqual(area.bottom);
+    }
+  });
+
+  it('is a pure function of the window: the same inputs give the same place (K3)', () => {
+    const photo = box(300, 400);
+    expect(placeCard(photo, 395, 416, area)).toEqual(placeCard(photo, 395, 416, area));
+    expect(fullCardSize(true, 1.5, 880, 800)).toEqual(fullCardSize(true, 1.5, 880, 800));
+    expect(fullCardSize(true, 1.5, 880, 200).width).toBe(200);
   });
 });

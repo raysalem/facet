@@ -76,7 +76,7 @@ import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { STACK_MAX_MEMBERS, STACK_MIN_MEMBERS } from './stack-limits';
 import { PhotoStackService } from '../../core/services/photo-stack.service';
 import { PhotoTooltipComponent } from './photo-tooltip.component';
-import { placeCard } from './card-placement';
+import { COMPACT_CARD, fullCardSize, placeCard, type CardFrame } from './card-placement';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { PhotoActionsService } from '../../core/services/photo-actions.service';
 import { CardActionsService } from './card-actions.service';
@@ -1124,15 +1124,15 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
          rail renders its own, so the floating one stays away while the rail is up;
          wherever the rail cannot dock (narrow or touch viewports) the panel place
          falls back to this bubble, and hover mode still hides on pure touch. -->
-    @if (!tooltipDisabled() && !panelMode() && (phoneSheet() || detailsPlace() === 'panel' || detailsTrigger() !== 'hover' || (isDesktop() && !isTouchDevice()))) {
+    <!-- A hover card needs a mouse and a window with room for side panels (640 px up; K2). -->
+    @if (!tooltipDisabled() && !panelMode() && (phoneSheet() || detailsPlace() === 'panel' || detailsTrigger() !== 'hover' || ((isDesktop() || sidePanels()) && !isTouchDevice()))) {
       <app-photo-tooltip
         [photo]="tooltipPhoto()"
         [x]="tooltipX()"
         [y]="tooltipY()"
         [flipped]="tooltipFlipped()"
-        [area]="tooltipArea()"
+        [frame]="tooltipFrame()"
         [sheet]="phoneSheet()"
-        [anchor]="tooltipAnchor()"
         [pinned]="tooltipPinned()"
         [histogramDefaultMode]="tooltipHistogramDefaultMode()"
         [indicatorPercent]="clippingIndicatorPercent()"
@@ -1409,11 +1409,8 @@ export class GalleryComponent implements OnInit, OnDestroy {
   protected readonly tooltipX = signal(0);
   protected readonly tooltipY = signal(0);
   protected readonly tooltipFlipped = signal(false);
-  /** The grid's part of the screen, which the floating card stays inside (B55). */
-  protected readonly tooltipArea = signal<{ left: number; top: number; right: number; bottom: number } | null>(null);
-
-  /** The box of the photo the floating card belongs to, so the card stays beside it as its content grows. */
-  protected readonly tooltipAnchor = signal<{ left: number; top: number; right: number; bottom: number } | null>(null);
+  /** The floating card's width, height cap and form (full or compact), decided with its place (B57). */
+  protected readonly tooltipFrame = signal<CardFrame | null>(null);
 
   // Selection state lives in the store (survives navigation, visible to services)
   protected readonly selectedPaths = this.store.selectedPaths;
@@ -3116,6 +3113,8 @@ export class GalleryComponent implements OnInit, OnDestroy {
       ['scroll', event => this.onScrollCapture(event)],
       ['wheel', () => { this.userScrollAt = performance.now(); }],
       ['touchmove', () => { this.userScrollAt = performance.now(); }],
+      ['animationend', event => this.onNoticesSettled(event)],
+      ['transitionend', event => this.onNoticesSettled(event)],
     ];
     for (const [type, listener] of listeners) doc.addEventListener(type, listener, true);
     inject(DestroyRef).onDestroy(() => { for (const [type, listener] of listeners) doc.removeEventListener(type, listener, true); });
@@ -3383,45 +3382,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
       return;
     }
     this.pinnedTooltipPath.set(byClick ? photo.path : null);
-    const source = target ?? event.currentTarget as HTMLElement;
-    const card = source?.closest('.relative.rounded-lg') as HTMLElement ?? source;
-    const rect = card.getBoundingClientRect();
-    const padding = 16;
-    const isLandscape = aspectOf(photo) > 1;
-    const vh = window.innerHeight;
-
-    const thumbImg = (card.querySelector('img') as HTMLImageElement | null);
-    const thumbAspect = (thumbImg?.naturalWidth && thumbImg.naturalHeight)
-      ? thumbImg.naturalWidth / thumbImg.naturalHeight
-      : aspectOf(photo);
-    const tooltipNatH = thumbAspect > 1 ? 640 / thumbAspect : 640;
-
-    let tooltipWidth: number;
-    let tooltipHeight: number;
-    if (isLandscape) {
-      const imgH = Math.min(tooltipNatH, vh * 0.35);
-      const imgW = imgH * thumbAspect;
-      tooltipWidth = Math.ceil(imgW) + 24;
-      // 260 = scoring panel (~160) + tech/EXIF row (~60) + tags row (~40)
-      tooltipHeight = Math.ceil(imgH) + 260;
-    } else {
-      const imgH = Math.min(tooltipNatH, vh * 0.5);
-      const imgW = imgH * thumbAspect;
-      tooltipWidth = Math.ceil(imgW) + 260 + 12 + 24;
-      // 100 = tech/EXIF row (~60) + tags row (~40)
-      tooltipHeight = Math.max(Math.ceil(imgH), 300) + 100;
-    }
-
-    // Beside the photo, never over it (a click-pinned card hid the very photo a second click closes it on),
-    // and inside the grid's part of the screen: never over the nav bar or the toolbar (B54), the rail or a
-    // side panel, or the selection bar (B55).
-    const area = this.cardArea();
-    this.tooltipArea.set(area);
-    this.tooltipAnchor.set({ left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom });
-    const first = placeCard(rect, tooltipWidth, tooltipHeight, area, padding);
-    this.tooltipFlipped.set(first.flipped);
-    this.tooltipX.set(first.x);
-    this.tooltipY.set(first.y);
+    this.placeTooltip(photo, target ?? event.currentTarget as HTMLElement);
     this.tooltipPhoto.set(photo);
     // The click that pinned it may raise the selection bar or scroll the grid: place it again once drawn.
     requestAnimationFrame(() => this.replaceCard());
@@ -3465,18 +3426,59 @@ export class GalleryComponent implements OnInit, OnDestroy {
       this.tooltipPhoto.set(null);
       return;
     }
-    this.tooltipArea.set(area);
-    this.tooltipAnchor.set({ left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom });
+    this.placeTooltip(photo, card as HTMLElement);
+  }
+
+  /**
+   * Where the floating card goes and in which form, from the window as it is: the photo's box, the grid area
+   * (toolbar, rail and panels, selection bar, notices) and the size the whole card needs at this window size.
+   * Never from the card's own rendered size: that fed back (a full card that did not fit turned compact, the
+   * compact one fitted elsewhere, so it turned full again, about 8 times a second). Beside the photo, never
+   * over it (a click-pinned card hid the very photo a second click closes it on), and inside the grid's part of
+   * the screen: never over the toolbar (B54), the rail or a side panel, or the selection bar (B55). Where the
+   * whole card does not fit it is compact: the name and key facts, no picture (B57).
+   */
+  private placeTooltip(photo: Photo, source: HTMLElement): void {
+    // The photo's own card, however it was reached (an enter on its inner element, or the grid's lookup), so the
+    // same window gives the same card (K3).
+    const card = source.closest<HTMLElement>('[data-pidx]') ?? source;
+    const rect = card.getBoundingClientRect();
+    const area = this.cardArea();
+    const thumb = card.querySelector('img');
+    const aspect = thumb?.naturalWidth && thumb.naturalHeight ? thumb.naturalWidth / thumb.naturalHeight : aspectOf(photo);
+    const full = fullCardSize(aspectOf(photo) > 1, aspect, window.innerHeight, area.right - area.left - 32);
+    let width = full.width;
+    let placed = placeCard(rect, full.width, full.height, area);
+    const compact = placed.maxHeight < full.height;
+    if (compact) {
+      width = Math.min(COMPACT_CARD.width, area.right - area.left - 32);
+      placed = placeCard(rect, width, COMPACT_CARD.height, area);
+    }
+    this.tooltipFlipped.set(placed.flipped);
+    this.tooltipX.set(placed.x);
+    this.tooltipY.set(placed.y);
+    this.tooltipFrame.set({ width, maxHeight: placed.maxHeight, compact });
+  }
+
+  /** The notice stack finished folding, unfolding or moving: the card's area has its final bottom now (B57). */
+  private onNoticesSettled(event: Event): void {
+    if (!(event.target as Element | null)?.closest?.('[data-gallery-notices], [data-gallery-notices-pill]')) return;
+    if (this.tooltipPhoto() && !this.panelMode()) requestAnimationFrame(() => this.replaceCard());
   }
 
   protected onWindowResize(): void {
     if (this.tooltipPhoto() && !this.panelMode()) requestAnimationFrame(() => this.replaceCard());
   }
 
-  /** The grid area changes width (a window resize, the rail's panel opening or closing): the card follows. */
+  /** The grid area changes (a window resize, the rail's panel opening or closing, the selection bar, the notice
+   *  stack folding or changing): the card is placed again from the new area. Never from the card's own size. */
   private readonly cardFollowsLayout = effect(() => {
     this.containerWidth();
     this.rail.tab();
+    this.selectingPhotos();
+    this.noticesCollapsed();
+    this.noticesSignature();
+    this.noticeStackVisible();
     untracked(() => { if (this.tooltipPhoto() && !this.panelMode()) requestAnimationFrame(() => this.replaceCard()); });
   });
 
