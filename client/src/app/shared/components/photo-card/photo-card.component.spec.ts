@@ -941,14 +941,14 @@ describe('PhotoCardComponent tooltip emission', () => {
 
   /** Drive the card directly: this is about which gesture emits, not markup.
    *  Named by the pre-split modes these cases were written for, mapped the way
-   *  stored settings migrate: hover/click -> card + that trigger, panel -> panel + its activation. */
-  function card(mode: 'hover' | 'click' | 'off' | 'panel', panelActivation?: 'hover' | 'click' | 'both') {
+   *  stored settings migrate: hover/click -> card + that mode, panel -> panel + its mode (Hover by default). */
+  function card(mode: 'hover' | 'click' | 'off' | 'panel', panelMode?: 'hover' | 'click') {
     const place = mode === 'hover' || mode === 'click' ? 'card' : mode;
-    const trigger = mode === 'hover' || mode === 'click' ? mode : (panelActivation ?? 'both');
+    const trigger = mode === 'hover' || mode === 'click' ? mode : (panelMode ?? 'hover');
     return cardFor(place, trigger);
   }
 
-  function cardFor(place: 'off' | 'card' | 'panel', trigger: 'hover' | 'click' | 'both') {
+  function cardFor(place: 'off' | 'card' | 'panel', trigger: 'hover' | 'click') {
     TestBed.configureTestingModule({
       imports: [PhotoCardComponent],
       providers: [{ provide: I18nService, useValue: mockI18n }],
@@ -969,15 +969,15 @@ describe('PhotoCardComponent tooltip emission', () => {
 
   afterEach(() => TestBed.resetTestingModule());
 
-  it('hover mode reports hover but not clicks', () => {
+  it('Hover reports the pointer and the click that holds a photo', () => {
     const { c, shown } = card('hover');
     c.onMouseEnter(clickEvent);
     expect(shown).toEqual(['/test.jpg']);
     c.onSelect(clickEvent);
-    expect(shown).toEqual(['/test.jpg']);
+    expect(shown).toEqual(['/test.jpg', '/test.jpg']);
   });
 
-  it('click mode reports clicks but not hover', () => {
+  it('Click reports clicks but not hover', () => {
     const { c, shown } = card('click');
     c.onMouseEnter(clickEvent);
     expect(shown).toEqual([]);
@@ -985,81 +985,55 @@ describe('PhotoCardComponent tooltip emission', () => {
     expect(shown).toEqual(['/test.jpg']);
   });
 
-  it('panel mode reports BOTH, since the rail is parked rather than chasing the cursor', () => {
+  it('the side panel in Hover mode (the default) retargets on hover and on click', () => {
     const { c, shown } = card('panel');
     c.onMouseEnter(clickEvent);
     c.onSelect(clickEvent);
     expect(shown).toEqual(['/test.jpg', '/test.jpg']);
   });
 
-  it('panel mode still reports mouse-out, which the gallery ignores while the rail shows', () => {
+  it('the side panel in Hover mode still reports mouse-out, which the gallery ignores while the panel shows', () => {
     const { c, hidden } = card('panel');
     c.onMouseLeave();
     expect(hidden()).toBe(1);
   });
 
-  // --- details_trigger: which gesture(s) retarget the panel ---------------------
-
-  it('activation "both" (the default) retargets on hover AND click', () => {
-    const { c, shown } = card('panel', 'both');
-    c.onMouseEnter(clickEvent);
-    c.onSelect(clickEvent);
-    expect(shown).toEqual(['/test.jpg', '/test.jpg']);
-  });
-
-  it('activation "hover" retargets on hover but does NOT retarget on click', () => {
-    const { c, shown } = card('panel', 'hover');
-    c.onMouseEnter(clickEvent);
-    expect(shown).toEqual(['/test.jpg']);
-    c.onSelect(clickEvent);
-    // A test that only checked the 'both' default would pass even if 'hover'
-    // also retargeted on click -- assert the click contributed nothing.
-    expect(shown).toEqual(['/test.jpg']);
-  });
-
-  it('activation "click" retargets on click but does NOT retarget on hover', () => {
+  it('the side panel in Click mode retargets on click but does NOT retarget on hover', () => {
     const { c, shown } = card('panel', 'click');
     c.onMouseEnter(clickEvent);
-    // A test that only checked the 'both' default would pass even if 'click'
+    // A test that only checked the Hover default would pass even if Click
     // also retargeted on hover -- assert the hover contributed nothing.
     expect(shown).toEqual([]);
     c.onSelect(clickEvent);
     expect(shown).toEqual(['/test.jpg']);
   });
 
-  it('activation "click" does not clear the panel on mouse-out -- it was deliberately pinned there', () => {
+  it('the side panel in Click mode does not clear on mouse-out -- it was deliberately set there', () => {
     const { c, hidden } = card('panel', 'click');
     c.onMouseLeave();
     expect(hidden()).toBe(0);
   });
 
-  it('activation "hover" still clears the panel on mouse-out', () => {
-    const { c, hidden } = card('panel', 'hover');
-    c.onMouseLeave();
-    expect(hidden()).toBe(1);
-  });
-
-  it('Space retargets the panel regardless of activation -- a keyboard user has no hover to fall back on', () => {
+  it('Space retargets the details in either mode -- a keyboard user has no hover to fall back on', () => {
     const keyEvent = { preventDefault: () => {} } as unknown as Event;
-    for (const activation of ['hover', 'click', 'both'] as const) {
-      const { c, shown } = card('panel', activation);
-      c.onKeySelect(keyEvent);
-      expect(shown).toEqual(['/test.jpg']);
-      TestBed.resetTestingModule();
+    for (const place of ['card', 'panel'] as const) {
+      for (const trigger of ['hover', 'click'] as const) {
+        const { c, shown } = cardFor(place, trigger);
+        c.onKeySelect(keyEvent);
+        expect(shown).toEqual(['/test.jpg']);
+        TestBed.resetTestingModule();
+      }
     }
   });
 
   it.each([
-    ['card', 'hover', true, false, true],
+    ['card', 'hover', true, true, true],
     ['card', 'click', false, true, false],
-    ['card', 'both', true, true, true],
-    ['panel', 'hover', true, false, true],
+    ['panel', 'hover', true, true, true],
     ['panel', 'click', false, true, false],
-    ['panel', 'both', true, true, true],
     ['off', 'hover', false, false, false],
     ['off', 'click', false, false, false],
-    ['off', 'both', false, false, false],
-  ] as const)('%s opened with %s: hover emits %s, click emits %s, mouse-out reported %s', (place, trigger, onHover, onClick, onLeave) => {
+  ] as const)('%s in %s mode: hover emits %s, click emits %s, mouse-out reported %s', (place, trigger, onHover, onClick, onLeave) => {
     const { c, shown, hidden } = cardFor(place, trigger);
     c.onMouseEnter(clickEvent);
     expect(shown.length).toBe(onHover ? 1 : 0);
@@ -1068,8 +1042,8 @@ describe('PhotoCardComponent tooltip emission', () => {
     c.onMouseLeave();
     expect(hidden()).toBe(onLeave ? 1 : 0);
     c.onKeySelect({ preventDefault: () => {} } as unknown as Event);
-    // Space feeds the panel whatever the trigger; a card opens from it unless it is hover-only.
-    const onKey = place === 'panel' || (place === 'card' && trigger !== 'hover');
+    // Space is the keyboard's click: it opens the details wherever they are on.
+    const onKey = place !== 'off';
     expect(shown.length).toBe((onHover ? 1 : 0) + (onClick ? 1 : 0) + (onKey ? 1 : 0));
   });
 
@@ -1098,7 +1072,7 @@ describe('PhotoCardComponent tooltip emission', () => {
   // mouse last touched — the one gesture that can reach it on a touch screen.
   it('Space reports the photo in the modes a click would', () => {
     const keyEvent = { preventDefault: () => {} } as unknown as Event;
-    for (const mode of ['click', 'panel'] as const) {
+    for (const mode of ['hover', 'click', 'panel'] as const) {
       const { c, shown } = card(mode);
       c.onKeySelect(keyEvent);
       expect(shown).toEqual(['/test.jpg']);
@@ -1106,9 +1080,9 @@ describe('PhotoCardComponent tooltip emission', () => {
     }
   });
 
-  it('Space reports nothing in the modes a click would not', () => {
+  it('Space reports nothing with details off, where a click would not either', () => {
     const keyEvent = { preventDefault: () => {} } as unknown as Event;
-    for (const mode of ['hover', 'off'] as const) {
+    for (const mode of ['off'] as const) {
       const { c, shown } = card(mode);
       c.onKeySelect(keyEvent);
       expect(shown).toEqual([]);

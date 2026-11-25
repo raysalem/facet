@@ -1597,7 +1597,7 @@ Web gallery display and behavior.
       "hide_panoramas": true,
       "hide_details": true,
       "details_place": "panel",
-      "details_trigger": "both",
+      "details_trigger": "hover",
       "hide_rejected": true,
       "sort": "aggregate",
       "sort_direction": "DESC",
@@ -1686,8 +1686,8 @@ Web gallery display and behavior.
 | `hide_brackets` | `true` | Show only a bracket's base exposure by default |
 | `hide_panoramas` | `true` | Show only one representative frame per panorama by default |
 | `hide_details` | `true` | Hide photo details on cards by default |
-| `details_place` | `"panel"` | Where photo details appear (Display > **Photo details**): `"off"`, `"card"` (a card beside the photo) or `"panel"` (the docked side panel) |
-| `details_trigger` | `"both"` | What opens them (Display > **Open with**), for the card and the panel alike: `"hover"`, `"click"` or `"both"`. The earlier keys `tooltip_mode` and `panel_activation` are still read and win when present (`hover`/`click` = card opened that way, `panel` = side panel opened by `panel_activation`, `off` = off) |
+| `details_place` | `"panel"` | Where photo details appear (Display > **Details location**): `"panel"` (the docked side panel), `"card"` (a card beside the photo) or `"off"` |
+| `details_trigger` | `"hover"` | Display > **Details mode**, for the card and the panel alike: `"hover"` (the details follow the pointer; a click holds a photo) or `"click"` (they change only when a photo is clicked). A stored `"both"` (the former Hover or click) reads as `"hover"`. The earlier keys `tooltip_mode` and `panel_activation` are still read and win when present (`hover`/`click` = card in that mode, `panel` = side panel in the mode `panel_activation` names, `off` = off) |
 | `hide_rejected` | `true` | Hide rejected photos by default |
 | `gallery_mode` | `"mosaic"` | Default gallery layout (`"grid"` or `"mosaic"`) |
 | **allowed_origins** | | |

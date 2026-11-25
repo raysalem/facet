@@ -1605,7 +1605,7 @@ Anzeige und Verhalten der Web-Galerie.
       "hide_panoramas": true,
       "hide_details": true,
       "details_place": "panel",
-      "details_trigger": "both",
+      "details_trigger": "hover",
       "hide_rejected": true,
       "sort": "aggregate",
       "sort_direction": "DESC",
@@ -1694,8 +1694,8 @@ Anzeige und Verhalten der Web-Galerie.
 | `hide_brackets` | `true` | Standardmäßig nur die Basisbelichtung einer Belichtungsreihe anzeigen |
 | `hide_panoramas` | `true` | Standardmäßig nur ein repräsentatives Bild je Panorama zeigen |
 | `hide_details` | `true` | Fotodetails auf Karten standardmäßig ausblenden |
-| `details_place` | `"panel"` | Wo Fotodetails erscheinen (Anzeige > **Fotodetails**): `"off"`, `"card"` (eine Karte neben dem Foto) oder `"panel"` (die angedockte Seitenleiste) |
-| `details_trigger` | `"both"` | Was sie öffnet (Anzeige > **Öffnen mit**), für Karte und Seitenleiste gleichermaßen: `"hover"`, `"click"` oder `"both"`. Die früheren Schlüssel `tooltip_mode` und `panel_activation` werden weiter gelesen und haben Vorrang, wenn sie gesetzt sind (`hover`/`click` = Karte mit dieser Geste, `panel` = Seitenleiste mit `panel_activation`, `off` = aus) |
+| `details_place` | `"panel"` | Wo Fotodetails erscheinen (Anzeige > **Ort der Details**): `"panel"` (die angedockte Seitenleiste), `"card"` (eine Karte neben dem Foto) oder `"off"` |
+| `details_trigger` | `"hover"` | Anzeige > **Detailmodus**, für Karte und Seitenleiste gleichermaßen: `"hover"` (die Details folgen dem Zeiger; ein Klick hält ein Foto fest) oder `"click"` (sie wechseln nur beim Klick auf ein Foto). Ein gespeichertes `"both"` (das frühere Hover oder Klick) gilt als `"hover"`. Die früheren Schlüssel `tooltip_mode` und `panel_activation` werden weiter gelesen und haben Vorrang, wenn sie gesetzt sind (`hover`/`click` = Karte in diesem Modus, `panel` = Seitenleiste im Modus aus `panel_activation`, `off` = aus) |
 | `hide_rejected` | `true` | Abgelehnte Fotos standardmäßig ausblenden |
 | `gallery_mode` | `"mosaic"` | Standard-Galerie-Layout (`"grid"` oder `"mosaic"`) |
 | **allowed_origins** | | |

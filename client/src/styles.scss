@@ -52,7 +52,8 @@ html {
   // Tooltip and details-rail colors: the accent theme's own surface roles, so they carry
   // the same grey as the workspace (warm with orange, cool with blue). Declared on html,
   // where every theme class re-declares the --mat-sys-* roles they resolve against.
-  --facet-tooltip-bg: color-mix(in srgb, var(--mat-sys-surface-container-low) 97%, transparent);
+  // Opaque: a 3% see-through card let the photos' badges behind it show through its text (B54).
+  --facet-tooltip-bg: var(--mat-sys-surface-container-low);
   --facet-tooltip-border: var(--mat-sys-outline-variant);
   --facet-tooltip-text: var(--mat-sys-on-surface);
   --facet-tooltip-text-secondary: var(--mat-sys-on-surface-variant);
@@ -158,7 +159,7 @@ html.light-mode {
   --facet-accent-text: #a8380a;
   --facet-accent-badge: color-mix(in srgb, var(--facet-accent-dim) 50%, transparent);
   // Light tooltips sit on the lightest surface; the other tooltip roles are inherited from html.
-  --facet-tooltip-bg: color-mix(in srgb, var(--mat-sys-surface-container-lowest) 97%, transparent);
+  --facet-tooltip-bg: var(--mat-sys-surface-container-lowest);
   // The details rail takes the accent-tinted low container instead, so it stands apart
   // from the white page as it does in dark mode; tooltips keep the white for contrast.
   --facet-rail-bg: color-mix(in srgb, var(--mat-sys-surface-container-low) 97%, transparent);

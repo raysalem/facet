@@ -57,7 +57,8 @@
       "save": "Guardar",
       "saving": "Guardando…",
       "load_more": "Cargar más",
-      "close_panels": "Cerrar los paneles"
+      "collapse_panel": "Ocultar panel",
+      "expand_panel": "Mostrar panel"
     },
     "sort": {
       "date": "Fecha"
@@ -1244,19 +1245,22 @@
     "composition_range": "Rango de composición",
     "hide_details": "Ocultar detalles",
     "tooltip_mode": {
-      "panel_empty": "Pasa el cursor sobre una foto o haz clic en ella para ver aquí sus detalles",
+      "panel_empty": "Señala una foto para ver aquí sus detalles",
+      "panel_empty_click": "Haz clic en una foto para ver aquí sus detalles",
       "panel_deselect": "Deseleccionar",
       "details": "Detalles de la foto"
     },
     "photo_details": {
-      "label": "Detalles de la foto",
+      "label": "Ubicación de los detalles",
       "off": "Desactivado",
-      "card": "Tarjeta al pasar",
+      "card": "Tarjeta",
       "panel": "Panel lateral",
-      "open_with": "Abrir con",
+      "mode": "Modo de los detalles",
       "hover": "Hover",
       "click": "Clic",
-      "both": "Hover o clic"
+      "phone_panel": "Panel en el teléfono",
+      "phone_sheet": "Hoja inferior",
+      "phone_side": "Lateral"
     },
     "hide_blinks": "Ocultar parpadeos",
     "hide_bursts": "Mejor de ráfaga",
@@ -1805,10 +1809,11 @@
       "hide_details": "Muestra solo las fotos, sin la información bajo cada foto",
       "fast_scrolling": "Dibuja solo las filas cercanas a la pantalla para que las galerías largas se desplacen con fluidez. Desactívalo si el diseño falla.",
       "card_buttons": "Elige qué botones muestra una tarjeta al pasar el ratón, y en qué orden",
-      "photo_details": "Dónde aparecen los detalles de una foto: en una tarjeta junto a la foto, en el panel lateral en el borde de la galería o en ninguna parte",
-      "open_with": "Qué abre los detalles de una foto: señalar la foto (Hover), hacer clic en ella (Clic) o cualquiera de las dos (Hover o clic). Se aplica a la tarjeta y al panel lateral por igual.",
+      "photo_details": "Dónde se muestran los detalles de una foto: en el panel lateral, en una tarjeta junto a la foto o en ningún sitio.",
+      "details_mode": "Un clic abre los detalles; con Hover siguen luego al puntero, con Clic solo cambian con el siguiente clic.",
       "tile_fit": "Recorta las miniaturas en cuadrado o muestra cada foto en su proporción original",
-      "reset_display": "Restablece el diseño, el tamaño de las miniaturas y los detalles de las fotos predeterminados. Los filtros, el orden y la selección no cambian."
+      "reset_display": "Restablece el diseño, el tamaño de las miniaturas y los detalles de las fotos predeterminados. Los filtros, el orden y la selección no cambian.",
+      "phone_panel": "En un teléfono, los paneles se abren como una hoja desde abajo, o al lado como en una pantalla más ancha."
     },
     "rail": {
       "label": "Paneles de la galería",

@@ -57,7 +57,8 @@
       "save": "Speichern",
       "saving": "Wird gespeichert…",
       "load_more": "Mehr laden",
-      "close_panels": "Bereiche schließen"
+      "collapse_panel": "Leiste ausblenden",
+      "expand_panel": "Leiste einblenden"
     },
     "sort": {
       "date": "Datum"
@@ -1244,19 +1245,22 @@
     "composition_range": "Kompositionsbereich",
     "hide_details": "Details ausblenden",
     "tooltip_mode": {
-      "panel_empty": "Fahre über ein Foto oder klicke es an, um seine Details hier zu sehen",
+      "panel_empty": "Zeigen Sie auf ein Foto, um hier seine Details zu sehen",
+      "panel_empty_click": "Klicken Sie auf ein Foto, um hier seine Details zu sehen",
       "panel_deselect": "Auswahl aufheben",
       "details": "Fotodetails"
     },
     "photo_details": {
-      "label": "Fotodetails",
+      "label": "Ort der Details",
       "off": "Aus",
-      "card": "Hover-Karte",
+      "card": "Karte",
       "panel": "Seitenleiste",
-      "open_with": "Öffnen mit",
+      "mode": "Detailmodus",
       "hover": "Hover",
       "click": "Klick",
-      "both": "Hover oder Klick"
+      "phone_panel": "Leiste auf dem Telefon",
+      "phone_sheet": "Unteres Blatt",
+      "phone_side": "Seite"
     },
     "hide_blinks": "Blinzler ausblenden",
     "hide_bursts": "Beste aus Serie",
@@ -1805,10 +1809,11 @@
       "hide_details": "Zeigt nur die Fotos, ohne die Angaben unter jedem Foto",
       "fast_scrolling": "Zeichnet nur die Zeilen nahe dem Bildschirm, damit große Galerien flüssig scrollen. Schalten Sie es aus, wenn das Layout Fehler zeigt.",
       "card_buttons": "Wählen Sie, welche Knöpfe eine Fotokarte beim Überfahren zeigt und in welcher Reihenfolge",
-      "photo_details": "Wo die Details eines Fotos erscheinen: in einer Karte neben dem Foto, in der Seitenleiste am Rand der Galerie oder gar nicht",
-      "open_with": "Was die Details eines Fotos öffnet: auf das Foto zeigen (Hover), es anklicken (Klick) oder beides (Hover oder Klick). Gilt für die Karte und die Seitenleiste gleichermaßen.",
+      "photo_details": "Wo die Details eines Fotos erscheinen: in der Seitenleiste, in einer Karte neben dem Foto oder gar nicht.",
+      "details_mode": "Ein Klick öffnet die Details; mit Hover folgen sie dann dem Zeiger, mit Klick wechseln sie erst beim nächsten Klick.",
       "tile_fit": "Schneidet Miniaturbilder quadratisch zu oder zeigt jedes Foto im Originalformat",
-      "reset_display": "Stellt Standardlayout, Miniaturbildgröße und Fotodetails wieder her. Filter, Sortierung und Auswahl bleiben erhalten."
+      "reset_display": "Stellt Standardlayout, Miniaturbildgröße und Fotodetails wieder her. Filter, Sortierung und Auswahl bleiben erhalten.",
+      "phone_panel": "Auf einem Telefon öffnen sich Leisten als Blatt von unten oder seitlich wie auf einem breiteren Bildschirm."
     },
     "rail": {
       "label": "Galeriebereiche",

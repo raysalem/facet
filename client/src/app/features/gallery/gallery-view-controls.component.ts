@@ -12,7 +12,8 @@ import { I18N, i18nKeys } from '../../core/i18n/keys';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { SortOptionIconPipe } from '../../shared/pipes/sort-option-icon.pipe';
 import { SortGroupIconPipe, SortGroupKeyPipe } from '../../shared/pipes/sort-group-key.pipe';
-import { useDesktopSignal, useHoverCapableSignal, DETAILS_RAIL_MIN_WIDTH_PX } from '../../shared/utils/media-query';
+import { useDesktopSignal, useHoverCapableSignal } from '../../shared/utils/media-query';
+import { PHONE_PANELS, PanelLayoutService, type PhonePanel } from '../../core/services/panel-layout.service';
 import { GalleryFilters, GalleryStore } from './gallery.store';
 import { TILE_FITS, GalleryMode, DetailsPlace, DetailsTrigger, inAlbum } from './gallery-filters.util';
 import { closeOverlayDirectives } from '../../shared/utils/overlays';
@@ -30,14 +31,17 @@ import { GalleryReviewNavigationService } from './gallery-review-navigation.serv
   template: `
     <ng-template #displayControls>
     @if (auth.isEdition() && store.config()?.features?.show_rating_controls) {
-      <mat-checkbox data-review-advance [checked]="reviewNavigation.enabled()" [matTooltip]="I18N.gallery.review_navigation.help | translate"
+      <mat-checkbox data-review-advance [checked]="reviewNavigation.enabled()" [matTooltip]="I18N.gallery.review_navigation.help | translate" matTooltipPosition="left"
                     (change)="setReviewAdvance($event)">{{ I18N.gallery.review_navigation.advance | translate }}</mat-checkbox>
     }
     @if (!portDisplay()) { <ng-container [ngTemplateOutlet]="layoutControls" [ngTemplateOutletContext]="{ $implicit: secondaryLayouts }" /> }
     @if (portDisplay()) {
-      <ng-container [ngTemplateOutlet]="choiceRow" [ngTemplateOutletContext]="{ id: 'photo-details', icon: placeIcon(), label: I18N.gallery.photo_details.label, value: placeLabel(), menu: detailsPlaceMenu, tip: I18N.gallery.display_tips.photo_details }" />
+      <ng-container [ngTemplateOutlet]="choiceRow" [ngTemplateOutletContext]="{ id: 'details-location', icon: placeIcon(), label: I18N.gallery.photo_details.label, value: placeLabel(), menu: detailsPlaceMenu, tip: I18N.gallery.display_tips.photo_details }" />
       @if (store.filters().details_place !== 'off') {
-        <ng-container [ngTemplateOutlet]="choiceRow" [ngTemplateOutletContext]="{ id: 'open-with', icon: triggerIcon(), label: I18N.gallery.photo_details.open_with, value: triggerLabel(), menu: detailsTriggerMenu, tip: I18N.gallery.display_tips.open_with }" />
+        <ng-container [ngTemplateOutlet]="choiceRow" [ngTemplateOutletContext]="{ id: 'details-mode', icon: triggerIcon(), label: I18N.gallery.photo_details.mode, value: triggerLabel(), menu: detailsTriggerMenu, tip: I18N.gallery.display_tips.details_mode }" />
+      }
+      @if (layout.phone()) {
+        <ng-container [ngTemplateOutlet]="choiceRow" [ngTemplateOutletContext]="{ id: 'phone-panel', icon: 'smartphone', label: I18N.gallery.photo_details.phone_panel, value: phonePanelLabel(), menu: phonePanelMenu, tip: I18N.gallery.display_tips.phone_panel }" />
       }
       @if (store.galleryMode() === 'grid' && store.filters().hide_details) {
         <ng-container [ngTemplateOutlet]="choiceRow" [ngTemplateOutletContext]="{ id: 'tile-fit', icon: 'aspect_ratio', label: I18N.gallery.tile_fit.label, value: tileFitLabel(), menu: tileFitMenu, tip: I18N.gallery.display_tips.tile_fit }" />
@@ -59,7 +63,7 @@ import { GalleryReviewNavigationService } from './gallery-review-navigation.serv
       }
     }
     <ng-template #choiceRow let-id="id" let-icon="icon" let-label="label" let-value="value" let-menu="menu" let-tip="tip">
-      <button type="button" matRipple [attr.data-choice]="id" aria-haspopup="menu" [matMenuTriggerFor]="menu" [matTooltip]="tip | translate"
+      <button type="button" matRipple [attr.data-choice]="id" aria-haspopup="menu" [matMenuTriggerFor]="menu" [matTooltip]="tip | translate" matTooltipPosition="left"
               class="flex w-full min-h-10 items-center gap-3 rounded-md px-2 py-1 text-left hover:bg-[var(--mat-sys-surface-container-high)] focus-visible:outline-2 focus-visible:outline-[var(--mat-sys-primary)]"
               [attr.aria-label]="I18N.gallery.sidebar.review.value_aria | translate:{ label: (label | translate), value: (value | translate) }">
         <mat-icon class="!text-xl !w-5 !h-5 !leading-5 shrink-0 opacity-80">{{ icon }}</mat-icon>
@@ -77,17 +81,17 @@ import { GalleryReviewNavigationService } from './gallery-review-navigation.serv
       }
     </mat-menu>
     <button mat-button class="!min-h-11 !min-w-11" [class.!w-full]="portDisplay()" [class.!justify-start]="portDisplay()" (click)="toggleSlideshow()"
-            [matTooltip]="I18N.slideshow.start | translate" [attr.aria-label]="I18N.slideshow.start | translate">
+            [matTooltip]="I18N.slideshow.start | translate" [matTooltipPosition]="portDisplay() ? 'left' : 'below'" [attr.aria-label]="I18N.slideshow.start | translate">
       <mat-icon [style.color]="store.slideshowActive() ? 'var(--mat-sys-primary)' : ''">slideshow</mat-icon>
       @if (portDisplay()) { <span>{{ I18N.slideshow.start | translate }}</span> }
     </button>
     @if (portDisplay()) {
       <button mat-button data-reset-display class="!min-h-11 !w-full !justify-start" (click)="resetDisplay()"
-              [matTooltip]="I18N.gallery.display_tips.reset_display | translate" [attr.aria-label]="I18N.gallery.reset_display | translate">
+              [matTooltip]="I18N.gallery.display_tips.reset_display | translate" matTooltipPosition="left" [attr.aria-label]="I18N.gallery.reset_display | translate">
         <mat-icon>restart_alt</mat-icon><span>{{ I18N.gallery.reset_display | translate }}</span>
       </button>
     }
-    <!-- Photo details: where they appear and what opens them, two independent settings shown together.
+    <!-- Details location and Details mode, two independent settings shown together.
          The toolbar opens both in one menu; the Display popover gives each its own row. -->
     <mat-menu #detailsMenu="matMenu">
       <div role="presentation" class="px-4 pt-2 pb-1 text-xs font-medium text-[var(--mat-sys-on-surface-variant)]">{{ I18N.gallery.photo_details.label | translate }}</div>
@@ -102,7 +106,7 @@ import { GalleryReviewNavigationService } from './gallery-review-navigation.serv
         </button>
       }
       <div role="presentation" class="mt-1 border-t border-[var(--mat-sys-outline-variant)] px-4 pt-2 pb-1 text-xs font-medium text-[var(--mat-sys-on-surface-variant)]"
-           [class.opacity-60]="store.filters().details_place === 'off'">{{ I18N.gallery.photo_details.open_with | translate }}</div>
+           [class.opacity-60]="store.filters().details_place === 'off'">{{ I18N.gallery.photo_details.mode | translate }}</div>
       @for (trigger of detailsTriggers; track trigger.id) {
         <button mat-menu-item role="menuitemradio" [attr.data-details-trigger]="trigger.id" [attr.aria-checked]="store.filters().details_trigger === trigger.id"
                 [disabled]="store.filters().details_place === 'off' || (trigger.id === 'hover' && !hoverTriggerAvailable() && store.filters().details_trigger !== 'hover')"
@@ -123,6 +127,18 @@ import { GalleryReviewNavigationService } from './gallery-review-navigation.serv
           <span class="flex items-center gap-4">
             <span class="grow">{{ place.label | translate }}</span>
             @if (store.filters().details_place === place.id) { <mat-icon aria-hidden="true">check</mat-icon> }
+          </span>
+        </button>
+      }
+    </mat-menu>
+    <mat-menu #phonePanelMenu="matMenu">
+      @for (choice of phonePanels; track choice.id) {
+        <button mat-menu-item role="menuitemradio" [attr.data-phone-panel]="choice.id" [attr.aria-checked]="layout.phonePanel() === choice.id"
+                (click)="layout.setPhonePanel(choice.id)">
+          <mat-icon aria-hidden="true">{{ choice.icon }}</mat-icon>
+          <span class="flex items-center gap-4">
+            <span class="grow">{{ choice.label | translate }}</span>
+            @if (layout.phonePanel() === choice.id) { <mat-icon aria-hidden="true">check</mat-icon> }
           </span>
         </button>
       }
@@ -254,32 +270,38 @@ export class GalleryViewControlsComponent {
   private readonly canAct = computed(() => this.controlsActive() && !this.navigationPending());
   private readonly menus = viewChildren(MatMenuTrigger);
   private readonly tooltips = viewChildren(MatTooltip);
-  private readonly railCapable = useDesktopSignal({ breakpointPx: DETAILS_RAIL_MIN_WIDTH_PX });
+  protected readonly layout = inject(PanelLayoutService);
   /** Below the desktop breakpoint the floating hover bubble never renders. */
   private readonly tooltipCapable = useDesktopSignal();
   /** Hover is equally meaningless on a pure touch device at any width: the tap's
    *  synthetic mouseenter fires once and sticks, so the gallery suppresses it. */
   private readonly hoverCapable = useHoverCapableSignal();
-  protected readonly canDockDetails = this.railCapable.isDesktop;
+  /** The side panel docks wherever the panels sit at the side (sm and up, or a phone set to Side). */
+  protected readonly canDockDetails = this.layout.side;
   protected readonly canUseHoverTooltips = this.tooltipCapable.isDesktop;
   protected readonly canHoverAtAll = this.hoverCapable.isHoverCapable;
   private readonly placeChoices: readonly { id: DetailsPlace; label: string; icon: string }[] = [
-    { id: 'off', label: I18N.gallery.photo_details.off, icon: 'visibility_off' },
-    { id: 'card', label: I18N.gallery.photo_details.card, icon: 'chat_bubble_outline' },
     { id: 'panel', label: I18N.gallery.photo_details.panel, icon: 'view_sidebar' },
+    { id: 'card', label: I18N.gallery.photo_details.card, icon: 'chat_bubble_outline' },
+    { id: 'off', label: I18N.gallery.photo_details.off, icon: 'visibility_off' },
   ];
-  /** Side panel is offered only where the rail can dock; elsewhere a saved Side panel shows the card instead. */
+  /** Side panel is offered only where the panels sit at the side; on a phone's bottom sheet a saved Side panel shows the card. */
   protected readonly detailsPlaces = computed(() =>
     this.placeChoices.filter(place => place.id !== 'panel' || this.canDockDetails() || this.store.filters().details_place === 'panel'));
   protected readonly detailsTriggers: readonly { id: DetailsTrigger; label: string; icon: string }[] = [
     { id: 'hover', label: I18N.gallery.photo_details.hover, icon: 'mouse' },
     { id: 'click', label: I18N.gallery.photo_details.click, icon: 'touch_app' },
-    { id: 'both', label: I18N.gallery.photo_details.both, icon: 'swap_horiz' },
   ];
+  protected readonly phonePanels: readonly { id: PhonePanel; label: string; icon: string }[] = PHONE_PANELS.map(id => ({
+    id, label: id === 'sheet' ? I18N.gallery.photo_details.phone_sheet : I18N.gallery.photo_details.phone_side,
+    icon: id === 'sheet' ? 'call_to_action' : 'view_sidebar',
+  }));
+  protected readonly phonePanelLabel = computed(() =>
+    this.layout.phonePanel() === 'side' ? I18N.gallery.photo_details.phone_side : I18N.gallery.photo_details.phone_sheet);
   private readonly currentPlace = computed(() =>
-    this.placeChoices.find(place => place.id === this.store.filters().details_place) ?? this.placeChoices[0]);
+    this.placeChoices.find(place => place.id === this.store.filters().details_place) ?? this.placeChoices[2]);
   private readonly currentTrigger = computed(() =>
-    this.detailsTriggers.find(trigger => trigger.id === this.store.filters().details_trigger) ?? this.detailsTriggers[2]);
+    this.detailsTriggers.find(trigger => trigger.id === this.store.filters().details_trigger) ?? this.detailsTriggers[0]);
   protected readonly placeIcon = computed(() => this.currentPlace().icon);
   protected readonly placeLabel = computed(() => this.currentPlace().label);
   protected readonly triggerIcon = computed(() => this.currentTrigger().icon);
@@ -302,8 +324,8 @@ export class GalleryViewControlsComponent {
     event.source.checked = this.reviewNavigation.enabled();
   }
   constructor() {
-    afterNextRender(() => { this.railCapable.setup(); this.tooltipCapable.setup(); this.hoverCapable.setup(); });
-    inject(DestroyRef).onDestroy(() => { this.railCapable.cleanup(); this.tooltipCapable.cleanup(); this.hoverCapable.cleanup(); });
+    afterNextRender(() => { this.tooltipCapable.setup(); this.hoverCapable.setup(); });
+    inject(DestroyRef).onDestroy(() => { this.tooltipCapable.cleanup(); this.hoverCapable.cleanup(); });
 
   }
 

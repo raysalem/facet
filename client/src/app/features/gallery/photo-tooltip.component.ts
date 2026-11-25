@@ -25,6 +25,7 @@ import { CaptureDatePipe } from '../../shared/pipes/capture-date.pipe';
 import { PhotoAssessmentComponent } from '../../shared/components/photo-assessment/photo-assessment.component';
 import { CAMERA_METRICS, GRADE_METRICS, METRICS_TABS, type MetricsPanel, type MetricsTab } from '../../core/services/metrics-tab-state.service';
 import { tagKinds } from '../../shared/utils/tag-kinds';
+import type { CardFrame } from './card-placement';
 
 export type TooltipSection = 'all' | 'grade' | 'camera' | 'content';
 
@@ -71,19 +72,20 @@ const KEY_SCORES = [
            that way). Docking overrides it through style bindings instead. -->
       <div #root
         class="fixed z-[1000] pointer-events-none flex flex-col p-3 rounded shadow-lg"
-        [class.max-h-[calc(100vh-2rem)]]="!docked()"
+        [style.max-height]="docked() ? null : sheet() ? '60dvh' : (frame()?.maxHeight ?? viewport().height - 32) + 'px'"
         [class.overflow-y-auto]="!docked()"
         [style.position]="docked() ? 'static' : null"
         [style.pointer-events]="showInteractiveControls() ? 'auto' : null"
-        [style.width]="docked() ? '100%' : null"
-        [style.max-width]="docked() ? null : 'min(640px, calc(100vw - 2rem))'"
+        [style.width]="docked() || sheet() ? '100%' : null"
+        [style.max-width]="docked() ? null : sheet() ? 'none' : (frame()?.width ?? 640) + 'px'"
         [style.padding]="docked() ? '16px' : null"
         [style.background]="docked() ? 'transparent' : 'var(--facet-tooltip-bg)'"
         [style.border]="docked() ? 'none' : '1px solid var(--facet-tooltip-border)'"
-        [style.border-radius]="docked() ? '0' : null"
+        [style.border-radius]="docked() ? '0' : sheet() ? '12px 12px 0 0' : null"
         [style.box-shadow]="docked() ? 'none' : null"
-        [style.left.px]="docked() ? null : left()"
-        [style.top.px]="docked() ? null : top()"
+        [style.left.px]="docked() ? null : sheet() ? 0 : left()"
+        [style.top.px]="docked() || sheet() ? null : top()"
+        [style.bottom]="sheet() ? 'calc(4.5rem + env(safe-area-inset-bottom))' : null"
       >
         <!-- Zone A: Image + Scoring sections. The floating tooltip puts a
              portrait photo beside its numbers to stay within the viewport; the
@@ -98,7 +100,7 @@ const KEY_SCORES = [
                rounded corners show on every orientation. In the docked rail it
                takes the rail's width, so a portrait photo is as large as the column
                allows; only a very tall one is capped and contained. -->
-          @if (shows().content) {
+          @if (shows().content && !frame()?.compact) {
           <img
             [src]="p.path | thumbnailUrl:640:p.preview_revision"
             [alt]="p.filename"
@@ -151,14 +153,14 @@ const KEY_SCORES = [
             }
 
             <!-- Caption (after score) -->
-            @if ((p.caption_translated || p.caption) && shows().content) {
+            @if ((p.caption_translated || p.caption) && shows().content && !frame()?.compact) {
               <!-- w-0 + min-w-full: the caption wraps inside the width the photo and
                    scores already give the bubble instead of widening it. -->
               <div class="w-0 min-w-full text-xs italic text-[var(--facet-tooltip-text-muted)] mb-1.5">{{ p.caption_translated || p.caption }}</div>
             }
 
             <!-- Narrative moment (with confidence) -->
-            @if ((p.narrative_moment | momentLabel) && shows().content) {
+            @if ((p.narrative_moment | momentLabel) && shows().content && !frame()?.compact) {
               @let ml = p.narrative_moment | momentLabel;
               <div class="text-xs mb-1.5 flex items-center gap-1.5">
                 <span class="text-[var(--mat-sys-primary)] font-medium">✦ {{ ml }}</span>
@@ -190,12 +192,13 @@ const KEY_SCORES = [
                 <ng-container [ngTemplateOutlet]="captureLine" [ngTemplateOutletContext]="{ $implicit: p }" />
               }
             }
-            @if (!isLandscape() && !docked()) {
+            @if (!isLandscape() && !docked() && !frame()?.compact) {
               <ng-container [ngTemplateOutlet]="details" />
             }
           </div>
         </div>
-        @if (isLandscape() || docked()) {
+        <!-- A compact card (no room for all of it) keeps the name, the date, the scores and the capture line. -->
+        @if ((isLandscape() || docked()) && !frame()?.compact) {
           <ng-container [ngTemplateOutlet]="details" />
         }
 
@@ -410,6 +413,11 @@ export class PhotoTooltipComponent {
   readonly x = input(0);
   readonly y = input(0);
   readonly flipped = input(false);
+  /** A phone's bottom sheet: the card spans the screen's width along its bottom, above the selection bar. */
+  readonly sheet = input(false);
+  /** Where the host placed the floating card: its width, height cap and form (full or compact). The card
+   *  never places itself from its own rendered size, which fed back into the choice and made it flicker (B57). */
+  readonly frame = input<CardFrame | null>(null);
   /**
    * Render docked in a column instead of floating at (x, y).
    *
@@ -514,7 +522,7 @@ export class PhotoTooltipComponent {
   protected readonly top = computed(() => {
     const y = this.y();
     const h = this.measured().height;
-    if (!h) return y;
+    if (this.frame() || !h) return y;
     return Math.max(16, Math.min(y, this.viewport().height - h - 16));
   });
 
@@ -522,7 +530,7 @@ export class PhotoTooltipComponent {
   protected readonly left = computed(() => {
     const x = this.x();
     const w = this.measured().width;
-    if (!w) return x;
+    if (this.frame() || !w) return x;
     return Math.max(16, Math.min(x, this.viewport().width - w - 16));
   });
 

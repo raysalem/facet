@@ -1,7 +1,7 @@
 import { test, expect, type Locator, type Page } from '../fixtures';
 import { openShowing, photoUrl, showingPanel, showingTab } from '../helpers/nav';
 
-// Photo details are two independent settings, Photo details (where) and Open with (how), and the
+// Photo details are two independent settings, Details location (where) and Details mode (how), and the
 // gallery's two side panels and the photo page's inspector are resized by dragging their inner edge.
 
 const card = (page: Page) => page.locator('app-photo-tooltip > div').first();
@@ -19,7 +19,7 @@ async function dragHandle(page: Page, handle: Locator, dx: number): Promise<void
   await page.mouse.up();
 }
 
-test('a setting saved before the split keeps its behaviour, shown as Photo details + Open with', async ({ page }) => {
+test('a setting saved before the split keeps its behaviour, shown as Details location + Details mode', async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
 
   await test.step('1. A browser that saved the old Click tooltip reloads the gallery', async () => {
@@ -29,10 +29,10 @@ test('a setting saved before the split keeps its behaviour, shown as Photo detai
     await expect(photo(page)).toBeVisible();
   });
 
-  await test.step('2. Display shows it as Photo details: Hover card, Open with: Click', async () => {
+  await test.step('2. Display shows it as Details location: Card, Details mode: Click', async () => {
     await page.getByRole('button', { name: 'Display' }).click();
-    await expect(page.getByRole('button', { name: 'Photo details: Hover card' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Open with: Click' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Details location: Card' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Details mode: Click' })).toBeVisible();
     await page.keyboard.press('Escape');
   });
 
@@ -45,14 +45,19 @@ test('a setting saved before the split keeps its behaviour, shown as Photo detai
     await expect(card(page)).toBeHidden();
   });
 
-  await test.step('4. Off hides Open with; the saved trigger comes back with a place', async () => {
+  await test.step('4. Off hides Details mode; the saved mode comes back with a location', async () => {
     await page.getByRole('button', { name: 'Display' }).click();
-    await page.getByRole('button', { name: /^Photo details:/ }).click();
+    await page.getByRole('button', { name: /^Details location:/ }).click();
     await page.getByRole('menuitemradio', { name: 'Off', exact: true }).click();
-    await expect(page.getByRole('button', { name: /^Open with:/ })).toHaveCount(0);
-    await page.getByRole('button', { name: /^Photo details:/ }).click();
+    await expect(page.getByRole('button', { name: /^Details mode:/ })).toHaveCount(0);
+    await page.getByRole('button', { name: /^Details location:/ }).click();
+    await expect(page.getByRole('menuitemradio')).toHaveText([/Side panel/, /Card/, /Off/]);
     await page.getByRole('menuitemradio', { name: 'Side panel', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Open with: Click' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Details mode: Click' })).toBeVisible();
+    await page.getByRole('button', { name: /^Details mode:/ }).click();
+    // Two modes: Hover or click is gone (a saved one reads as Hover).
+    await expect(page.getByRole('menuitemradio')).toHaveText([/Hover/, /Click/]);
+    await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('facet_display_options') ?? '{}'));
     expect(saved).toMatchObject({ details_place: 'panel', details_trigger: 'click' });
@@ -98,10 +103,9 @@ test('the Showing and photo details panels widen by dragging their inner edge, a
   });
 
   await test.step('4. The photo details panel (Side panel, the default) has its own handle and width', async () => {
-    // Close Showing first: a photo never takes the place of an open panel.
-    await showingTab(page).click();
-    await expect(showingTab(page)).toHaveAttribute('aria-selected', 'false');
+    // A click on a photo shows its details in place of Showing (a hover would not).
     await photo(page).click();
+    await expect(showingTab(page)).toHaveAttribute('aria-selected', 'false');
     const rail = page.locator('[data-details-rail]');
     await expect(rail).toBeVisible();
     expect(await width(rail)).toBe(320);

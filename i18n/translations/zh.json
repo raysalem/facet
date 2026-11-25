@@ -57,7 +57,8 @@
       "save": "保存",
       "saving": "正在保存…",
       "load_more": "加载更多",
-      "close_panels": "关闭面板"
+      "collapse_panel": "隐藏面板",
+      "expand_panel": "显示面板"
     },
     "sort": {
       "date": "日期"
@@ -1244,19 +1245,22 @@
     "composition_range": "构图评分范围",
     "hide_details": "隐藏照片详情",
     "tooltip_mode": {
-      "panel_empty": "将鼠标悬停在照片上或点击照片，即可在此查看详情",
+      "panel_empty": "指向一张照片即可在此查看详情",
+      "panel_empty_click": "点击一张照片即可在此查看详情",
       "panel_deselect": "取消选择",
       "details": "照片详情"
     },
     "photo_details": {
-      "label": "照片详情",
+      "label": "详情位置",
       "off": "关闭",
-      "card": "悬停卡片",
+      "card": "卡片",
       "panel": "侧边面板",
-      "open_with": "打开方式",
+      "mode": "详情模式",
       "hover": "悬停",
       "click": "点击",
-      "both": "悬停或点击"
+      "phone_panel": "手机上的面板",
+      "phone_sheet": "底部面板",
+      "phone_side": "侧边"
     },
     "hide_blinks": "隐藏闭眼照片",
     "hide_bursts": "连拍最佳照片",
@@ -1805,10 +1809,11 @@
       "hide_details": "只显示照片，不显示每张照片下方的信息",
       "fast_scrolling": "只绘制屏幕附近的行，让大型图库滚动流畅。若布局出现异常，请关闭此项。",
       "card_buttons": "选择照片卡片在悬停时显示哪些按钮及其顺序",
-      "photo_details": "照片详情的显示位置：照片旁的卡片、图库边缘的侧边面板，或不显示",
-      "open_with": "打开照片详情的方式：指向照片（悬停）、点击照片（点击）或两者皆可（悬停或点击）。卡片和侧边面板都适用。",
+      "photo_details": "照片详情显示的位置：侧边面板、照片旁的卡片，或不显示。",
+      "details_mode": "点击即可打开详情；选择悬停后详情会跟随指针，选择点击则仅在下次点击时更换。",
       "tile_fit": "将缩略图裁切为正方形，或按原有比例显示每张照片",
-      "reset_display": "恢复默认的布局、缩略图大小和照片详情。筛选、排序和选择保持不变。"
+      "reset_display": "恢复默认的布局、缩略图大小和照片详情。筛选、排序和选择保持不变。",
+      "phone_panel": "在手机上，面板从底部弹出，或像在更宽的屏幕上一样显示在侧边。"
     },
     "rail": {
       "label": "图库面板",

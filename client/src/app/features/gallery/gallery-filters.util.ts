@@ -1,7 +1,7 @@
 import filterLimits from './gallery-filter-limits.generated.json';
 import { hasTagQuery, parseTagQuery, serializeTagQuery } from './tag-query.util';
 import { parseScorePresence, serializeScorePresence } from './score-presence.util';
-import { DETAILS_PLACES, DETAILS_TRIGGERS, detailsGestures, type DetailsPlace, type DetailsTrigger } from '../../shared/utils/photo-details';
+import { DETAILS_PLACES, DETAILS_TRIGGERS, detailsGestures, readDetailsTrigger, type DetailsPlace, type DetailsTrigger } from '../../shared/utils/photo-details';
 /**
  * Pure filter logic for the gallery: types, defaults, and the URL/API/storage
  * codec. Extracted from gallery.store.ts so it can be unit-tested in isolation
@@ -33,7 +33,7 @@ export interface DetailsSettings {
   details_trigger: DetailsTrigger;
 }
 
-export const DEFAULT_DETAILS: Readonly<DetailsSettings> = { details_place: 'panel', details_trigger: 'both' };
+export const DEFAULT_DETAILS: Readonly<DetailsSettings> = { details_place: 'panel', details_trigger: 'hover' };
 
 /** The settings as stored before the split, in localStorage, shared links and
  *  `viewer.defaults`: `tooltip_mode` mixed the place with the gesture, and
@@ -46,10 +46,10 @@ export interface LegacyDetailsSettings {
 type DetailsSource = Partial<Record<keyof DetailsSettings, unknown>> & LegacyDetailsSettings;
 
 const isPlace = (value: unknown): value is DetailsPlace => DETAILS_PLACES.includes(value as DetailsPlace);
-const isTrigger = (value: unknown): value is DetailsTrigger => DETAILS_TRIGGERS.includes(value as DetailsTrigger);
 
 /** The old pair read as the new one: hover -> card + hover, click -> card + click,
- *  panel -> panel + its panel_activation, off -> off (any panel_activation kept as the trigger). */
+ *  panel -> panel + its panel_activation, off -> off (any panel_activation kept as the mode;
+ *  its 'both' reads as Hover). */
 function legacyDetails(source: LegacyDetailsSettings): Partial<DetailsSettings> {
   const result: Partial<DetailsSettings> = {};
   const mode = source.tooltip_mode;
@@ -59,7 +59,8 @@ function legacyDetails(source: LegacyDetailsSettings): Partial<DetailsSettings> 
   } else if (mode === 'panel' || mode === 'off') {
     result.details_place = mode;
   }
-  if (!result.details_trigger && isTrigger(source.panel_activation)) result.details_trigger = source.panel_activation;
+  const activation = readDetailsTrigger(source.panel_activation);
+  if (!result.details_trigger && activation) result.details_trigger = activation;
   return result;
 }
 
@@ -70,7 +71,8 @@ export function pickDetailsSettings(source: DetailsSource | null | undefined, le
   if (!source) return {};
   const current: Partial<DetailsSettings> = {};
   if (isPlace(source.details_place)) current.details_place = source.details_place;
-  if (isTrigger(source.details_trigger)) current.details_trigger = source.details_trigger;
+  const named = readDetailsTrigger(source.details_trigger);
+  if (named) current.details_trigger = named;
   const legacy = legacyDetails(source);
   const [first, second] = legacyFirst ? [legacy, current] : [current, legacy];
   const result: Partial<DetailsSettings> = {};

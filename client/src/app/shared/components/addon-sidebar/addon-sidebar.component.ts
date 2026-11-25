@@ -17,6 +17,7 @@ import { AssistantChangesService } from '../../../core/agent/assistant-changes.s
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { i18nKeys } from '../../../core/i18n/keys';
 import { ThemeService } from '../../../core/services/theme.service';
+import { PanelLayoutService } from '../../../core/services/panel-layout.service';
 
 /** Below sm: over the page from the right, leaving a strip of the page in view; no resize handle. */
 export const DRAWER_CLASSES = 'max-sm:absolute max-sm:inset-y-0 max-sm:right-0 max-sm:z-40 max-sm:!w-[calc(100vw-3rem)] max-sm:!max-w-none max-sm:shadow-2xl';
@@ -38,7 +39,8 @@ export const DRAWER_CLASSES = 'max-sm:absolute max-sm:inset-y-0 max-sm:right-0 m
     // for the page behind (a 311 px column left the album 78 px at 390).
     class: `relative flex shrink-0 flex-col border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-low)] max-w-[80vw] ${DRAWER_CLASSES}`,
     '[style.width.px]': 'service.width()',
-    '[class.lg:!hidden]': 'service.dockHidden()',
+    // Where the panels sit at the side, the page's rail picks between its own panels and the dock.
+    '[class.!hidden]': 'service.dockHidden() && layout.side()',
     '[attr.data-addon-sidebar]': 'panel()?.addon?.id ?? null',
     '(window:message)': 'onMessage($event)',
   },
@@ -75,6 +77,7 @@ export const DRAWER_CLASSES = 'max-sm:absolute max-sm:inset-y-0 max-sm:right-0 m
 export class AddonSidebarComponent {
   protected readonly I18N = i18nKeys();
   protected readonly service = inject(AddonPanelService);
+  protected readonly layout = inject(PanelLayoutService);
   private readonly sanitizer = inject(DomSanitizer);
   private readonly router = inject(Router);
   private readonly gallery = inject(GalleryStore);

@@ -821,27 +821,24 @@ export class PhotoCardComponent {
    *  once the siblings it was picked over are visible beside it. */
   readonly burstFramesVisible = input(false);
   readonly personFilterId = input('');
-  /** Where the photo's details appear ("Photo details"): 'off', a floating
-   *  'card', or the gallery's docked side 'panel'. */
+  /** "Details location": 'off', a floating 'card', or the gallery's docked side 'panel'. */
   readonly detailsPlace = input<DetailsPlace>('card');
-  /** What opens them ("Open with"): 'hover', 'click', or 'both'. One gesture
-   *  setting for the card and the panel alike. */
+  /** "Details mode": 'hover' (the details follow the pointer; a click holds a photo) or 'click'
+   *  (only a click changes them). One setting for the card and the panel alike. */
   readonly detailsTrigger = input<DetailsTrigger>('hover');
   private readonly gestures = computed(() => detailsGestures(this.detailsPlace(), this.detailsTrigger()));
 
-  /** A mouse hover asks for the details only when the trigger allows hover. */
+  /** A mouse hover asks for the details only in Hover mode. */
   private hoverDriven(): boolean {
     return this.gestures().hover;
   }
 
-  /** A mouse click asks for the details only when the trigger allows click. */
+  /** A mouse click asks for the details in either mode while they are on. */
   private clickDriven(): boolean {
     return this.gestures().click;
   }
 
-  /** Keyboard selection (Space) feeds the side panel whatever the trigger: a
-   *  keyboard user has no hover to fall back on, so narrowing it like
-   *  clickDriven() would strand them. A hover-only card keeps Space for selecting. */
+  /** Space is the keyboard's click: it asks for the details whenever a click would. */
   private keyboardDriven(): boolean {
     return this.gestures().keyboard;
   }

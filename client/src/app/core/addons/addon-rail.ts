@@ -2,6 +2,7 @@ import { DestroyRef, Injector, computed, effect, inject, signal, untracked } fro
 import { AuthService } from '../services/auth.service';
 import { AddonsService, type Addon, type AddonName } from '../services/addons.service';
 import { AddonPanelService } from './addon-panel.service';
+import { isEditableTarget } from '../../shared/utils/keyboard';
 
 /** An add-on as a rail and the panel service know it. */
 export type RailAddon = Pick<Addon, 'id' | 'name' | 'icon'> & Partial<Pick<Addon, 'mode'>>;
@@ -20,6 +21,8 @@ export interface AddonRailOptions<T extends string> {
 }
 
 const ADDON_PREFIX = 'addon:';
+/** Suffix of the storage key that remembers the panel last on screen, for Show panel after a reload. */
+const LAST_SUFFIX = '_last';
 
 /**
  * A page's right rail: it picks one of the page's own panels or an add-on's panel. The add-on's frame lives
@@ -37,6 +40,9 @@ export class AddonRail<T extends string> {
   readonly tab = signal<string | null>(null);
   /** The page panel shown when no add-on is, and below lg where add-ons keep their own dock. */
   readonly pageTab = signal<T | null>(null);
+  /** The panel last on screen (page tab or `addon:<id>`), so a collapsed rail can bring it back with one click;
+   *  remembered across a reload beside the picked tab. */
+  readonly lastOpen = signal<string | null>(null);
   /** The page panel on screen: none while everything is closed. */
   readonly shownPage = computed(() => this.tab() === null ? null : this.pageTab());
   /** The add-on service, resolved only once this page needs it (a page with no add-on never starts it). */
@@ -119,9 +125,14 @@ export class AddonRail<T extends string> {
       const shown = this.addonActive();
       if (this.active && this.panels.panel()) untracked(() => this.panels.addonShown.set(shown));
     });
+    try { this.lastOpen.set(localStorage.getItem(options.storageKey + LAST_SUFFIX) || null); } catch { /* none */ }
     effect(() => {
       const tab = this.tab();
-      try { localStorage.setItem(options.storageKey, tab ?? ''); } catch { /* Storage blocked: the pick holds for this page only. */ }
+      if (tab !== null) untracked(() => this.lastOpen.set(tab));
+      try {
+        localStorage.setItem(options.storageKey, tab ?? '');
+        if (tab !== null) localStorage.setItem(options.storageKey + LAST_SUFFIX, tab);
+      } catch { /* Storage blocked: the pick holds for this page only. */ }
     });
     inject(DestroyRef).onDestroy(() => this.release());
   }
@@ -173,6 +184,20 @@ export class AddonRail<T extends string> {
     else this.tab.set(tab);
   }
 
+  /**
+   * Bring the collapsed rail's panel back: the one last on screen when it is still offered (`available`, the
+   * page tabs the rail shows now), else the first of them. An add-on comes back through its own open.
+   */
+  reopen(available: readonly string[]): void {
+    const last = this.lastOpen();
+    if (last?.startsWith(ADDON_PREFIX)) {
+      const addon = this.addons().find(entry => ADDON_PREFIX + entry.id === last);
+      if (addon && this.usable(addon.id)) { this.selectAddon(addon); return; }
+    }
+    const tab = (last && available.includes(last) ? last : available[0]) as T | undefined;
+    if (tab !== undefined) this.open(tab);
+  }
+
   /** Close every panel to the side, and the add-on's too; clicking an icon brings one back. */
   closeAll(): void {
     this.tab.set(null);
@@ -185,6 +210,13 @@ export class AddonRail<T extends string> {
    */
   escape(event: KeyboardEvent): boolean {
     if (event.key !== 'Escape' || event.defaultPrevented) return false;
+    // Escape in a field (the Showing panel's "Find a filter…" or Search) only leaves the field (B55).
+    if (isEditableTarget(event.target)) {
+      (event.target as HTMLElement).blur();
+      event.preventDefault();
+      event.stopPropagation();
+      return false;
+    }
     event.preventDefault();
     event.stopPropagation();
     this.closeAll();

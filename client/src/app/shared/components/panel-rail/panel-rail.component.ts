@@ -1,15 +1,15 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Injector, afterNextRender, computed, inject, input } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import type { AddonRail } from '../../../core/addons/addon-rail';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { i18nKeys } from '../../../core/i18n/keys';
-import { LG_BREAKPOINT_PX, useDesktopSignal } from '../../utils/media-query';
+import { PanelLayoutService } from '../../../core/services/panel-layout.service';
 
 /** One of the page's own panels on the rail; `label` is an i18n key. */
 export interface RailTab { id: string; icon: string; label: string }
 
-/** The shell's add-on dock (`app-addon-sidebar`), which an add-on tab controls at lg and up. */
+/** The shell's add-on dock (`app-addon-sidebar`), which an add-on tab controls while the panels sit at the side. */
 export const ADDON_DOCK_ID = 'addon-dock';
 
 const TAB = 'inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-[var(--mat-sys-on-surface-variant)] hover:bg-[var(--mat-sys-surface-container-high)] focus-visible:outline-2 focus-visible:outline-[var(--mat-sys-primary)] max-sm:h-11 max-sm:w-11 pointer-coarse:h-11 pointer-coarse:w-11';
@@ -17,8 +17,10 @@ const TAB = 'inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-ce
 /**
  * The narrow icon rail beside a page's panel slot (Acrobat-style): the page's own panels, then one icon per
  * enabled add-on with a panel. The picked icon is highlighted; the state lives in the page's `AddonRail`.
- * A row of tabs below lg, a column at lg and up. Below lg an add-on keeps its own dock or sheet beside the
- * page panel, so its icon is a plain toggle button there and the page panel's tab stays the selected one.
+ * A column at the side wherever the panels sit at the side (sm and up, or a phone set to Side); a row of tabs
+ * on a phone's bottom sheet, where an add-on keeps its own drawer, so its icon is a plain toggle button there
+ * and the page panel's tab stays the selected one. With every panel collapsed, the column starts with a
+ * Show panel button that brings the last one back.
  */
 @Component({
   selector: 'app-panel-rail',
@@ -30,9 +32,21 @@ const TAB = 'inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-ce
     '[attr.aria-orientation]': 'isWide() ? "vertical" : "horizontal"',
     // The keys bubble here from the tabs, which are the focusable elements.
     '(keydown)': 'rail().key($event)',
-    class: 'flex shrink-0 items-center gap-1 border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-1 max-lg:border-y lg:w-11 lg:flex-col lg:border-l',
+    class: 'flex shrink-0 items-center gap-1 border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] p-1',
+    '[class.border-y]': '!isWide()',
+    '[class.w-11]': 'isWide()',
+    '[class.flex-col]': 'isWide()',
+    '[class.border-l]': 'isWide()',
   },
   template: `
+    @if (isWide() && rail().tab() === null) {
+      <!-- Its tooltip goes below: to the left it would cover the page toolbar's last button (Display) beside it. -->
+      <button type="button" data-rail-expand [matTooltip]="I18N.ui.buttons.expand_panel | translate" matTooltipPosition="below"
+        [attr.aria-label]="I18N.ui.buttons.expand_panel | translate" (click)="reopen()" [class]="TAB">
+        <mat-icon aria-hidden="true">first_page</mat-icon>
+      </button>
+      <span aria-hidden="true" class="my-1 h-px w-6 shrink-0 bg-[var(--mat-sys-outline-variant)]"></span>
+    }
     @for (tab of tabs(); track tab.id) {
       <button type="button" role="tab" [attr.id]="idPrefix() ? idPrefix() + '-rail-' + tab.id : null" [attr.aria-controls]="idPrefix() ? idPrefix() + '-panel-' + tab.id : null"
         [attr.data-rail-tab]="tab.id" [attr.aria-selected]="selectedPage() === tab.id" [attr.tabindex]="tabStop() === tab.id ? 0 : -1"
@@ -42,7 +56,7 @@ const TAB = 'inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-ce
       </button>
     }
     @if (rail().addons().length) {
-      <span aria-hidden="true" class="shrink-0 bg-[var(--mat-sys-outline-variant)] max-lg:mx-1 max-lg:h-6 max-lg:w-px lg:my-1 lg:h-px lg:w-6"></span>
+      <span aria-hidden="true" class="shrink-0 bg-[var(--mat-sys-outline-variant)]" [class]="isWide() ? 'my-1 h-px w-6' : 'mx-1 h-6 w-px'"></span>
       @for (addon of rail().addons(); track addon.id) {
         @let picked = rail().tab() === 'addon:' + addon.id;
         @let usable = rail().usable(addon.id);
@@ -71,17 +85,24 @@ export class PanelRailComponent {
   readonly label = input.required<string>();
   /** Gives the tabs ids (`<prefix>-rail-<id>`) and points them at their panels (`<prefix>-panel-<id>`). */
   readonly idPrefix = input<string | null>(null);
-  /** Whether the rail is the lg-and-up column; a page that renders the rail only at lg says so, else the viewport decides. */
+  /** Whether the rail is the side column; a page that renders the rail only at the side says so, else the layout decides. */
   readonly wide = input<boolean | undefined>(undefined);
-  private readonly lg = useDesktopSignal({ breakpointPx: LG_BREAKPOINT_PX });
-  protected readonly isWide = computed(() => this.wide() ?? this.lg.isDesktop());
-  /** The page tab announced and highlighted as selected: at lg the pick; below lg the page panel on screen. */
+  private readonly layout = inject(PanelLayoutService);
+  protected readonly isWide = computed(() => this.wide() ?? this.layout.side());
+  /** The page tab announced and highlighted as selected: in the side column the pick; in the phone row the page panel on screen. */
   protected readonly selectedPage = computed(() => this.isWide() ? this.rail().tab() : this.rail().shownPage());
   /** The one Tab stop: the picked tab, or the first one while no panel is open. */
   protected readonly tabStop = computed(() => this.selectedPage() ?? this.tabs()[0]?.id ?? null);
 
-  constructor() {
-    this.lg.setup();
-    inject(DestroyRef).onDestroy(() => this.lg.cleanup());
+  private readonly injector = inject(Injector);
+
+  /** Show panel: the panel last on screen, if this rail still offers it, else the first. The focus goes to the
+   *  opened panel's Hide panel (the mirror of Hide panel putting it here), so Enter, Enter, ... toggles it (B55). */
+  protected reopen(): void {
+    this.rail().reopen(this.tabs().map(tab => tab.id));
+    afterNextRender(() => {
+      const hide = [...document.querySelectorAll<HTMLElement>('[data-collapse-panel]')].find(button => button.offsetParent !== null);
+      hide?.focus();
+    }, { injector: this.injector });
   }
 }

@@ -58,7 +58,7 @@ import { ComparisonSessionService } from './comparison-session.service';
 import { GalleryStore, HiddenFilterFlags, REVIEW_RESUME_NAVIGATION } from './gallery.store';
 import { NoticeDismissals, NoticeKind, readNoticeDismissals, saveNoticeDismissals, withDismissal } from './notice-dismiss.util';
 import { Photo } from '../../shared/models/photo.model';
-import { isImeOrRepeat, isPageShortcutBlocked, isShortcutContextBlocked, isTypingContext } from '../../shared/utils/keyboard';
+import { isEditableTarget, isImeOrRepeat, isPageShortcutBlocked, isShortcutContextBlocked, isTypingContext } from '../../shared/utils/keyboard';
 import { KeyboardMappingService } from '../../core/services/keyboard-mapping.service';
 import { GALLERY_REVISIT, PHOTO_PATH } from '../../core/gallery-reuse.strategy';
 import { SequenceKindIconPipe } from '../../shared/pipes/sequence-kind.pipe';
@@ -67,7 +67,8 @@ import { PhotoSetKindIconPipe, PhotoSetKindLabelPipe } from '../../shared/pipes/
 import { AuthService } from '../../core/services/auth.service';
 import { StalenessGuardFactory } from '../../core/services/staleness-guard.service';
 import { ScanService } from '../../core/services/scan.service';
-import { useDesktopSignal, DETAILS_RAIL_MIN_WIDTH_PX, LG_BREAKPOINT_PX } from '../../shared/utils/media-query';
+import { useDesktopSignal, LG_BREAKPOINT_PX } from '../../shared/utils/media-query';
+import { PanelLayoutService } from '../../core/services/panel-layout.service';
 import { privateImageSessionKey } from '../../shared/utils/private-image-session';
 import { I18nService } from '../../core/services/i18n.service';
 import { PluralKeyPipe } from '../../shared/pipes/plural-key.pipe';
@@ -75,6 +76,7 @@ import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { STACK_MAX_MEMBERS, STACK_MIN_MEMBERS } from './stack-limits';
 import { PhotoStackService } from '../../core/services/photo-stack.service';
 import { PhotoTooltipComponent } from './photo-tooltip.component';
+import { COMPACT_CARD, fullCardSize, placeCard, type CardFrame } from './card-placement';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { PhotoActionsService } from '../../core/services/photo-actions.service';
 import { CardActionsService } from './card-actions.service';
@@ -96,6 +98,18 @@ import { I18N, i18nKeys } from '../../core/i18n/keys';
 import { PageHelpService } from '../../core/services/page-help.service';
 import { MAX_COMPARE_QUEUE } from './comparison-slots.util';
 import { HistogramMode, isHistogramMode } from '../../shared/utils/histogram';
+
+/** The folded notice pill's height: the band the floating card keeps clear of at the grid's lower right. */
+const NOTICE_PILL_PX = 44;
+
+/** Keys that scroll the grid: a scroll right after one is the user's own. */
+const SCROLL_KEYS = new Set(['PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown', ' ']);
+
+/** localStorage key of the photo the gallery's details panel showed last. */
+const PANEL_PHOTO_KEY = 'facet_gallery_details_photo';
+
+/** Longest gap between the two clicks of a double click (the common OS default). */
+const DOUBLE_CLICK_MS = 500;
 
 /** The gallery rail's own panels: Filter, then the held photo split like the photo page. */
 const PHOTO_TABS = ['grade', 'camera', 'content'] as const;
@@ -245,21 +259,22 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
     </ng-template>
 
 
-    <!-- lg and up: the grid area, then the rail and the panel it picks (Filter, the photo's Grade / Camera /
-         Content, or an add-on, whose panel is the shell's dock to the right, never moved). No panel by default,
-         so the grid keeps the width. -->
-    <div class="flex h-full min-h-0">
-    <div #noticeHost class="relative h-full min-w-0 flex-1">
+    <!-- Side panels (sm and up, or a phone set to Side): the grid area, then the rail and the panel it picks
+         (Showing, the photo's Grade / Camera / Content, or an add-on, whose panel is the shell's dock to the right,
+         never moved). No panel by default, so the grid keeps the width. The grid keeps a minimum width and a
+         panel shrinks toward its own minimum before the grid goes below that: a panel never wraps under it. -->
+    <div class="flex h-full min-h-0 overflow-hidden">
+    <div #noticeHost class="relative h-full min-w-[min(18rem,35vw)] flex-1">
     <mat-sidenav-container class="h-full !overflow-clip">
       <app-gallery-view-controls #collectionViewControls (slideshowRequested)="closeCollectionPopovers(true)" [portPrimary]="true" [portFilters]="true" [portDisplay]="true" class="contents" />
-      <app-gallery-filter-sidebar #collectionSettings [portSettings]="true" [closable]="!lgDesktop.isDesktop()"
+      <app-gallery-filter-sidebar #collectionSettings [portSettings]="true" [closable]="!sidePanels()"
          [layoutControls]="collectionViewControls.sidebarLayoutControls() ?? null"
          [displayExtras]="collectionViewControls.displayControls() ?? null" />
       <!-- Below lg only: the Filters drawer (over the grid on a phone, beside it on a tablet). From lg the
            filters are the rail's Filter panel and this drawer stays shut and empty. -->
       <mat-sidenav #filterDrawer [mode]="isDesktop() ? 'side' : 'over'" position="end" class="w-[min(320px,100vw)] p-0"
         (openedChange)="onFilterDrawerChange($event)">
-        @if (!lgDesktop.isDesktop()) {
+        @if (!sidePanels()) {
           <!-- Usually closed, and heavy enough that building it eagerly holds up the grid's first paint. -->
           @defer (on idle; when store.filterDrawerOpen()) {
             <ng-container [ngTemplateOutlet]="collectionSettings.bodyContent()" />
@@ -284,7 +299,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
               {{ (pinned() ? store.total() : store.photoTotal()) | pluralKey:I18N.gallery.photo_count_one:I18N.gallery.photo_count | translate:{ count: pinned() ? store.total() : store.photoTotal() } }}
             }
           </p>
-          @if (lgDesktop.isDesktop() && activeFilterCount()) {
+          @if (sidePanels() && activeFilterCount()) {
             <button type="button" data-collection-filter-summary class="m-0 cursor-pointer p-0 text-left text-xs leading-5 tabular-nums text-[var(--mat-sys-primary)] underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-[var(--mat-sys-primary)]"
               [attr.aria-expanded]="filterPanelOpen()" aria-controls="gallery-panel-filter" (click)="rail.open('filter')">{{ activeFilterCount() | pluralKey:I18N.gallery.rail.filters_one:I18N.gallery.rail.filters | translate:{ count: activeFilterCount() } }}</button>
           }
@@ -339,7 +354,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
         <!-- Below lg the criteria row stays under the header (not sticky: it can grow to several wrapped rows,
              which would bury the grid under the pinned chrome); from lg it is the rail's View panel. It carries
              the marker too, so the focus guards that treat the header as part of the gallery see it. -->
-        @if (!lgDesktop.isDesktop()) {
+        @if (!sidePanels()) {
           <app-gallery-criteria data-collection-header [portShortcuts]="true" [consolidatedSettings]="true" [searchPresented]="true"
               class="block min-w-0 border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] px-2 md:px-4 has-[>:not(:empty)]:border-b has-[>:not(:empty)]:pb-1" />
         }
@@ -484,7 +499,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
                     [matContextMenuTriggerDisabled]="touchOnly()"
                     [matContextMenuTriggerRestoreFocus]="false"
                     (contextmenu)="onCardContextMenu(row.startIndex + i)"
-                    (doubleClicked)="downloadPhoto($event)"
+                    (doubleClicked)="openFromDoubleClick($event)"
                   />
                 }
               </div>
@@ -552,7 +567,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
                   [matContextMenuTriggerDisabled]="touchOnly()"
                   [matContextMenuTriggerRestoreFocus]="false"
                   (contextmenu)="onCardContextMenu(i)"
-                  (doubleClicked)="downloadPhoto($event)"
+                  (doubleClicked)="openFromDoubleClick($event)"
                 />
               }
             </div>
@@ -616,7 +631,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
                       [matContextMenuTriggerDisabled]="touchOnly()"
                       [matContextMenuTriggerRestoreFocus]="false"
                       (contextmenu)="onCardContextMenu(row.startIndex + i)"
-                      (doubleClicked)="downloadPhoto($event)"
+                      (doubleClicked)="openFromDoubleClick($event)"
                     />
                   }
                 </div>
@@ -980,7 +995,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
         </div>
       }
     </div>
-    @if (lgDesktop.isDesktop()) {
+    @if (sidePanels()) {
       <app-panel-rail data-gallery-rail [rail]="rail" [tabs]="railTabs()" [wide]="true" [label]="I18N.gallery.rail.label | translate" idPrefix="gallery" />
       <!-- Showing: what the grid holds (the collection and the filters that define it), and where to change it.
            The statement first, then the active filters, the filter controls, the album's rules last. A photo held
@@ -988,8 +1003,8 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
            Both panels are relative + overflow-hidden: an sr-only label is absolutely placed, and without a positioned
            ancestor it escapes the inner scroller and stretches the shell's <main> into a scrollbar of its own. -->
       <aside id="gallery-panel-filter" data-gallery-panel="filter" role="tabpanel" aria-labelledby="gallery-rail-filter" [hidden]="!filterPanelOpen()" (keydown)="closePanels($event)"
-        [style.width.px]="showingWidth.width()"
-        class="relative flex shrink-0 flex-col overflow-hidden border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] text-sm">
+        [style.flex-basis.px]="showingWidth.width()"
+        class="relative flex min-w-[min(15rem,50vw)] shrink grow-0 flex-col overflow-hidden border-l border-[var(--mat-sys-outline-variant)] bg-[var(--mat-sys-surface-container-lowest)] text-sm">
         <!-- Drag or arrow-key the inner edge to widen the panel (remembered). Inside the panel: it clips its overflow. -->
         <app-panel-resize-handle class="absolute inset-y-0 left-0 flex" [panel]="showingWidth" [label]="I18N.gallery.rail.resize_showing | translate" />
         <div data-panel-header class="flex shrink-0 items-center gap-2 px-4 pt-2">
@@ -999,8 +1014,8 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
               {{ collectionTitle() }}@if (activeFilterCount()) { · {{ activeFilterCount() | pluralKey:I18N.gallery.rail.filters_one:I18N.gallery.rail.filters | translate:{ count: activeFilterCount() } }}}
             </p>
           </div>
-          <button mat-icon-button data-close-panels class="!h-8 !w-8 !p-0 shrink-0" [matTooltip]="I18N.ui.buttons.close_panels | translate"
-            [attr.aria-label]="I18N.ui.buttons.close_panels | translate" (click)="rail.closeAll()"><mat-icon class="!text-xl">close</mat-icon></button>
+          <button mat-icon-button data-collapse-panel class="!h-8 !w-8 !p-0 shrink-0" [matTooltip]="I18N.ui.buttons.collapse_panel | translate"
+            [attr.aria-label]="I18N.ui.buttons.collapse_panel | translate" (click)="hidePanels()"><mat-icon class="!text-xl">last_page</mat-icon></button>
         </div>
         <!-- While the album is read, the room its chip and rules take (92 px), so the filters below stay put (B49). -->
         <app-gallery-criteria data-collection-header [portShortcuts]="true" [consolidatedSettings]="true" [searchPresented]="true" [rulesLast]="true"
@@ -1014,11 +1029,11 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
         }
       </aside>
       <!-- The photo under the cursor (or the last one hovered), split like the photo page: Grade, Camera, Content.
-           Only with "Show details: Side panel" on a window wide enough for it. -->
+           Only with "Details location: Side panel". -->
       @if (detailsRailVisible()) {
         <aside data-details-rail data-gallery-panel="photo" tabindex="-1" (keydown.escape)="onRailEscape($event)" (keydown)="closePanels($event)" (focusout)="onGridFocusOut($event)"
-          [style.width.px]="detailsWidth.width()"
-          class="relative flex shrink-0 flex-col overflow-hidden border-l border-[var(--mat-sys-outline-variant)] bg-[var(--facet-rail-bg)]">
+          [style.flex-basis.px]="detailsWidth.width()"
+          class="relative flex min-w-[min(15rem,50vw)] shrink grow-0 flex-col overflow-hidden border-l border-[var(--mat-sys-outline-variant)] bg-[var(--facet-rail-bg)]">
           <app-panel-resize-handle class="absolute inset-y-0 left-0 flex" [panel]="detailsWidth" [label]="I18N.photo_detail.inspector_resize | translate" />
           <div data-panel-header class="flex shrink-0 items-center gap-2 border-b border-[var(--mat-sys-outline-variant)] px-4 py-2">
             <div class="min-w-0 flex-1">
@@ -1027,8 +1042,8 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
                 <p data-inspector-owner class="m-0 truncate text-xs text-[var(--mat-sys-on-surface-variant)]" [title]="owner.filename">{{ owner.filename }}</p>
               }
             </div>
-            <button mat-icon-button data-close-panels class="!h-8 !w-8 !p-0 shrink-0" [matTooltip]="I18N.ui.buttons.close_panels | translate"
-              [attr.aria-label]="I18N.ui.buttons.close_panels | translate" (click)="rail.closeAll()"><mat-icon class="!text-xl">close</mat-icon></button>
+            <button mat-icon-button data-collapse-panel class="!h-8 !w-8 !p-0 shrink-0" [matTooltip]="I18N.ui.buttons.collapse_panel | translate"
+              [attr.aria-label]="I18N.ui.buttons.collapse_panel | translate" (click)="hidePanels()"><mat-icon class="!text-xl">last_page</mat-icon></button>
           </div>
           @if (hasActivePhoto()) {
             <button mat-button data-rail-deselect class="!min-w-0 !px-0 shrink-0 self-start mx-4 mt-2" (click)="deselectFromRail()">
@@ -1048,7 +1063,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
                                      (personSelected)="store.updateFilter('person_id', $event)" />
                 } @else {
                   <div class="p-4 text-sm text-[var(--mat-sys-on-surface-variant)] text-center">
-                    {{ I18N.gallery.tooltip_mode.panel_empty | translate }}
+                    {{ (detailsTrigger() === 'click' ? I18N.gallery.tooltip_mode.panel_empty_click : I18N.gallery.tooltip_mode.panel_empty) | translate }}
                   </div>
                 }
               }
@@ -1112,12 +1127,15 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
          rail renders its own, so the floating one stays away while the rail is up;
          wherever the rail cannot dock (narrow or touch viewports) the panel place
          falls back to this bubble, and hover mode still hides on pure touch. -->
-    @if (!tooltipDisabled() && !panelMode() && (detailsPlace() === 'panel' || detailsTrigger() !== 'hover' || (isDesktop() && !isTouchDevice()))) {
+    <!-- A hover card needs a mouse and a window with room for side panels (640 px up; K2). -->
+    @if (!tooltipDisabled() && !panelMode() && (phoneSheet() || detailsPlace() === 'panel' || detailsTrigger() !== 'hover' || ((isDesktop() || sidePanels()) && !isTouchDevice()))) {
       <app-photo-tooltip
         [photo]="tooltipPhoto()"
         [x]="tooltipX()"
         [y]="tooltipY()"
         [flipped]="tooltipFlipped()"
+        [frame]="tooltipFrame()"
+        [sheet]="phoneSheet()"
         [pinned]="tooltipPinned()"
         [histogramDefaultMode]="tooltipHistogramDefaultMode()"
         [indicatorPercent]="clippingIndicatorPercent()"
@@ -1153,6 +1171,8 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
     '(document:keydown.control.a)': 'onSelectAllShortcut($event)',
     '(document:keydown.meta.a)': 'onSelectAllShortcut($event)',
     '(document:keydown)': 'onGalleryShortcut($event)',
+    '(document:pointerdown)': 'onDocumentPointerDown($event)',
+    '(window:resize)': 'onWindowResize()',
   },
 })
 export class GalleryComponent implements OnInit, OnDestroy {
@@ -1256,8 +1276,8 @@ export class GalleryComponent implements OnInit, OnDestroy {
   protected readonly collectionBarHeight = signal(0);
   protected readonly collectionHeaderHeight = this.collectionBarHeight.asReadonly();
   /**
-   * The right rail (lg and up): Filter, the held photo's Grade / Camera / Content (with "Show details: Side
-   * panel"), or an add-on's panel; none by default so the grid keeps the width.
+   * The right rail (wherever the panels sit at the side): Showing, the held photo's Grade / Camera / Content (with
+   * "Details location: Side panel"), or an add-on's panel; none by default so the grid keeps the width.
    */
   protected readonly rail: AddonRail<GalleryTab> = new AddonRail<GalleryTab>({
     storageKey: 'facet_gallery_rail_tab', tabs: ['filter', ...PHOTO_TABS], defaultTab: null,
@@ -1292,7 +1312,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
    */
   private readonly filterPanelFollowsFlag = effect(() => {
     const open = this.store.filterDrawerOpen();
-    const wide = this.lgDesktop.isDesktop();
+    const wide = this.sidePanels();
     untracked(() => {
       if (!wide || this.pinned()) return;
       if (open && this.rail.tab() !== 'filter') this.rail.open('filter');
@@ -1302,7 +1322,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
   /** Tells the filter controls when they are on screen: the Showing panel from lg, the drawer below. */
   private readonly filterControlsShownFollows = (() => {
     effect(() => {
-      const shown = this.lgDesktop.isDesktop() ? this.filterPanelOpen() && !this.pinned() : this.store.filterDrawerOpen();
+      const shown = this.sidePanels() ? this.filterPanelOpen() && !this.pinned() : this.store.filterDrawerOpen();
       untracked(() => this.store.filterControlsShown.set(shown));
     });
     inject(DestroyRef).onDestroy(() => this.store.filterControlsShown.set(false));
@@ -1314,17 +1334,40 @@ export class GalleryComponent implements OnInit, OnDestroy {
       untracked(() => {
         const changed = previous !== undefined && tab !== previous;
         previous = tab;
-        if (!changed || !this.lgDesktop.isDesktop() || this.pinned()) return;
+        if (!changed || !this.sidePanels() || this.pinned()) return;
         const open = tab === 'filter';
         if (this.store.filterDrawerOpen() !== open) this.store.setFilterDrawerOpen(open);
       });
     });
   })();
-  /** Without the details dock (another Show details mode, a narrower window) no photo tab stays picked. */
+  /** Another Details location closes a photo tab. A width change does not: below sm (a phone's bottom sheet)
+   *  the rail is not drawn, and the tab, with the photo it held, is back when the window widens again. */
   private readonly photoTabsFollowMode = effect(() => {
-    const docked = this.panelMode();
-    untracked(() => { if (!docked && isPhotoTab(this.rail.tab())) this.rail.closePage(); });
+    const off = this.detailsPlace() !== 'panel';
+    untracked(() => { if (off && isPhotoTab(this.rail.tab())) this.rail.closePage(); });
   });
+  /** The photo the details panel showed last, kept across a narrow window and a reload (localStorage). */
+  private panelPhotoPath: string | null = (() => {
+    try { return localStorage.getItem(PANEL_PHOTO_KEY); } catch { return null; }
+  })();
+  private readonly rememberPanelPhoto = effect(() => {
+    const path = this.detailsRailVisible() ? this.panelPhoto()?.path ?? null : null;
+    if (!path || path === this.panelPhotoPath) return;
+    this.panelPhotoPath = path;
+    try { localStorage.setItem(PANEL_PHOTO_KEY, path); } catch { /* this visit only */ }
+  });
+  /** An open details panel with no photo shows the one it showed last, when that photo is in the results:
+   *  after a reload, Show panel, or a window that was a phone's width for a while. */
+  private readonly restorePanelPhotoFollows = effect(() => {
+    this.detailsRailVisible();
+    this.store.photos();
+    untracked(() => this.restorePanelPhoto());
+  });
+  private restorePanelPhoto(): void {
+    if (!this.detailsRailVisible() || this.tooltipPhoto() || this.hasActivePhoto() || !this.panelPhotoPath) return;
+    const photo = this.store.photos().find(candidate => candidate.path === this.panelPhotoPath);
+    if (photo) this.tooltipPhoto.set(photo);
+  }
   private readonly railElement = viewChild<PanelRailComponent, ElementRef<HTMLElement>>(PanelRailComponent, { read: ElementRef });
 
   /** Escape in the panel folds every panel to the side; the focus goes back to the rail. */
@@ -1369,6 +1412,8 @@ export class GalleryComponent implements OnInit, OnDestroy {
   protected readonly tooltipX = signal(0);
   protected readonly tooltipY = signal(0);
   protected readonly tooltipFlipped = signal(false);
+  /** The floating card's width, height cap and form (full or compact), decided with its place (B57). */
+  protected readonly tooltipFrame = signal<CardFrame | null>(null);
 
   // Selection state lives in the store (survives navigation, visible to services)
   protected readonly selectedPaths = this.store.selectedPaths;
@@ -1485,18 +1530,18 @@ export class GalleryComponent implements OnInit, OnDestroy {
 
   /** Whether the viewport is md+ (768px) — drives the side/over drawer, container padding and hover tooltips */
   private readonly desktop = useDesktopSignal({
-    onChange: matches => { if (!matches) this.dropHeldPhoto(); },
+    // Below md the floating card has no room; an open side panel (sm and up) keeps its photo.
+    onChange: matches => { if (!matches && this.detailsPlace() !== 'panel') this.dropHeldPhoto(); },
   });
   protected readonly isDesktop = this.desktop.isDesktop;
 
   /**
-   * Whether the viewport is wide enough to give up a 320px strip permanently.
-   *
-   * The details rail is not merely a desktop feature: at the md breakpoint the
-   * drawer would take more than a third of the window and leave the grid too
-   * narrow to browse, so it wants its own, higher bar.
+   * Whether the rail and its panels (Showing, the photo details, an add-on) sit at the side of the grid: from sm
+   * at every width, and on a phone set to Side. When room is short a panel narrows to its minimum and the grid
+   * gives way; it never drops below the grid. Otherwise (a phone's bottom sheet) the filters are a drawer and
+   * the details a floating card.
    */
-  private readonly railWide = useDesktopSignal({ breakpointPx: DETAILS_RAIL_MIN_WIDTH_PX });
+  protected readonly sidePanels = inject(PanelLayoutService).side;
 
   /** Whether the viewport is lg+ (1024px): the notice stack floats as cards above it and is one bar below it,
    *  and the criteria row only sticks under the header from there up. */
@@ -1513,8 +1558,12 @@ export class GalleryComponent implements OnInit, OnDestroy {
     this.selectionAffordance() || (this.selectingPhotos() && !this.isDesktop()),
   );
   protected readonly cardDetailsPlace = computed<DetailsPlace>(() =>
-    this.selectingPhotos() && !this.isDesktop() ? 'off' : this.detailsPlace(),
+    this.selectingPhotos() && this.selectionHidesDetails() && !this.detailsOnTap() ? 'off' : this.detailsPlace(),
   );
+  /** Below md, picking photos turns the details off (a tap only picks), except in a window wide enough for side
+   *  panels driven by a mouse: there a click selects and shows its card, as above md (from 640 to 767 px a click
+   *  showed no card). */
+  private readonly selectionHidesDetails = computed(() => !this.isDesktop() && (!this.sidePanels() || this.isTouchDevice()));
 
   /** Whether to hide photo details below the thumbnails */
   readonly effectiveHideDetails = computed(() => this.store.filters().hide_details);
@@ -1522,9 +1571,9 @@ export class GalleryComponent implements OnInit, OnDestroy {
   /** The Showing and photo-details panels' user-set widths (drag or arrow-key their inner edge). */
   protected readonly showingWidth = new PanelWidth({ storageKey: 'facet_gallery_showing_width', defaultWidth: 320, min: 288, max: 560, side: 'right' });
   protected readonly detailsWidth = new PanelWidth({ storageKey: 'facet_gallery_details_width', defaultWidth: 320, min: 288, max: 560, side: 'right' });
-  /** "Photo details": where a photo's details appear — 'off' | 'card' | 'panel'. */
+  /** "Details location": where a photo's details appear — 'off' | 'card' | 'panel'. */
   readonly detailsPlace = computed(() => this.store.filters().details_place);
-  /** "Open with": what opens them — 'hover' | 'click' | 'both', for the card and the panel alike. */
+  /** "Details mode": 'hover' (the details follow the pointer; a click holds a photo) or 'click', for the card and the panel alike. */
   readonly detailsTrigger = computed(() => this.store.filters().details_trigger);
   /** The path of the photo whose floating card a click (or Space) opened. Such a
    *  card is pinned: it stays when the pointer leaves, takes pointer events, and a
@@ -1550,10 +1599,16 @@ export class GalleryComponent implements OnInit, OnDestroy {
     });
   })();
   /** Whether tooltip is fully disabled (off mode) — used for skipping rendering and hover handlers */
-  readonly tooltipDisabled = computed(() => this.detailsPlace() === 'off' || (this.selectingPhotos() && !this.isDesktop()));
+  readonly tooltipDisabled = computed(() => this.detailsPlace() === 'off' || (this.selectingPhotos() && this.selectionHidesDetails() && !this.detailsOnTap()));
+  /** A phone's bottom sheet (a touch screen below sm, Panel on phone: Bottom sheet): a tap on a photo shows its
+   *  details in a sheet along the bottom of the screen, as well as selecting it (B54); a tap elsewhere, Escape or
+   *  Clear closes it. A narrow window with a mouse keeps the floating card. */
+  protected readonly phoneSheet = computed(() => !this.sidePanels() && !this.isDesktop() && this.isTouchDevice());
+  /** The sheet answers a tap except in the explicit Select mode, where a tap only picks photos. */
+  private readonly detailsOnTap = computed(() => this.phoneSheet() && !this.selectionAffordance());
 
-  /** Docked rail needs real width, not merely "not a phone". */
-  readonly panelMode = computed(() => this.detailsPlace() === 'panel' && this.railWide.isDesktop());
+  /** The details dock in the side panel wherever the panels sit at the side; a phone's bottom sheet shows the card. */
+  readonly panelMode = computed(() => this.detailsPlace() === 'panel' && this.sidePanels());
 
   /** An assistant-pinned list is shown: the filter controls are hidden so no edit can drop it. */
   protected readonly pinned = computed(() => this.store.pinnedPaths() !== null);
@@ -1561,20 +1616,26 @@ export class GalleryComponent implements OnInit, OnDestroy {
   /**
    * Whether one of the photo tabs (Grade, Camera, Content) is the rail's panel.
    *
-   * The panel is 320px of the grid, so it stays closed until a photo first enters it
-   * (a hover, a click or the keyboard cursor in panel mode) and then stays until the
-   * user dismisses it, picks another panel, or the view it belongs to is reset. The
-   * rail's pick, not the held photo, decides: a hover that crosses the gap between two
-   * cards, or leaves the grid, never opens or closes anything. Nor does a reload of the
-   * results (a re-sort, a filter, the next page): when it drops the held photo the tab
-   * shows its empty state, because closing would widen the grid under a still pointer
-   * and the card landing under it would reopen it on a photo nobody chose.
+   * The panel is 320px of the grid, so it stays closed until a click (or Space) on a
+   * photo opens it, and then stays until the user hides it (Hide panel, Escape), picks
+   * another panel, or the view it belongs to is reset. The rail's pick, not the held
+   * photo, decides: a hover never opens or closes anything, it only changes the photo
+   * an open panel shows. Nor does a reload of the results (a re-sort, a filter, the
+   * next page): when it drops the held photo the tab shows its empty state, because
+   * closing would widen the grid under a still pointer.
    */
   readonly detailsRailVisible = computed(() => this.panelMode() && isPhotoTab(this.rail.tab()));
 
-  /** A photo enters the panel: it opens the last photo tab, but only while no other panel (Filter, an add-on) is up. */
+  /**
+   * A click (or Space) on a photo opens the side panel on the last photo tab, also in the place of Showing; an
+   * add-on's panel is never replaced. Only a click does: a hover or a cursor move never opens or reopens the
+   * panel (B54). Without the Showing case a click with Showing open (opened by Filters, or left open and
+   * restored on reload) changed nothing on screen: the details panel seemed gone for good (B53).
+   */
   private openRail(): void {
-    if (this.panelMode() && this.rail.tab() === null) this.rail.open(this.lastPhotoTab);
+    if (!this.panelMode()) return;
+    const tab = this.rail.tab();
+    if (tab === null || tab === 'filter') this.rail.open(this.lastPhotoTab);
   }
 
   /** A view or collection reset drops the hovered photo; its tab closes with it unless the keyboard cursor still holds one. */
@@ -1689,8 +1750,8 @@ export class GalleryComponent implements OnInit, OnDestroy {
   protected readonly noticeRightPx = computed(() => {
     // ResizeObserver can retain the previous side-drawer inset after a viewport
     // or presentation change. An over drawer never reserves photo-canvas width.
-    // From lg the rail's panels sit outside the notice host, so only the md-to-lg side drawer takes room.
-    const reservesSpace = this.isDesktop() && !this.lgDesktop.isDesktop() && this.store.filterDrawerOpen();
+    // With side panels the rail's panels sit outside the notice host; a side drawer only on a phone, never at md.
+    const reservesSpace = this.isDesktop() && !this.sidePanels() && this.store.filterDrawerOpen();
     return (reservesSpace ? this.noticeInsetPx() : 0) + this.floatMarginPx();
   });
 
@@ -2171,7 +2232,6 @@ export class GalleryComponent implements OnInit, OnDestroy {
     // rail's open panel, the header measured the full width, showed its wide one-row controls and then folded
     // them to the compact ones once the panel took its 320 px, moving the grid under it.
     this.desktop.setup();
-    this.railWide.setup();
     this.lgDesktop.setup();
     let previousMode: string | null = null;
     effect(() => {
@@ -2267,7 +2327,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
     // Sync store.filterDrawerOpen signal → mat-sidenav, below lg only (from lg the flag is the Filter panel).
     effect(() => {
       // The persisted flag is left alone while pinned: the drawer only stays shut.
-      const open = this.store.filterDrawerOpen() && !this.pinned() && !this.lgDesktop.isDesktop();
+      const open = this.store.filterDrawerOpen() && !this.pinned() && !this.sidePanels();
       const drawer = this.filterDrawer();
       if (!drawer) return;
       if (open) drawer.open();
@@ -2309,9 +2369,15 @@ export class GalleryComponent implements OnInit, OnDestroy {
     effect(() => {
       // A card's trigger change drops it (a hover card must not turn into a pinned one);
       // the docked panel keeps its photo when only the trigger changes.
-      if (this.detailsPlace() !== 'panel') this.detailsTrigger();
-      this.panelMode(); // the rail breakpoint flips panel mode without a mode change
-      untracked(() => this.dropHeldPhoto());
+      const place = this.detailsPlace();
+      if (place !== 'panel') this.detailsTrigger();
+      const docked = this.panelMode(); // the side-panel breakpoint flips panel mode without a mode change
+      untracked(() => {
+        if (place !== 'panel') { this.dropHeldPhoto(); return; }
+        // Side panel across a width change (a phone's bottom sheet and back) or a reload: the floating stand-in
+        // must not show a photo at a stale spot, and the panel comes back open on the photo it held.
+        if (!docked) this.tooltipPhoto.set(null);
+      });
     });
   }
 
@@ -2565,7 +2631,6 @@ export class GalleryComponent implements OnInit, OnDestroy {
     this.saveViewSnapshot();
     this.resizeObserver?.disconnect();
     this.desktop.cleanup();
-    this.railWide.cleanup();
     this.lgDesktop.cleanup();
   }
 
@@ -2689,8 +2754,8 @@ export class GalleryComponent implements OnInit, OnDestroy {
     // would make the sync effect close the drawer, whose pending open would then
     // reopen it -- an endless open/close loop.
     if (open !== this.filterDrawer()?.opened) return;
-    // From lg the drawer is shut because the Filter panel took over, not because the user closed the filters.
-    if (this.lgDesktop.isDesktop()) return;
+    // With side panels the drawer is shut because Showing took over, not because the user closed the filters.
+    if (this.sidePanels()) return;
     // A close caused by the pin is not the user's choice; keep the persisted flag.
     if (this.pinned()) return;
     this.store.setFilterDrawerOpen(open);
@@ -2720,17 +2785,21 @@ export class GalleryComponent implements OnInit, OnDestroy {
    *  newly current card clear of the action bar that this very selection has
    *  just raised over it. */
   protected toggleSelection(photo: Photo, event: MouseEvent | undefined, index: number): void {
+    const at = event instanceof MouseEvent && event.detail > 0 ? { x: event.clientX, y: event.clientY } : null;
+    this.recentClicks = [...this.recentClicks.slice(-3), { path: photo.path, at: performance.now(), point: at }];
     this.store.toggleSelection(photo, event);
     const selected = this.viewScoped() ? !this.excludedPaths().has(photo.path) : this.selectedPaths().has(photo.path);
     if (this.panelMode() && !selected) {
       this.tooltipPhoto.set(photo);
-      this.openRail();
       this.setCursor(-1);
     } else this.setCursor(index);
+    this.openRail();
     this.focusCard(index);
   }
 
   protected clearSelection(): void {
+    // A card pinned by a click goes with the selection that click made.
+    if (this.tooltipPinned()) this.hideTooltip();
     this.store.clearSelection();
     this.selectionAffordance.set(false);
     this.restoreCursorFocus();
@@ -3028,6 +3097,147 @@ export class GalleryComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** The latest photo clicks (path, time, spot), so a double click can open the photo its first click hit. */
+  private recentClicks: { path: string; at: number; point: { x: number; y: number } | null }[] = [];
+  /** When a double click was last opened, so the dblclick that follows it does not open again. */
+  private doubleClickHandledAt = -Infinity;
+  /** Where the pointer last really was (a pointer move or press), so a hover can tell a moving pointer from
+   *  a card sliding under a still one. */
+  private lastPointer: { x: number; y: number } | null = null;
+  private readonly documentCapture = (() => {
+    const doc = inject(DOCUMENT);
+    const listeners: [string, (event: Event) => void][] = [
+      ['click', event => this.onDoubleClickCapture(event as MouseEvent)],
+      // Escape is decided before anything under the focus sees it: a card's own buttons stop its bubbling,
+      // and a tooltip under the pointer swallows it (Material's overlay keyboard dispatcher, on the body).
+      ['keydown', event => this.onEscapeCapture(event as KeyboardEvent)],
+      ['pointermove', event => this.notePointer(event as PointerEvent)],
+      ['pointerdown', event => this.notePointer(event as PointerEvent)],
+      ['scroll', event => this.onScrollCapture(event)],
+      ['wheel', () => { this.userScrollAt = performance.now(); }],
+      ['touchmove', () => { this.userScrollAt = performance.now(); }],
+      ['animationend', event => this.onBarSettled(event)],
+      ['transitionend', event => this.onBarSettled(event)],
+    ];
+    for (const [type, listener] of listeners) doc.addEventListener(type, listener, true);
+    inject(DestroyRef).onDestroy(() => { for (const [type, listener] of listeners) doc.removeEventListener(type, listener, true); });
+  })();
+
+  /** When the user last scrolled on purpose (wheel, touch, a scroll key). */
+  private userScrollAt = -Infinity;
+
+  /** A hover ignored because the pointer had not moved (B55): the photo then under the pointer gets no other
+   *  enter, so the first real move inside it takes it (V1c). Only set while such an enter is pending. */
+  private pendingHover: { photo: Photo; target: HTMLElement; from: { x: number; y: number } } | null = null;
+
+  private notePointer(event: PointerEvent): void {
+    this.lastPointer = { x: event.clientX, y: event.clientY };
+    const pending = this.pendingHover;
+    if (!pending || event.type !== 'pointermove') return;
+    if (!pending.target.isConnected || !pending.target.contains(event.target as Node | null)) {
+      this.pendingHover = null;
+      return;
+    }
+    // More than a hand's tremor (1 to 2 px jitter keeps the details where they are).
+    if (Math.hypot(event.clientX - pending.from.x, event.clientY - pending.from.y) <= 2) return;
+    this.pendingHover = null;
+    // A hover of that photo, now the pointer has really moved; `target` stands in for the enter's own element.
+    this.showTooltip(new MouseEvent('mouseenter', { clientX: event.clientX, clientY: event.clientY }), pending.photo, pending.target);
+  }
+
+  /** A hover that is not the pointer moving: a card slid under a still pointer (the grid scrolled to clear the
+   *  selection bar, or reflowed when a panel opened). It must never retarget the details (B55). */
+  private hoverWithoutMove(event: MouseEvent): boolean {
+    const last = this.lastPointer;
+    // Within a pixel: a pointer event's coordinates are fractional, a mouse event's are whole pixels.
+    return event?.type === 'mouseenter' && !!last && Math.abs(event.clientX - last.x) < 1 && Math.abs(event.clientY - last.y) < 1;
+  }
+
+  /** The grid scrolling takes a click-pinned floating card's photo away from it: the card closes (B55). */
+  private onScrollCapture(event: Event): void {
+    if (this.panelMode() || this.phoneSheet() || !this.tooltipPhoto()) return;
+    if ((event.target as Element | null)?.closest?.('app-photo-tooltip')) return;
+    // A scroll the user makes (wheel, touch, scroll keys) closes it. Any other scroll moves it with its photo:
+    // the one its pinning click starts (a bottom-row photo scrolled clear of the selection bar), or the
+    // grid keeping its place through a window resize.
+    if (performance.now() - this.userScrollAt > 600) {
+      requestAnimationFrame(() => this.replaceCard());
+      return;
+    }
+    this.pinnedTooltipPath.set(null);
+    this.tooltipPhoto.set(null);
+  }
+
+  /**
+   * Escape anywhere on the page, outside a field, a menu, a dialog or the phone's filter drawer: a floating
+   * details card closes, else the open side panel hides to the rail (B54). Seen in the capture phase, so a
+   * tooltip under the pointer (Show panel's, just clicked) cannot take the first press (B55).
+   */
+  private onEscapeCapture(event: KeyboardEvent): void {
+    if (SCROLL_KEYS.has(event.key) && !isEditableTarget(event.target)) this.userScrollAt = performance.now();
+    if (event.key !== 'Escape' || this.parked || this.store.slideshowActive() || event.defaultPrevented) return;
+    if (isEditableTarget(event.target) || isShortcutContextBlocked(event) || this.overDrawerOpen()) return;
+    if ((event.target as Element | null)?.closest?.('.cdk-overlay-container')) return;
+    if (this.document.querySelector('.cdk-overlay-container .mat-mdc-menu-panel, .cdk-overlay-container [role="dialog"]')) return;
+    if (!this.panelMode() && this.tooltipPhoto()) {
+      this.pinnedTooltipPath.set(null);
+      this.tooltipPhoto.set(null);
+      return;
+    }
+    const tab = this.rail.tab();
+    if (this.sidePanels() && tab !== null && !tab.startsWith('addon:')) {
+      event.preventDefault();
+      this.hidePanels(false);
+    }
+  }
+
+  /** The photo clicks a click at `point` ends: back from the latest, each within the double-click time of the
+   *  next and on the same spot (as the browser counts them), however the grid moved under them. */
+  private clickChain(point: { x: number; y: number }): { path: string; at: number }[] {
+    const near = (a: { x: number; y: number } | null, b: { x: number; y: number } | null) =>
+      !!a && !!b && Math.abs(a.x - b.x) <= 4 && Math.abs(a.y - b.y) <= 4;
+    const clicks = this.recentClicks;
+    const last = clicks.at(-1);
+    if (!last || !near(last.point, point) || performance.now() - last.at > DOUBLE_CLICK_MS) return [];
+    let start = clicks.length - 1;
+    while (start > 0 && near(clicks[start - 1].point, clicks[start].point) && clicks[start].at - clicks[start - 1].at <= DOUBLE_CLICK_MS) start--;
+    return clicks.slice(start);
+  }
+
+  /**
+   * The second click of a double click (seen at the document, before anything under the pointer): open the photo
+   * the FIRST click hit (B54). That click can move the grid before the next one lands (it opens the side panel,
+   * or scrolls the card clear of the bottom edge), so the second click can fall on another card, on one of a
+   * card's own buttons, on the panel or on a notice, and the card under it may be mid re-render and not listen:
+   * the photo page opened a photo nobody aimed at, or nothing opened. The click is stopped there, and every
+   * selection toggle the double click's clicks made is put back, as a double click on one photo leaves it as it was.
+   */
+  private onDoubleClickCapture(event: MouseEvent): void {
+    if (event.detail !== 2 || this.parked || !(event.target as Element | null)?.closest?.('app-gallery')) return;
+    if ((event.target as Element | null)?.closest?.('input, textarea, select, [contenteditable], .cdk-overlay-container')) return;
+    const clicks = this.clickChain({ x: event.clientX, y: event.clientY });
+    if (!clicks.length) return;
+    event.stopPropagation();
+    event.preventDefault();
+    this.recentClicks = [];
+    this.doubleClickHandledAt = performance.now();
+    const photos = this.store.photos();
+    const aimed = photos.find(candidate => candidate.path === clicks[0].path);
+    if (!aimed) return;
+    for (const click of clicks) {
+      const clicked = photos.find(candidate => candidate.path === click.path);
+      if (clicked) this.store.toggleSelection(clicked);
+    }
+    // Navigate once this click has settled, so nothing its handlers start supersedes the navigation.
+    setTimeout(() => { if (!this.parked && !this.destroyRef.destroyed) this.downloadPhoto(aimed); });
+  }
+
+  /** A card's own dblclick: already opened on the double click's second click, unless that never reached here. */
+  protected openFromDoubleClick(photo: Photo): void {
+    if (performance.now() - this.doubleClickHandledAt <= DOUBLE_CLICK_MS) return;
+    this.downloadPhoto(photo);
+  }
+
   protected downloadPhoto(photo: Photo): void {
     this.router.navigate(['/photo'], {
       queryParams: { path: photo.path },
@@ -3124,16 +3334,39 @@ export class GalleryComponent implements OnInit, OnDestroy {
     this.photoActions.embedMetadata(photo);
   }
 
-  showTooltip(event: MouseEvent, photo: Photo): void {
+  showTooltip(event: MouseEvent, photo: Photo, target?: HTMLElement): void {
     const place = this.detailsPlace();
     if (place === 'off') return;
+    if (!target && this.hoverWithoutMove(event)) {
+      const at = this.lastPointer;
+      const element = event.currentTarget as HTMLElement | null;
+      this.pendingHover = element && at ? { photo, target: element, from: at } : null;
+      return;
+    }
+    this.pendingHover = null;
     // The rail is parked, so none of the placement maths below applies to it.
     // Only while it is actually shown, though: with the mode selected on a
     // viewport too narrow for the rail, skipping the maths left the floating
     // tooltip to render at a stale coordinate in the middle of the page.
     if (place === 'panel' && this.panelMode()) {
+      // Hover never opens (or reopens) the side panel: opening it narrows the grid, which moved the photo the
+      // hand was travelling to (the click then fell on the panel), and brought a hidden panel back on its own.
+      // It only changes which photo an open details panel shows. A click (or Space) opens it.
+      if (event?.type === 'mouseenter') {
+        if (this.detailsRailVisible()) this.tooltipPhoto.set(photo);
+        return;
+      }
       this.tooltipPhoto.set(photo);
       this.openRail();
+      return;
+    }
+    if (this.phoneSheet()) {
+      // A tap's emulated mouseenter is not a hover; the tap itself shows the sheet, a second tap on the same
+      // photo closes it.
+      if (event?.type === 'mouseenter') return;
+      if (this.tooltipPinned() && this.tooltipPhoto()?.path === photo.path) { this.hideTooltip(); return; }
+      this.pinnedTooltipPath.set(photo.path);
+      this.tooltipPhoto.set(photo);
       return;
     }
     // The card only asks for a gesture its trigger allows; a click or Space pins
@@ -3152,68 +3385,105 @@ export class GalleryComponent implements OnInit, OnDestroy {
       return;
     }
     this.pinnedTooltipPath.set(byClick ? photo.path : null);
-    const card = (event.currentTarget as HTMLElement)?.closest('.relative.rounded-lg') as HTMLElement ?? event.currentTarget as HTMLElement;
-    const rect = card.getBoundingClientRect();
-    const padding = 16;
-    const isLandscape = aspectOf(photo) > 1;
-    const vh = window.innerHeight;
-    const vw = window.innerWidth;
-
-    const thumbImg = (card.querySelector('img') as HTMLImageElement | null);
-    const thumbAspect = (thumbImg?.naturalWidth && thumbImg.naturalHeight)
-      ? thumbImg.naturalWidth / thumbImg.naturalHeight
-      : aspectOf(photo);
-    const tooltipNatH = thumbAspect > 1 ? 640 / thumbAspect : 640;
-
-    let tooltipWidth: number;
-    let tooltipHeight: number;
-    if (isLandscape) {
-      const imgH = Math.min(tooltipNatH, vh * 0.35);
-      const imgW = imgH * thumbAspect;
-      tooltipWidth = Math.ceil(imgW) + 24;
-      // 260 = scoring panel (~160) + tech/EXIF row (~60) + tags row (~40)
-      tooltipHeight = Math.ceil(imgH) + 260;
-    } else {
-      const imgH = Math.min(tooltipNatH, vh * 0.5);
-      const imgW = imgH * thumbAspect;
-      tooltipWidth = Math.ceil(imgW) + 260 + 12 + 24;
-      // 100 = tech/EXIF row (~60) + tags row (~40)
-      tooltipHeight = Math.max(Math.ceil(imgH), 300) + 100;
-    }
-
-    const wouldOverflowRight = rect.right + padding + tooltipWidth > vw - padding;
-    let x: number;
-    if (wouldOverflowRight) {
-      x = rect.left - tooltipWidth - padding;
-    } else {
-      x = rect.right + padding;
-    }
-
-    let y = rect.top + rect.height / 2 - tooltipHeight / 2;
-    y = Math.max(padding, Math.min(y, vh - tooltipHeight - padding));
-
-    this.tooltipFlipped.set(wouldOverflowRight);
-    this.tooltipX.set(x);
-    this.tooltipY.set(y);
+    this.placeTooltip(photo, target ?? event.currentTarget as HTMLElement);
     this.tooltipPhoto.set(photo);
-
-    setTimeout(() => {
-      if (this.tooltipPhoto() !== photo) return;
-      const el = document.querySelector('app-photo-tooltip > div') as HTMLElement | null;
-      if (!el) return;
-      const { width: actualWidth, height: actualHeight } = el.getBoundingClientRect();
-      const wouldOverflowRightActual = rect.right + padding + actualWidth > vw - padding;
-      const newX = wouldOverflowRightActual
-        ? rect.left - actualWidth - padding
-        : rect.right + padding;
-      if (Math.abs(newX - this.tooltipX()) > 1) this.tooltipX.set(newX);
-      if (wouldOverflowRightActual !== this.tooltipFlipped()) this.tooltipFlipped.set(wouldOverflowRightActual);
-
-      let newY = rect.top + rect.height / 2 - actualHeight / 2;
-      newY = Math.max(padding, Math.min(newY, vh - actualHeight - padding));
-      if (Math.abs(newY - this.tooltipY()) > 1) this.tooltipY.set(newY);
-    }, 0);
+    // The click that pinned it may raise the selection bar or scroll the grid: place it again once drawn.
+    requestAnimationFrame(() => this.replaceCard());
   }
+
+  /** The part of the screen the floating card may use: the grid area, below the sticky toolbar and above the
+   *  selection bar while it is up. */
+  private cardArea(): { left: number; top: number; right: number; bottom: number } {
+    const host = this.noticeHost()?.nativeElement.getBoundingClientRect();
+    const header = this.collectionHeader()?.nativeElement.getBoundingClientRect();
+    const bar = this.selectionBar()?.nativeElement.getBoundingClientRect();
+    let bottom = window.innerHeight;
+    if (bar && bar.height) bottom = Math.min(bottom, bar.top - 8);
+    // The notice stack floats over the grid's lower right. The card keeps clear of its folded pill, a fixed band
+    // whether the stack is folded or open: the stack folds on its own (after 6 s from 1024 px, and when the window
+    // narrows), and following it changed a pinned card while nothing moved (B57). Open, the cards above the pill
+    // may lie under the card for those seconds.
+    if (this.noticeStackVisible() && host) bottom = Math.min(bottom, host.bottom - this.noticeBottomPx() - NOTICE_PILL_PX - 8);
+    return {
+      left: host ? Math.max(0, host.left) : 0,
+      right: host && host.width ? Math.min(window.innerWidth, host.right) : window.innerWidth,
+      top: Math.round((header?.bottom ?? 8) + 8),
+      bottom,
+    };
+  }
+
+  /** Place the floating card again beside its photo, inside the grid area as it is now: after a window resize,
+   *  a panel opening or closing, the selection bar rising, or the scroll a click starts. It closes when its
+   *  photo is no longer on screen (B55). */
+  private replaceCard(): void {
+    const photo = this.tooltipPhoto();
+    if (!photo || this.panelMode() || this.phoneSheet() || this.parked) return;
+    const index = this.store.photos().findIndex(candidate => candidate.path === photo.path);
+    const card = index < 0 ? null : this.document.querySelector(`[data-pidx="${index}"]`);
+    const rect = card?.getBoundingClientRect();
+    const area = this.cardArea();
+    // Gone only when the photo itself left the screen (under the toolbar or past the bottom edge); a photo
+    // behind the selection bar or a notice is still there, and the card goes above it.
+    if (!rect || !rect.width || rect.bottom <= area.top || rect.top >= window.innerHeight) {
+      this.pinnedTooltipPath.set(null);
+      this.tooltipPhoto.set(null);
+      return;
+    }
+    this.placeTooltip(photo, card as HTMLElement);
+  }
+
+  /**
+   * Where the floating card goes and in which form, from the window as it is: the photo's box, the grid area
+   * (toolbar, rail and panels, selection bar, notices) and the size the whole card needs at this window size.
+   * Never from the card's own rendered size: that fed back (a full card that did not fit turned compact, the
+   * compact one fitted elsewhere, so it turned full again, about 8 times a second). Beside the photo, never
+   * over it (a click-pinned card hid the very photo a second click closes it on), and inside the grid's part of
+   * the screen: never over the toolbar (B54), the rail or a side panel, or the selection bar (B55). Where the
+   * whole card does not fit it is compact: the name and key facts, no picture (B57).
+   */
+  private placeTooltip(photo: Photo, source: HTMLElement): void {
+    // The photo's own card, however it was reached (an enter on its inner element, or the grid's lookup), so the
+    // same window gives the same card (K3).
+    const card = source.closest<HTMLElement>('[data-pidx]') ?? source;
+    const rect = card.getBoundingClientRect();
+    const area = this.cardArea();
+    const thumb = card.querySelector('img');
+    const aspect = thumb?.naturalWidth && thumb.naturalHeight ? thumb.naturalWidth / thumb.naturalHeight : aspectOf(photo);
+    const caption = (photo.caption_translated || photo.caption || '').length;
+    const full = fullCardSize(aspectOf(photo) > 1, aspect, window.innerHeight, area.right - area.left - 32, caption);
+    let width = full.width;
+    let placed = placeCard(rect, full.width, full.height, area);
+    const compact = placed.maxHeight < full.height;
+    if (compact) {
+      width = Math.min(COMPACT_CARD.width, area.right - area.left - 32);
+      placed = placeCard(rect, width, COMPACT_CARD.height, area);
+    }
+    this.tooltipFlipped.set(placed.flipped);
+    this.tooltipX.set(placed.x);
+    this.tooltipY.set(placed.y);
+    this.tooltipFrame.set({ width, maxHeight: placed.maxHeight, compact });
+  }
+
+  /** The selection bar finished rising or leaving: the card's area has its final bottom now (B57). */
+  private onBarSettled(event: Event): void {
+    if (!this.selectionBar()?.nativeElement.contains(event.target as Node | null)) return;
+    if (this.tooltipPhoto() && !this.panelMode()) requestAnimationFrame(() => this.replaceCard());
+  }
+
+  protected onWindowResize(): void {
+    if (this.tooltipPhoto() && !this.panelMode()) requestAnimationFrame(() => this.replaceCard());
+  }
+
+  /** The grid area changes (a window resize, the rail's panel opening or closing, the selection bar, the notice
+   *  stack folding or changing): the card is placed again from the new area. Never from the card's own size. */
+  private readonly cardFollowsLayout = effect(() => {
+    this.containerWidth();
+    this.rail.tab();
+    this.selectingPhotos();
+    this.noticeStackVisible();
+    this.noticeBottomPx();
+    untracked(() => { if (this.tooltipPhoto() && !this.panelMode()) requestAnimationFrame(() => this.replaceCard()); });
+  });
 
   hideTooltip(): void {
     // A docked rail keeps the last photo on mouse-out. Blanking it every time
@@ -3315,6 +3585,24 @@ export class GalleryComponent implements OnInit, OnDestroy {
       event.preventDefault();
       this.store.setGalleryMode(nextGalleryMode(this.effectiveGalleryMode()));
     }
+  }
+
+  /**
+   * Hide panel: every panel folds to the rail (the header button also closes an add-on's, as before; Escape
+   * leaves an add-on alone), and the focus goes to the rail's Show panel, so the keyboard is not dropped to
+   * the page and the next Enter brings the panel back.
+   */
+  protected hidePanels(withAddon = true): void {
+    if (withAddon) this.rail.closeAll();
+    else this.rail.closePage();
+    afterNextRender(() => this.railElement()?.nativeElement.querySelector<HTMLElement>('[data-rail-expand]')?.focus(), { injector: this.injector });
+  }
+
+  /** A click outside a click-pinned card (and outside the photos, whose own click moves or closes it) closes it. */
+  protected onDocumentPointerDown(event: PointerEvent): void {
+    if (!this.tooltipPinned() || this.panelMode()) return;
+    if ((event.target as Element | null)?.closest?.('app-photo-tooltip, app-photo-card, .cdk-overlay-container')) return;
+    this.hideTooltip();
   }
 
   protected focusCollectionSearch(): void {
@@ -3421,10 +3709,9 @@ export class GalleryComponent implements OnInit, OnDestroy {
     this.activeIndex.set(index);
     this.activePath.set(path);
     // The mirror outlives a blur: a drop with the window unfocused (the user went to the agent) keeps it.
-    if (path !== null) {
-      this.store.focusedPath.set(path);
-      this.openRail();
-    } else if (document.hasFocus()) this.store.focusedPath.set(null);
+    // Moving the cursor never opens the side panel (a click, Space or Enter does): an open one follows it.
+    if (path !== null) this.store.focusedPath.set(path);
+    else if (document.hasFocus()) this.store.focusedPath.set(null);
   }
 
   /** Re-find the marked photo whenever the result set changes, so the cursor
@@ -3484,7 +3771,24 @@ export class GalleryComponent implements OnInit, OnDestroy {
   protected onGridFocusOut(event: FocusEvent): void {
     const next = event.relatedTarget as HTMLElement | null;
     if (next?.closest('[role="grid"], [data-photo-collection], [data-collection-header], [data-selection-bar], [data-details-rail], .cdk-overlay-container')) return;
-    this.setCursor(-1);
+    const card = (event.target as HTMLElement | null)?.closest?.('app-photo-card');
+    if (next || !card) {
+      this.setCursor(-1);
+      return;
+    }
+    // Focus went nowhere from a card. Either the user left (a click on the page's empty space), or the grid
+    // re-rendered the card under the focus: the details panel opening narrows the grid, the virtual rows are
+    // rebuilt with fewer columns, and the focused card is destroyed (the browser reports the blur while it
+    // is still attached). That is not leaving. Clearing the cursor there dropped the photo just clicked, and
+    // the hover on whichever card then slid under the pointer took the panel over: the clicked photo was
+    // never the one shown. Decide once the render is done: a detached card keeps the cursor and its new
+    // card takes the focus back.
+    const revision = this.cursorRevision;
+    queueMicrotask(() => {
+      if (revision !== this.cursorRevision) return;
+      if (card.isConnected) this.setCursor(-1);
+      else if (this.hasActivePhoto()) this.focusCard(this.activeIndex(), false, false);
+    });
   }
 
   /** Whether the cursor is actually standing on a photo that is on screen.
@@ -3563,6 +3867,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
    *  Escape (close every panel) leaves an open add-on alone; propagation is left alone so an open tooltip's
    *  overlay handler still closes. Focus moves back to the gallery rather than dropping to the body. */
   protected onRailEscape(event: Event): void {
+    if (isEditableTarget(event.target)) return;
     event.preventDefault();
     const index = this.railPhotoIndex();
     this.escapeSelection();
@@ -3625,6 +3930,9 @@ export class GalleryComponent implements OnInit, OnDestroy {
         if (this.selectionCount() || (this.panelMode() && this.hasActivePhoto())) {
           event.preventDefault();
           this.escapeSelection();
+          // Escape also hides the side panel (B54), in the same press: every click selects, so waiting for
+          // a second Escape would leave the panel up after the first one seemed to do nothing to it.
+          if (this.detailsRailVisible()) this.hidePanels(false);
         }
         return;
       default:

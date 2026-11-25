@@ -57,7 +57,8 @@
       "save": "Salvar",
       "saving": "Salvando…",
       "load_more": "Carregar mais",
-      "close_panels": "Fechar os painéis"
+      "collapse_panel": "Ocultar painel",
+      "expand_panel": "Mostrar painel"
     },
     "sort": {
       "date": "Data"
@@ -1244,19 +1245,22 @@
     "composition_range": "Faixa de composição",
     "hide_details": "Ocultar detalhes",
     "tooltip_mode": {
-      "panel_empty": "Passe o cursor sobre uma foto ou clique nela para ver aqui os seus detalhes",
+      "panel_empty": "Aponte para uma foto para ver os detalhes aqui",
+      "panel_empty_click": "Clique numa foto para ver os detalhes aqui",
       "panel_deselect": "Desmarcar",
       "details": "Detalhes da foto"
     },
     "photo_details": {
-      "label": "Detalhes da foto",
+      "label": "Local dos detalhes",
       "off": "Desligado",
-      "card": "Cartão ao passar",
+      "card": "Cartão",
       "panel": "Painel lateral",
-      "open_with": "Abrir com",
+      "mode": "Modo dos detalhes",
       "hover": "Passar o mouse",
       "click": "Clicar",
-      "both": "Passar o mouse ou clicar"
+      "phone_panel": "Painel no telefone",
+      "phone_sheet": "Folha inferior",
+      "phone_side": "Lateral"
     },
     "hide_blinks": "Ocultar piscadas",
     "hide_bursts": "Melhor da rajada",
@@ -1805,10 +1809,11 @@
       "hide_details": "Mostra só as fotos, sem as informações por baixo de cada foto",
       "fast_scrolling": "Desenha só as linhas perto do ecrã, para que galerias longas rolem com fluidez. Desative se o layout falhar.",
       "card_buttons": "Escolha que botões um cartão mostra ao passar o rato, e por que ordem",
-      "photo_details": "Onde aparecem os detalhes de uma foto: num cartão ao lado da foto, no painel lateral na borda da galeria, ou em lugar nenhum",
-      "open_with": "O que abre os detalhes de uma foto: apontar para a foto (Passar o mouse), clicar nela (Clicar) ou qualquer um (Passar o mouse ou clicar). Vale para o cartão e para o painel lateral.",
+      "photo_details": "Onde os detalhes de uma foto aparecem: no painel lateral, num cartão ao lado da foto ou em lugar nenhum.",
+      "details_mode": "Um clique abre os detalhes; com Passar o mouse eles seguem o ponteiro, com Clicar só mudam no próximo clique.",
       "tile_fit": "Recorta as miniaturas em quadrado ou mostra cada foto na proporção original",
-      "reset_display": "Repõe o layout, o tamanho das miniaturas e os detalhes das fotos predefinidos. Os filtros, a ordenação e a seleção mantêm-se."
+      "reset_display": "Repõe o layout, o tamanho das miniaturas e os detalhes das fotos predefinidos. Os filtros, a ordenação e a seleção mantêm-se.",
+      "phone_panel": "No telefone, os painéis abrem como uma folha a partir de baixo, ou ao lado como numa tela mais larga."
     },
     "rail": {
       "label": "Painéis da galeria",

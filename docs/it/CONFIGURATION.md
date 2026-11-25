@@ -1601,7 +1601,7 @@ Visualizzazione e comportamento della galleria web.
       "hide_panoramas": true,
       "hide_details": true,
       "details_place": "panel",
-      "details_trigger": "both",
+      "details_trigger": "hover",
       "hide_rejected": true,
       "sort": "aggregate",
       "sort_direction": "DESC",
@@ -1690,8 +1690,8 @@ Visualizzazione e comportamento della galleria web.
 | `hide_brackets` | `true` | Mostra per impostazione predefinita solo l'esposizione base di ogni bracketing |
 | `hide_panoramas` | `true` | Mostrare per impostazione predefinita un solo fotogramma per panorama |
 | `hide_details` | `true` | Nasconde per impostazione predefinita i dettagli della foto sulle schede |
-| `details_place` | `"panel"` | Dove compaiono i dettagli della foto (Visualizzazione > **Dettagli della foto**): `"off"`, `"card"` (una scheda accanto alla foto) o `"panel"` (il pannello laterale ancorato) |
-| `details_trigger` | `"both"` | Cosa li apre (Visualizzazione > **Apri con**), per la scheda e per il pannello: `"hover"`, `"click"` o `"both"`. Le chiavi precedenti `tooltip_mode` e `panel_activation` vengono ancora lette e prevalgono se presenti (`hover`/`click` = scheda aperta così, `panel` = pannello laterale con `panel_activation`, `off` = disattivato) |
+| `details_place` | `"panel"` | Dove compaiono i dettagli della foto (Visualizzazione > **Posizione dei dettagli**): `"panel"` (il pannello laterale ancorato), `"card"` (una scheda accanto alla foto) o `"off"` |
+| `details_trigger` | `"hover"` | Visualizzazione > **Modalità dei dettagli**, per la scheda e per il pannello: `"hover"` (i dettagli seguono il puntatore; un clic fissa una foto) o `"click"` (cambiano solo al clic su una foto). Un `"both"` salvato (il vecchio Hover o clic) vale come `"hover"`. Le chiavi precedenti `tooltip_mode` e `panel_activation` vengono ancora lette e prevalgono se presenti (`hover`/`click` = scheda in quella modalità, `panel` = pannello laterale nella modalità di `panel_activation`, `off` = disattivato) |
 | `hide_rejected` | `true` | Nasconde per impostazione predefinita le foto rifiutate |
 | `gallery_mode` | `"mosaic"` | Layout predefinito della galleria (`"grid"` o `"mosaic"`) |
 | **allowed_origins** | | |

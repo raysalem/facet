@@ -4,14 +4,16 @@ import {
   expectNoPageScroll, expectTagKindOrder, openAlbum, photoTabsLayout, photoUrl, recordContentWidth, signInAsEditor,
 } from '../helpers/nav';
 
-// Below lg (1024 px) the gallery has no rail: Filters opens as a drawer. On the photo page the panel
-// tabs are a bar of icons in a row instead of a column, and the Content panel reads in the same
-// order as when wide (U13). Nothing scrolls sideways (I3). lg is Tailwind's 1024 px, so 1024 itself
-// is the first width WITH the rail; 1023 is the last without it.
+// From sm (640 px) the side panels sit at the side at every width: the gallery's rail and the photo page's
+// panel tabs in a column beside the content. Below sm (a phone, Panel on phone: Bottom sheet, the default) the
+// gallery has no rail and Filters opens as a drawer; on the photo page the panel tabs are a bar of icons in a
+// row instead of a column, and the Content panel reads in the same order as when wide (U13). Nothing scrolls
+// sideways (I3). sm is Tailwind's 640 px, so 640 itself is the first width WITH the rail; 639 the last without.
 
 const SIZES = [
-  { name: '1024 (first width with the rail)', width: 1024, height: 768, rail: true },
-  { name: '1023 (last width without it)', width: 1023, height: 768, rail: false },
+  { name: '1023 (below lg, still the side rail)', width: 1023, height: 768, rail: true },
+  { name: '640 (first width with the rail)', width: 640, height: 768, rail: true },
+  { name: '639 (last width without it)', width: 639, height: 768, rail: false },
   { name: '390 phone', width: 390, height: 844, rail: false },
 ];
 
@@ -21,7 +23,7 @@ for (const { name, width, height, rail } of SIZES) {
     await signInAsEditor(page);
     const panels = page.getByRole('tablist', { name: 'Gallery panels' });
 
-    await test.step('1. The album: the rail is there from lg and only then', async () => {
+    await test.step('1. The album: the rail is there from sm and only then', async () => {
       await openAlbum(page, 'E2E Tagged');
       await expect(page.getByRole('grid').getByRole('button', { name: /^TAG_0\d\.jpg$/ })).toHaveCount(6);
       if (rail) await expect(panels).toBeVisible();
@@ -46,7 +48,7 @@ for (const { name, width, height, rail } of SIZES) {
       });
     }
 
-    await test.step('3. The photo page: tabs in a column from lg, in a row below; Content in the same order', async () => {
+    await test.step('3. The photo page: tabs in a column from sm, in a row below; Content in the same order', async () => {
       await page.goto(photoUrl('tagged', 'TAG_01.jpg'));
       await page.getByRole('tablist', { name: 'Photo panels' }).getByRole('tab', { name: 'Content' }).click();
       expect(await photoTabsLayout(page), `photo tabs at ${width}`).toBe(rail ? 'column' : 'row');
@@ -61,9 +63,9 @@ for (const { name, width, height, rail } of SIZES) {
       await recordContentWidth(page, `10 photo ${width}`);
     });
 
-    await test.step('4. The panel closes to the side and opens again', async () => {
+    await test.step('4. The panel hides to the side and opens again', async () => {
       const content = page.getByRole('tabpanel', { name: 'Content' });
-      await page.getByRole('button', { name: 'Close panels' }).click();
+      await page.getByRole('button', { name: 'Hide panel' }).click();
       await expect(content).toBeHidden();
       await page.getByRole('tablist', { name: 'Photo panels' }).getByRole('tab', { name: 'Content' }).click();
       await expect(content).toBeVisible();

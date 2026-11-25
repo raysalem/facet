@@ -57,7 +57,8 @@
       "save": "Enregistrer",
       "saving": "Enregistrement…",
       "load_more": "Charger plus",
-      "close_panels": "Fermer les panneaux"
+      "collapse_panel": "Masquer le panneau",
+      "expand_panel": "Afficher le panneau"
     },
     "sort": {
       "date": "Date"
@@ -1244,19 +1245,22 @@
     "composition_range": "Plage composition",
     "hide_details": "Masquer détails",
     "tooltip_mode": {
-      "panel_empty": "Survolez une photo ou cliquez dessus pour voir ses détails ici",
+      "panel_empty": "Pointez une photo pour voir ses détails ici",
+      "panel_empty_click": "Cliquez sur une photo pour voir ses détails ici",
       "panel_deselect": "Désélectionner",
       "details": "Détails de la photo"
     },
     "photo_details": {
-      "label": "Détails de la photo",
+      "label": "Emplacement des détails",
       "off": "Désactivée",
-      "card": "Carte au survol",
+      "card": "Carte",
       "panel": "Panneau latéral",
-      "open_with": "Ouvrir avec",
+      "mode": "Mode des détails",
       "hover": "Survol",
       "click": "Clic",
-      "both": "Survol ou clic"
+      "phone_panel": "Panneau sur téléphone",
+      "phone_sheet": "Feuille en bas",
+      "phone_side": "Côté"
     },
     "hide_blinks": "Masquer clignements",
     "hide_bursts": "Meilleure de la rafale",
@@ -1805,10 +1809,11 @@
       "hide_details": "Affiche les photos seules, sans les informations sous chaque photo",
       "fast_scrolling": "N’affiche que les lignes proches de l’écran, pour un défilement fluide des grandes galeries. Désactivez-le si la mise en page se dérègle.",
       "card_buttons": "Choisissez les boutons qu’une vignette affiche au survol, et leur ordre",
-      "photo_details": "Où apparaissent les détails d'une photo : dans une carte à côté de la photo, dans le panneau latéral au bord de la galerie, ou nulle part",
-      "open_with": "Ce qui ouvre les détails d'une photo : pointer la photo (Survol), cliquer dessus (Clic), ou l'un ou l'autre (Survol ou clic). S'applique à la carte comme au panneau latéral.",
+      "photo_details": "Où s'affichent les détails d'une photo : dans le panneau latéral, dans une carte à côté de la photo, ou nulle part.",
+      "details_mode": "Un clic ouvre les détails ; avec Survol ils suivent ensuite le pointeur, avec Clic ils ne changent qu'au clic suivant.",
       "tile_fit": "Recadre les vignettes en carré, ou montre chaque photo dans son ratio d’origine",
-      "reset_display": "Rétablit la disposition, la taille des vignettes et les détails des photos par défaut. Les filtres, le tri et la sélection restent inchangés."
+      "reset_display": "Rétablit la disposition, la taille des vignettes et les détails des photos par défaut. Les filtres, le tri et la sélection restent inchangés.",
+      "phone_panel": "Sur un téléphone, les panneaux s'ouvrent en feuille depuis le bas, ou sur le côté comme sur un écran plus large."
     },
     "rail": {
       "label": "Panneaux de la galerie",

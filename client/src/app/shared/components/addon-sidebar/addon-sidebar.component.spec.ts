@@ -2,6 +2,7 @@ import { signal } from '@angular/core';
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { NavigationEnd, Router } from '@angular/router';
 import { Subject } from 'rxjs';
+import { PanelLayoutService } from '../../../core/services/panel-layout.service';
 import { AddonSidebarComponent } from './addon-sidebar.component';
 import { AnnotationViewService } from '../../../core/addons/annotation-view.service';
 import { AddonPanelService, type OpenPanel } from '../../../core/addons/addon-panel.service';
@@ -46,14 +47,20 @@ describe('add-on sidebar host', () => {
 
   function frame(): HTMLIFrameElement { return root.querySelector('iframe')!; }
 
-  it('hides the dock at lg and up while a page shows its own panel there, keeping the frame mounted', () => {
+  it('hides the dock where the panels sit at the side while a page shows its own panel there, keeping the frame mounted', () => {
+    const layout = TestBed.inject(PanelLayoutService);
+    layout.setWide(true);
     const first = frame();
     dockHidden.set(true); fixture.detectChanges();
-    expect(root.classList).toContain('lg:!hidden');
+    expect(root.classList).toContain('!hidden');
     expect(frame()).toBe(first);
     dockHidden.set(false); fixture.detectChanges();
-    expect(root.classList).not.toContain('lg:!hidden');
+    expect(root.classList).not.toContain('!hidden');
     expect(frame()).toBe(first);
+    // A phone's bottom sheet: the add-on keeps its own drawer, whatever a page's rail picked.
+    layout.setWide(false);
+    dockHidden.set(true); fixture.detectChanges();
+    expect(root.classList).not.toContain('!hidden');
   });
   it('is a drawer over the page below sm, not a column that squeezes it (#391)', () => {
     for (const cls of ['max-sm:absolute', 'max-sm:inset-y-0', 'max-sm:right-0', 'max-sm:!w-[calc(100vw-3rem)]', 'max-sm:!max-w-none']) {
