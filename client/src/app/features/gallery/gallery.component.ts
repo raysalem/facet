@@ -58,7 +58,7 @@ import { ComparisonSessionService } from './comparison-session.service';
 import { GalleryStore, HiddenFilterFlags, REVIEW_RESUME_NAVIGATION } from './gallery.store';
 import { NoticeDismissals, NoticeKind, readNoticeDismissals, saveNoticeDismissals, withDismissal } from './notice-dismiss.util';
 import { Photo } from '../../shared/models/photo.model';
-import { isImeOrRepeat, isPageShortcutBlocked, isShortcutContextBlocked, isTypingContext } from '../../shared/utils/keyboard';
+import { isEditableTarget, isImeOrRepeat, isPageShortcutBlocked, isShortcutContextBlocked, isTypingContext } from '../../shared/utils/keyboard';
 import { KeyboardMappingService } from '../../core/services/keyboard-mapping.service';
 import { GALLERY_REVISIT, PHOTO_PATH } from '../../core/gallery-reuse.strategy';
 import { SequenceKindIconPipe } from '../../shared/pipes/sequence-kind.pipe';
@@ -98,6 +98,9 @@ import { I18N, i18nKeys } from '../../core/i18n/keys';
 import { PageHelpService } from '../../core/services/page-help.service';
 import { MAX_COMPARE_QUEUE } from './comparison-slots.util';
 import { HistogramMode, isHistogramMode } from '../../shared/utils/histogram';
+
+/** Keys that scroll the grid: a scroll right after one is the user's own. */
+const SCROLL_KEYS = new Set(['PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown', ' ']);
 
 /** localStorage key of the photo the gallery's details panel showed last. */
 const PANEL_PHOTO_KEY = 'facet_gallery_details_photo';
@@ -1127,7 +1130,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
         [x]="tooltipX()"
         [y]="tooltipY()"
         [flipped]="tooltipFlipped()"
-        [minTop]="tooltipMinTop()"
+        [area]="tooltipArea()"
         [sheet]="phoneSheet()"
         [anchor]="tooltipAnchor()"
         [pinned]="tooltipPinned()"
@@ -1166,6 +1169,7 @@ const SET_KIND_TOGGLE: Record<string, keyof HiddenFilterFlags> = {
     '(document:keydown.meta.a)': 'onSelectAllShortcut($event)',
     '(document:keydown)': 'onGalleryShortcut($event)',
     '(document:pointerdown)': 'onDocumentPointerDown($event)',
+    '(window:resize)': 'onWindowResize()',
   },
 })
 export class GalleryComponent implements OnInit, OnDestroy {
@@ -1405,7 +1409,9 @@ export class GalleryComponent implements OnInit, OnDestroy {
   protected readonly tooltipX = signal(0);
   protected readonly tooltipY = signal(0);
   protected readonly tooltipFlipped = signal(false);
-  protected readonly tooltipMinTop = signal(16);
+  /** The grid's part of the screen, which the floating card stays inside (B55). */
+  protected readonly tooltipArea = signal<{ left: number; top: number; right: number; bottom: number } | null>(null);
+
   /** The box of the photo the floating card belongs to, so the card stays beside it as its content grows. */
   protected readonly tooltipAnchor = signal<{ left: number; top: number; right: number; bottom: number } | null>(null);
 
@@ -3091,25 +3097,77 @@ export class GalleryComponent implements OnInit, OnDestroy {
   private recentClicks: { path: string; at: number; point: { x: number; y: number } | null }[] = [];
   /** When a double click was last opened, so the dblclick that follows it does not open again. */
   private doubleClickHandledAt = -Infinity;
-  private readonly doubleClickCapture = (() => {
-    const listener = (event: MouseEvent) => this.onDoubleClickCapture(event);
-    // Escape closes a floating card wherever the focus is: a card's own buttons stop the key's bubbling.
-    const escape = (event: KeyboardEvent) => this.onCardEscapeCapture(event);
+  /** Where the pointer last really was (a pointer move or press), so a hover can tell a moving pointer from
+   *  a card sliding under a still one. */
+  private lastPointer: { x: number; y: number } | null = null;
+  private readonly documentCapture = (() => {
     const doc = inject(DOCUMENT);
-    doc.addEventListener('click', listener, true);
-    doc.addEventListener('keydown', escape, true);
-    inject(DestroyRef).onDestroy(() => {
-      doc.removeEventListener('click', listener, true);
-      doc.removeEventListener('keydown', escape, true);
-    });
+    const listeners: [string, (event: Event) => void][] = [
+      ['click', event => this.onDoubleClickCapture(event as MouseEvent)],
+      // Escape is decided before anything under the focus sees it: a card's own buttons stop its bubbling,
+      // and a tooltip under the pointer swallows it (Material's overlay keyboard dispatcher, on the body).
+      ['keydown', event => this.onEscapeCapture(event as KeyboardEvent)],
+      ['pointermove', event => this.notePointer(event as PointerEvent)],
+      ['pointerdown', event => this.notePointer(event as PointerEvent)],
+      ['scroll', event => this.onScrollCapture(event)],
+      ['wheel', () => { this.userScrollAt = performance.now(); }],
+      ['touchmove', () => { this.userScrollAt = performance.now(); }],
+    ];
+    for (const [type, listener] of listeners) doc.addEventListener(type, listener, true);
+    inject(DestroyRef).onDestroy(() => { for (const [type, listener] of listeners) doc.removeEventListener(type, listener, true); });
   })();
 
-  private onCardEscapeCapture(event: KeyboardEvent): void {
-    if (event.key !== 'Escape' || this.parked || this.panelMode() || !this.tooltipPhoto()) return;
-    if (isShortcutContextBlocked(event) || (event.target as Element | null)?.closest?.('.cdk-overlay-container')) return;
-    if (this.document.querySelector('.cdk-overlay-container .mat-mdc-menu-panel, .cdk-overlay-container [role="dialog"]')) return;
+  /** When the user last scrolled on purpose (wheel, touch, a scroll key). */
+  private userScrollAt = -Infinity;
+
+  private notePointer(event: PointerEvent): void {
+    this.lastPointer = { x: event.clientX, y: event.clientY };
+  }
+
+  /** A hover that is not the pointer moving: a card slid under a still pointer (the grid scrolled to clear the
+   *  selection bar, or reflowed when a panel opened). It must never retarget the details (B55). */
+  private hoverWithoutMove(event: MouseEvent): boolean {
+    const last = this.lastPointer;
+    // Within a pixel: a pointer event's coordinates are fractional, a mouse event's are whole pixels.
+    return event?.type === 'mouseenter' && !!last && Math.abs(event.clientX - last.x) < 1 && Math.abs(event.clientY - last.y) < 1;
+  }
+
+  /** The grid scrolling takes a click-pinned floating card's photo away from it: the card closes (B55). */
+  private onScrollCapture(event: Event): void {
+    if (this.panelMode() || this.phoneSheet() || !this.tooltipPhoto()) return;
+    if ((event.target as Element | null)?.closest?.('app-photo-tooltip')) return;
+    // A scroll the user makes (wheel, touch, scroll keys) closes it. Any other scroll moves it with its photo:
+    // the one its pinning click starts (a bottom-row photo scrolled clear of the selection bar), or the
+    // grid keeping its place through a window resize.
+    if (performance.now() - this.userScrollAt > 600) {
+      requestAnimationFrame(() => this.replaceCard());
+      return;
+    }
     this.pinnedTooltipPath.set(null);
     this.tooltipPhoto.set(null);
+  }
+
+  /**
+   * Escape anywhere on the page, outside a field, a menu, a dialog or the phone's filter drawer: a floating
+   * details card closes, else the open side panel hides to the rail (B54). Seen in the capture phase, so a
+   * tooltip under the pointer (Show panel's, just clicked) cannot take the first press (B55).
+   */
+  private onEscapeCapture(event: KeyboardEvent): void {
+    if (SCROLL_KEYS.has(event.key) && !isEditableTarget(event.target)) this.userScrollAt = performance.now();
+    if (event.key !== 'Escape' || this.parked || this.store.slideshowActive() || event.defaultPrevented) return;
+    if (isEditableTarget(event.target) || isShortcutContextBlocked(event) || this.overDrawerOpen()) return;
+    if ((event.target as Element | null)?.closest?.('.cdk-overlay-container')) return;
+    if (this.document.querySelector('.cdk-overlay-container .mat-mdc-menu-panel, .cdk-overlay-container [role="dialog"]')) return;
+    if (!this.panelMode() && this.tooltipPhoto()) {
+      this.pinnedTooltipPath.set(null);
+      this.tooltipPhoto.set(null);
+      return;
+    }
+    const tab = this.rail.tab();
+    if (this.sidePanels() && tab !== null && !tab.startsWith('addon:')) {
+      event.preventDefault();
+      this.hidePanels(false);
+    }
   }
 
   /** The photo clicks a click at `point` ends: back from the latest, each within the double-click time of the
@@ -3257,7 +3315,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
 
   showTooltip(event: MouseEvent, photo: Photo): void {
     const place = this.detailsPlace();
-    if (place === 'off') return;
+    if (place === 'off' || this.hoverWithoutMove(event)) return;
     // The rail is parked, so none of the placement maths below applies to it.
     // Only while it is actually shown, though: with the mode selected on a
     // viewport too narrow for the rail, skipping the maths left the floating
@@ -3304,7 +3362,6 @@ export class GalleryComponent implements OnInit, OnDestroy {
     const padding = 16;
     const isLandscape = aspectOf(photo) > 1;
     const vh = window.innerHeight;
-    const vw = window.innerWidth;
 
     const thumbImg = (card.querySelector('img') as HTMLImageElement | null);
     const thumbAspect = (thumbImg?.naturalWidth && thumbImg.naturalHeight)
@@ -3329,35 +3386,72 @@ export class GalleryComponent implements OnInit, OnDestroy {
     }
 
     // Beside the photo, never over it (a click-pinned card hid the very photo a second click closes it on),
-    // and never above the gallery's toolbar: the card once sat from y 16 over the nav bar and the toolbar,
-    // taking the clicks meant for Filters (B54).
-    const minTop = this.cardMinTop();
-    this.tooltipMinTop.set(minTop);
+    // and inside the grid's part of the screen: never over the nav bar or the toolbar (B54), the rail or a
+    // side panel, or the selection bar (B55).
+    const area = this.cardArea();
+    this.tooltipArea.set(area);
     this.tooltipAnchor.set({ left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom });
-    const placeAt = (width: number, height: number) => placeCard(rect, width, height, { width: vw, height: vh }, minTop, padding);
-    const first = placeAt(tooltipWidth, tooltipHeight);
+    const first = placeCard(rect, tooltipWidth, tooltipHeight, area, padding);
     this.tooltipFlipped.set(first.flipped);
     this.tooltipX.set(first.x);
     this.tooltipY.set(first.y);
     this.tooltipPhoto.set(photo);
-
-    setTimeout(() => {
-      if (this.tooltipPhoto() !== photo) return;
-      const el = document.querySelector('app-photo-tooltip:not([docked]) > div') as HTMLElement | null;
-      if (!el) return;
-      const { width: actualWidth, height: actualHeight } = el.getBoundingClientRect();
-      const actual = placeAt(actualWidth, actualHeight);
-      if (Math.abs(actual.x - this.tooltipX()) > 1) this.tooltipX.set(actual.x);
-      if (actual.flipped !== this.tooltipFlipped()) this.tooltipFlipped.set(actual.flipped);
-      if (Math.abs(actual.y - this.tooltipY()) > 1) this.tooltipY.set(actual.y);
-    }, 0);
+    // The click that pinned it may raise the selection bar or scroll the grid: place it again once drawn.
+    requestAnimationFrame(() => this.replaceCard());
   }
 
-  /** The floating card's highest top edge: just under the gallery's sticky toolbar. */
-  private cardMinTop(): number {
+  /** The part of the screen the floating card may use: the grid area, below the sticky toolbar and above the
+   *  selection bar while it is up. */
+  private cardArea(): { left: number; top: number; right: number; bottom: number } {
+    const host = this.noticeHost()?.nativeElement.getBoundingClientRect();
     const header = this.collectionHeader()?.nativeElement.getBoundingClientRect();
-    return Math.round((header?.bottom ?? 0) + 8);
+    const bar = this.selectionBar()?.nativeElement.getBoundingClientRect();
+    // The notice stack floats over the grid's lower right; the card keeps clear of it too.
+    let bottom = window.innerHeight;
+    if (bar && bar.height) bottom = Math.min(bottom, bar.top - 8);
+    // The visible notice cards and pill (not their stack's box, which can span the whole height).
+    const notices = [...(this.noticeHost()?.nativeElement.querySelectorAll<HTMLElement>('[data-gallery-notices] > *') ?? [])]
+      .map(notice => notice.getBoundingClientRect()).filter(rect => rect.height > 0 && rect.width > 0);
+    if (notices.length) bottom = Math.min(bottom, Math.min(...notices.map(rect => rect.top)) - 8);
+    return {
+      left: host ? Math.max(0, host.left) : 0,
+      right: host && host.width ? Math.min(window.innerWidth, host.right) : window.innerWidth,
+      top: Math.round((header?.bottom ?? 8) + 8),
+      bottom,
+    };
   }
+
+  /** Place the floating card again beside its photo, inside the grid area as it is now: after a window resize,
+   *  a panel opening or closing, the selection bar rising, or the scroll a click starts. It closes when its
+   *  photo is no longer on screen (B55). */
+  private replaceCard(): void {
+    const photo = this.tooltipPhoto();
+    if (!photo || this.panelMode() || this.phoneSheet() || this.parked) return;
+    const index = this.store.photos().findIndex(candidate => candidate.path === photo.path);
+    const card = index < 0 ? null : this.document.querySelector(`[data-pidx="${index}"]`);
+    const rect = card?.getBoundingClientRect();
+    const area = this.cardArea();
+    // Gone only when the photo itself left the screen (under the toolbar or past the bottom edge); a photo
+    // behind the selection bar or a notice is still there, and the card goes above it.
+    if (!rect || !rect.width || rect.bottom <= area.top || rect.top >= window.innerHeight) {
+      this.pinnedTooltipPath.set(null);
+      this.tooltipPhoto.set(null);
+      return;
+    }
+    this.tooltipArea.set(area);
+    this.tooltipAnchor.set({ left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom });
+  }
+
+  protected onWindowResize(): void {
+    if (this.tooltipPhoto() && !this.panelMode()) requestAnimationFrame(() => this.replaceCard());
+  }
+
+  /** The grid area changes width (a window resize, the rail's panel opening or closing): the card follows. */
+  private readonly cardFollowsLayout = effect(() => {
+    this.containerWidth();
+    this.rail.tab();
+    untracked(() => { if (this.tooltipPhoto() && !this.panelMode()) requestAnimationFrame(() => this.replaceCard()); });
+  });
 
   hideTooltip(): void {
     // A docked rail keeps the last photo on mouse-out. Blanking it every time
@@ -3431,10 +3525,6 @@ export class GalleryComponent implements OnInit, OnDestroy {
    *  query below cannot see it. */
   protected onGalleryShortcut(event: KeyboardEvent): void {
     if (this.parked || this.store.slideshowActive() || event.defaultPrevented) return;
-    if (event.key === 'Escape') {
-      this.onPageEscape(event);
-      return;
-    }
     // Either Cmd or Ctrl, like select-all; never both.
     const quickChord = event.key.toLowerCase() === 's' && event.shiftKey && !event.altKey && event.ctrlKey !== event.metaKey;
     if (quickChord && !isImeOrRepeat(event) && !isShortcutContextBlocked(event) && this.canOpenStackFlow()) {
@@ -3462,28 +3552,6 @@ export class GalleryComponent implements OnInit, OnDestroy {
     if (this.keymap.matches(event, 'swapLayout')) {
       event.preventDefault();
       this.store.setGalleryMode(nextGalleryMode(this.effectiveGalleryMode()));
-    }
-  }
-
-  /**
-   * Escape anywhere on the page, outside a text field, a menu, a dialog or the phone's filter drawer: a
-   * floating details card closes (pinned or not), else the open side panel hides to the rail (B54).
-   * The grid's and the panels' own Escape handling runs first and marks what it handled.
-   */
-  private onPageEscape(event: KeyboardEvent): void {
-    if (isShortcutContextBlocked(event) || this.overDrawerOpen()) return;
-    if ((event.target as Element | null)?.closest?.('.cdk-overlay-container')) return;
-    if (this.document.querySelector('.cdk-overlay-container .mat-mdc-menu-panel, .cdk-overlay-container [role="dialog"]')) return;
-    if (!this.panelMode() && this.tooltipPhoto()) {
-      event.preventDefault();
-      this.pinnedTooltipPath.set(null);
-      this.tooltipPhoto.set(null);
-      return;
-    }
-    const tab = this.rail.tab();
-    if (this.sidePanels() && tab !== null && !tab.startsWith('addon:')) {
-      event.preventDefault();
-      this.hidePanels(false);
     }
   }
 
@@ -3767,6 +3835,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
    *  Escape (close every panel) leaves an open add-on alone; propagation is left alone so an open tooltip's
    *  overlay handler still closes. Focus moves back to the gallery rather than dropping to the body. */
   protected onRailEscape(event: Event): void {
+    if (isEditableTarget(event.target)) return;
     event.preventDefault();
     const index = this.railPhotoIndex();
     this.escapeSelection();

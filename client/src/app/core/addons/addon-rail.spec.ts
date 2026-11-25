@@ -53,6 +53,19 @@ describe('AddonRail', () => {
     expect(rail.tab()).toBe('a');
   });
 
+  it('Escape in a field only leaves the field; it never closes the panel (B55)', () => {
+    const rail = TestBed.runInInjectionContext(() => new AddonRail<'a'>({ storageKey: KEY, tabs: ['a'], defaultTab: null }));
+    rail.select('a'); TestBed.tick();
+    const field = document.body.appendChild(document.createElement('input'));
+    field.focus();
+    const event = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true });
+    Object.defineProperty(event, 'target', { value: field });
+    expect(rail.escape(event)).toBe(false);
+    expect(rail.tab()).toBe('a');
+    expect(document.activeElement).not.toBe(field);
+    field.remove();
+  });
+
   it('remembers the panel last shown across a reload, so Show panel after one brings it back (B54)', () => {
     const make = () => TestBed.runInInjectionContext(() => new AddonRail<'a' | 'b'>({ storageKey: KEY, tabs: ['a', 'b'], defaultTab: null }));
     const rail = make();

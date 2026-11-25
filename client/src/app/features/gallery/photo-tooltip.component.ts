@@ -72,12 +72,12 @@ const KEY_SCORES = [
            that way). Docking overrides it through style bindings instead. -->
       <div #root
         class="fixed z-[1000] pointer-events-none flex flex-col p-3 rounded shadow-lg"
-        [style.max-height]="docked() ? null : sheet() ? '60dvh' : 'calc(100vh - ' + (minTop() + 16) + 'px)'"
+        [style.max-height]="docked() ? null : sheet() ? '60dvh' : (placement()?.maxHeight ?? bounds().bottom - bounds().top - 16) + 'px'"
         [class.overflow-y-auto]="!docked()"
         [style.position]="docked() ? 'static' : null"
         [style.pointer-events]="showInteractiveControls() ? 'auto' : null"
         [style.width]="docked() || sheet() ? '100%' : null"
-        [style.max-width]="docked() ? null : sheet() ? 'none' : 'min(640px, calc(100vw - 2rem))'"
+        [style.max-width]="docked() ? null : sheet() ? 'none' : 'min(640px, ' + (bounds().right - bounds().left - 32) + 'px)'"
         [style.padding]="docked() ? '16px' : null"
         [style.background]="docked() ? 'transparent' : 'var(--facet-tooltip-bg)'"
         [style.border]="docked() ? 'none' : '1px solid var(--facet-tooltip-border)'"
@@ -416,8 +416,11 @@ export class PhotoTooltipComponent {
   readonly sheet = input(false);
   /** The photo the floating card belongs to (its box on screen), so the card can stay beside it. */
   readonly anchor = input<PlacementBox | null>(null);
-  /** The floating card's highest top edge (the gallery passes the bottom of its toolbar). */
-  readonly minTop = input(16);
+  /** The part of the screen the floating card may use (the gallery passes its grid area: below the toolbar,
+   *  left of the rail and any side panel, above the selection bar); the whole window, less 16 px, otherwise. */
+  readonly area = input<PlacementBox | null>(null);
+  protected readonly bounds = computed<PlacementBox>(() =>
+    this.area() ?? { left: 0, top: 16, right: this.viewport().width, bottom: this.viewport().height });
   /**
    * Render docked in a column instead of floating at (x, y).
    *
@@ -519,12 +522,12 @@ export class PhotoTooltipComponent {
   private readonly viewport = signal({ width: window.innerWidth, height: window.innerHeight });
 
   /** Where the card goes once its real size is known: beside its photo (`anchor`), never over it, never above
-   *  `minTop`. Content that arrives late (the image, the set, the histogram) grows the card, and a plain clamp
+   *  the area it may use. Content that arrives late (the image, the set, the histogram) grows the card, and a plain clamp
    *  to the viewport then slid it over its own photo, so the click that closes it could not reach the photo. */
-  private readonly placement = computed(() => {
+  protected readonly placement = computed(() => {
     const anchor = this.anchor();
     const { width, height } = this.measured();
-    return anchor && width && !this.docked() && !this.sheet() ? placeCard(anchor, width, height, this.viewport(), this.minTop()) : null;
+    return anchor && width && !this.docked() && !this.sheet() ? placeCard(anchor, width, height, this.bounds()) : null;
   });
 
   /** Top edge kept inside the viewport (16px margin) once the height is known. */
@@ -534,7 +537,8 @@ export class PhotoTooltipComponent {
     const y = this.y();
     const h = this.measured().height;
     if (!h) return y;
-    return Math.max(this.minTop(), Math.min(y, this.viewport().height - h - 16));
+    const { top, bottom } = this.bounds();
+    return Math.max(top, Math.min(y, bottom - h - 16));
   });
 
   /** Left edge kept inside the viewport (16px margin) once the width is known. */
@@ -544,7 +548,8 @@ export class PhotoTooltipComponent {
     const x = this.x();
     const w = this.measured().width;
     if (!w) return x;
-    return Math.max(16, Math.min(x, this.viewport().width - w - 16));
+    const { left, right } = this.bounds();
+    return Math.max(left + 16, Math.min(x, right - w - 16));
   });
 
   constructor() {

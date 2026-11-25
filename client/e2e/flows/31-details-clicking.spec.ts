@@ -106,6 +106,9 @@ test('the side panel always shows the photo just clicked, whatever was clicked o
 
   await test.step('2. With Showing open (Filters), a click shows the details in its place, also after a reload', async () => {
     await page.keyboard.press('Escape');
+    // Escape hides the panel; the toolbar widens with the grid, so let it settle before aiming at Filters.
+    await expect(detailsPanel(page)).toHaveCount(0);
+    await page.waitForTimeout(400);
     await hand(page, page.getByRole('button', { name: 'Filters', exact: true }));
     await expect(showingPanel(page)).toBeVisible();
     // A hover crossing the grid never takes Showing over.
@@ -296,6 +299,114 @@ test.describe('hand clicks on a moving gallery (B54)', () => {
         expect(card.y, 'below the toolbar').toBeGreaterThanOrEqual(headerBottom);
       }
     });
+  });
+});
+
+// B55 fixed scenarios: each fails without its fix.
+test.describe('round 3 (B55)', () => {
+  /** The photos on screen now, with the part of each that shows (the bottom row is cut by the window's edge). */
+  const onScreen = (page: Page) => page.getByRole('gridcell').evaluateAll(all => all.map(cell => {
+    const button = cell.querySelector('[role=button]')!; const r = button.getBoundingClientRect();
+    const shown = Math.min(r.bottom, innerHeight - 70) - r.y;
+    return { name: button.getAttribute('aria-label')!.split(',')[0], x: r.x + r.width / 2, y: r.y + Math.max(8, Math.min(r.height / 2, shown / 2)), top: r.y, bottom: r.bottom };
+  }).filter(cell => cell.top > 115 && cell.top < innerHeight - 70));
+  const pressAt = async (page: Page, x: number, y: number) => {
+    await page.mouse.move(x, y, { steps: 12 });
+    await page.mouse.down();
+    await page.mouse.up();
+  };
+
+  test('R1: in Hover mode a click holds the panel on its photo while the grid scrolls under the still pointer', async ({ page }) => {
+    await freshGallery(page, 1180, undefined, 880);
+    await hand(page, photoButton(page, 'IMG_0300.jpg'));
+    await expectPanelHolds(page, 'IMG_0300.jpg', 'panel open');
+    const cells = await onScreen(page);
+    const lowest = Math.max(...cells.map(cell => cell.top));
+    const target = cells.filter(cell => cell.top === lowest)[1];
+    // First visit selects it; the grid scrolls it clear of the selection bar.
+    await pressAt(page, target.x, target.y);
+    await expectPanelHolds(page, target.name, 'first visit');
+    const moved = (await photoButton(page, target.name).boundingBox())!.y - target.top;
+    const other = (await onScreen(page)).find(cell => cell.name !== target.name)!;
+    await pressAt(page, other.x, other.y);
+    await page.mouse.wheel(0, moved);
+    await page.waitForTimeout(800);
+    const again = (await onScreen(page)).find(cell => cell.name === target.name)!;
+    // The second click deselects it and scrolls the grid again; the photo sliding under the still pointer
+    // must not take the panel over.
+    await pressAt(page, again.x, again.y);
+    await page.waitForTimeout(900);
+    await expectPanelHolds(page, target.name, 'clicked again (deselected), grid scrolled under the pointer');
+  });
+
+  test('R3: Escape in the filter box of the Showing panel leaves the box, not the panel', async ({ page }) => {
+    await freshGallery(page, 1180, undefined, 880);
+    await hand(page, showingTab(page));
+    const box = showingPanel(page).getByPlaceholder(/Find a filter/);
+    await hand(page, box);
+    await page.keyboard.type('per');
+    await page.keyboard.press('Escape');
+    await expect(showingPanel(page)).toBeVisible();
+    await expect(box).not.toBeFocused();
+    // A second Escape, outside the field, hides the panel as everywhere.
+    await page.keyboard.press('Escape');
+    await expect(showingPanel(page)).toBeHidden();
+  });
+
+  test('C2: a pinned card is placed again when the window narrows, and stays in the grid area', async ({ page }) => {
+    await freshGallery(page, 1180, 'details_place=card&details_trigger=click', 880);
+    const top = (await onScreen(page)).filter(cell => cell.top < 300).at(-1)!;
+    await pressAt(page, top.x, top.y);
+    await expect(floatingCard(page)).toBeVisible();
+    await page.mouse.move(5, 870, { steps: 4 });
+    await page.setViewportSize({ width: 800, height: 880 });
+    await expect.poll(async () => {
+      const card = (await floatingCard(page).boundingBox())!;
+      const grid = (await page.locator('[data-photo-collection], [role="grid"]').first().boundingBox())!;
+      return card.x >= 0 && card.x + card.width <= Math.min(800, grid.x + grid.width) + 1;
+    }, { message: 'the card inside the window and the grid area' }).toBe(true);
+    const card = (await floatingCard(page).boundingBox())!;
+    const photo = (await photoButton(page, top.name).boundingBox())!;
+    const overlaps = card.x < photo.x + photo.width && card.x + card.width > photo.x && card.y < photo.y + photo.height && card.y + card.height > photo.y;
+    expect(overlaps, 'the card covers its own photo').toBe(false);
+  });
+
+  test('K1: ten keyboard hide/show pairs in a row, on the gallery and on the photo page', async ({ page }) => {
+    await freshGallery(page, 1180, undefined, 880);
+    await hand(page, photoButton(page, 'IMG_0300.jpg'));
+    await expectPanelHolds(page, 'IMG_0300.jpg', 'panel open');
+    await hidePanel(page).focus();
+    for (let pair = 1; pair <= 10; pair++) {
+      await page.keyboard.press('Enter');
+      await expect(detailsPanel(page), `pair ${pair}: hidden`).toHaveCount(0);
+      await expect(showPanel(page), `pair ${pair}: focus on Show panel`).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expectPanelHolds(page, 'IMG_0300.jpg', `pair ${pair}: back`);
+      await expect(hidePanel(page), `pair ${pair}: focus on Hide panel`).toBeFocused();
+    }
+    await page.goto(photoUrl('review', 'IMG_0300.jpg'));
+    const inspector = page.locator('[data-photo-inspector]');
+    await expect(inspector).toBeVisible();
+    await hidePanel(page).focus();
+    for (let pair = 1; pair <= 10; pair++) {
+      await page.keyboard.press('Enter');
+      await expect(inspector, `photo page pair ${pair}: hidden`).toBeHidden();
+      await expect(showPanel(page)).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(inspector, `photo page pair ${pair}: back`).toBeVisible();
+      await expect(hidePanel(page)).toBeFocused();
+    }
+  });
+
+  test('E2: one Escape after a click on Show panel hides the panel, with its tooltip up', async ({ page }) => {
+    await freshGallery(page, 1180, undefined, 880);
+    await hand(page, photoButton(page, 'IMG_0300.jpg'));
+    await hand(page, hidePanel(page));
+    await hand(page, showPanel(page));
+    await expectPanelHolds(page, 'IMG_0300.jpg', 'back');
+    await page.waitForTimeout(400);
+    await page.keyboard.press('Escape');
+    await expect(detailsPanel(page)).toHaveCount(0);
   });
 });
 

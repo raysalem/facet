@@ -3171,8 +3171,23 @@ describe('GalleryComponent', () => {
         field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
         expect(component.detailsRailVisible()).toBe(true);
         field.remove();
-        component['onGalleryShortcut'](new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+        const plain = document.createElement('div');
+        document.body.appendChild(plain);
+        plain.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
         expect(component.detailsRailVisible()).toBe(false);
+        plain.remove();
+      });
+
+      it('a photo sliding under a still pointer never retargets the panel; a moving pointer does (B55)', () => {
+        const [a, b] = [makePhoto({ path: '/a.jpg' }), makePhoto({ path: '/b.jpg' })];
+        mockStore.photos.set([a, b]); TestBed.tick();
+        component.showTooltip(pickEvent, a);
+        component['notePointer']({ clientX: 300.4, clientY: 500.6 } as PointerEvent);
+        // The grid scrolled: b slid under the pointer, which did not move (a mouse event's whole pixels).
+        component.showTooltip({ type: 'mouseenter', clientX: 300, clientY: 501, currentTarget: null } as unknown as MouseEvent, b);
+        expect(component['tooltipPhoto']()?.path).toBe('/a.jpg');
+        component.showTooltip({ type: 'mouseenter', clientX: 340, clientY: 501, currentTarget: null } as unknown as MouseEvent, b);
+        expect(component['tooltipPhoto']()?.path).toBe('/b.jpg');
       });
 
       it('a click never replaces an add-on panel the user opened', () => {

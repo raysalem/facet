@@ -4,6 +4,15 @@
  * page-level shortcuts must not fire. Shared by the gallery, photo page and
  * darkroom so they gate keyboard shortcuts the same way.
  */
+/**
+ * True when the target is a field the user types or edits in: any input, textarea, select or contenteditable,
+ * wherever it sits. Escape there belongs to the field (it leaves it); it must never hide the panel around it.
+ */
+export function isEditableTarget(target: EventTarget | null): boolean {
+  const element = target as HTMLElement | null;
+  return !!element && (['INPUT', 'TEXTAREA', 'SELECT'].includes(element.tagName) || !!element.isContentEditable);
+}
+
 export function isTypingContext(event: Event): boolean {
   const target = event.target as HTMLElement | null;
   if (!target) return false;

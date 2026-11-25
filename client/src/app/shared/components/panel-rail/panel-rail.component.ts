@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Injector, afterNextRender, computed, inject, input } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import type { AddonRail } from '../../../core/addons/addon-rail';
@@ -94,8 +94,15 @@ export class PanelRailComponent {
   /** The one Tab stop: the picked tab, or the first one while no panel is open. */
   protected readonly tabStop = computed(() => this.selectedPage() ?? this.tabs()[0]?.id ?? null);
 
-  /** Show panel: the panel last on screen, if this rail still offers it, else the first. */
+  private readonly injector = inject(Injector);
+
+  /** Show panel: the panel last on screen, if this rail still offers it, else the first. The focus goes to the
+   *  opened panel's Hide panel (the mirror of Hide panel putting it here), so Enter, Enter, ... toggles it (B55). */
   protected reopen(): void {
     this.rail().reopen(this.tabs().map(tab => tab.id));
+    afterNextRender(() => {
+      const hide = [...document.querySelectorAll<HTMLElement>('[data-collapse-panel]')].find(button => button.offsetParent !== null);
+      hide?.focus();
+    }, { injector: this.injector });
   }
 }

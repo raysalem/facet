@@ -2,6 +2,7 @@ import { DestroyRef, Injector, computed, effect, inject, signal, untracked } fro
 import { AuthService } from '../services/auth.service';
 import { AddonsService, type Addon, type AddonName } from '../services/addons.service';
 import { AddonPanelService } from './addon-panel.service';
+import { isEditableTarget } from '../../shared/utils/keyboard';
 
 /** An add-on as a rail and the panel service know it. */
 export type RailAddon = Pick<Addon, 'id' | 'name' | 'icon'> & Partial<Pick<Addon, 'mode'>>;
@@ -209,6 +210,13 @@ export class AddonRail<T extends string> {
    */
   escape(event: KeyboardEvent): boolean {
     if (event.key !== 'Escape' || event.defaultPrevented) return false;
+    // Escape in a field (the Showing panel's "Find a filter…" or Search) only leaves the field (B55).
+    if (isEditableTarget(event.target)) {
+      (event.target as HTMLElement).blur();
+      event.preventDefault();
+      event.stopPropagation();
+      return false;
+    }
     event.preventDefault();
     event.stopPropagation();
     this.closeAll();
